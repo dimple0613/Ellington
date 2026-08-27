@@ -21,11 +21,12 @@
 - #1 Task 3 / #2 Task 4 / #3 Task 5 / #4 Task 6 / #5 Task 7 / #6 Task 8 / #7 Task 9 / #8 Task 10
 
 ## In Progress
-- [~] Issue #2 - Data model + Next.js scaffold (ACTIVE)
+- [~] Issue #3 - Inventory screen (unit board + status)
 
 ## Done
 - [x] Task 1 — scaffold (TEAM, OneTask, CEO-Review, README, MILESTONES, ROADMAP, WORKFLOW, AGENTS + docs/)
 - [x] Task 2 — Git repo + remote origin + gh installed/auth + project labels + 8 issues on github.com/dimple0613/Ellington
+- [x] Task 3 — Issue #1/CEO-Review migrated; issue #2 data model + Next.js/TS scaffold done (commit 4542e8e; build + tsc pass; DB seeded with 5 Ellington projects)
 
 ## Blocked
 - (none)
@@ -34,7 +35,7 @@
 - Reference: Archive/UI systems design review/Ellington ERP.dc.html
 - Stack: PostgreSQL + SQL, Next.js, shadcn/ui + Tailwind, Formik + Yup, toast.
 ## Active Assignment (CEO)
-- **Issue #2 — Data model + Next.js scaffold**
-- Assignee: Engineering Lead (hire-2) + Backend/DB Engineer
+- **Issue #3 — Inventory screen (unit board + status)**
+- Assignee: Engineering Lead + Frontend Engineer
 - Reviewer: CEO (approval before close)
-- Reporting: CEO gets status at each milestone (scaffold done / schema done / seed done / build ok)
+- Reporting: CEO gets status at each milestone
