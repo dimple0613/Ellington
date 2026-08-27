@@ -21,7 +21,7 @@
 - #1 Task 3 / #2 Task 4 / #3 Task 5 / #4 Task 6 / #5 Task 7 / #6 Task 8 / #7 Task 9 / #8 Task 10
 
 ## In Progress
-- (none)
+- [~] Issue #2 - Data model + Next.js scaffold (ACTIVE)
 
 ## Done
 - [x] Task 1 — scaffold (TEAM, OneTask, CEO-Review, README, MILESTONES, ROADMAP, WORKFLOW, AGENTS + docs/)
@@ -33,3 +33,8 @@
 ## CEO Notes
 - Reference: Archive/UI systems design review/Ellington ERP.dc.html
 - Stack: PostgreSQL + SQL, Next.js, shadcn/ui + Tailwind, Formik + Yup, toast.
+## Active Assignment (CEO)
+- **Issue #2 — Data model + Next.js scaffold**
+- Assignee: Engineering Lead (hire-2) + Backend/DB Engineer
+- Reviewer: CEO (approval before close)
+- Reporting: CEO gets status at each milestone (scaffold done / schema done / seed done / build ok)
