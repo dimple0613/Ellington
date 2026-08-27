@@ -21,12 +21,13 @@
 - #1 Task 3 / #2 Task 4 / #3 Task 5 / #4 Task 6 / #5 Task 7 / #6 Task 8 / #7 Task 9 / #8 Task 10
 
 ## In Progress
-- [~] Issue #3 - Inventory screen (unit board + status)
+- [~] Issue #4 - Sales: leads kanban + booking wizard
 
 ## Done
 - [x] Task 1 — scaffold (TEAM, OneTask, CEO-Review, README, MILESTONES, ROADMAP, WORKFLOW, AGENTS + docs/)
 - [x] Task 2 — Git repo + remote origin + gh installed/auth + project labels + 8 issues on github.com/dimple0613/Ellington
 - [x] Task 3 — Issue #1/CEO-Review migrated; issue #2 data model + Next.js/TS scaffold done (commit 4542e8e; build + tsc pass; DB seeded with 5 Ellington projects)
+- [x] Task 4 — Issue #3 inventory screen (unit board + status tiles + filters + API) done (build + tsc pass)
 
 ## Blocked
 - (none)
@@ -35,7 +36,7 @@
 - Reference: Archive/UI systems design review/Ellington ERP.dc.html
 - Stack: PostgreSQL + SQL, Next.js, shadcn/ui + Tailwind, Formik + Yup, toast.
 ## Active Assignment (CEO)
-- **Issue #3 — Inventory screen (unit board + status)**
+- **Issue #4 — Sales: leads kanban + booking wizard**
 - Assignee: Engineering Lead + Frontend Engineer
 - Reviewer: CEO (approval before close)
 - Reporting: CEO gets status at each milestone

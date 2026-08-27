@@ -64,3 +64,22 @@ input {
 .needs { border: 1px solid var(--red); }
 .needs .v { color: var(--red); }
 .loading { padding: 40px; text-align: center; color: var(--muted); }
+/* ---- Inventory / Unit board ---- */
+.toolbar { display: flex; gap: 12px; flex-wrap: wrap; margin: 16px 0; align-items: center; }
+.toolbar select, .toolbar input {
+  padding: 9px 12px; border: 1px solid var(--border); border-radius: 11px;
+  font-size: 14px; font-family: inherit; background: #fff; color: var(--text);
+}
+.status-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px,1fr)); gap: 12px; margin-bottom: 18px; }
+.status-tile { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 14px; cursor: pointer; }
+.status-tile.active { border-color: var(--primary); box-shadow: 0 0 0 2px var(--primary-soft); }
+.status-tile .st-n { font-size: 22px; font-weight: 800; }
+.status-tile .st-l { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.board { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px,1fr)); gap: 12px; }
+.unit-card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 14px; }
+.unit-card .u-no { font-weight: 800; font-size: 15px; display: flex; justify-content: space-between; }
+.unit-card .u-proj { font-size: 12px; color: var(--muted); margin: 2px 0 10px; }
+.unit-card .u-meta { font-size: 12px; color: var(--muted); display: flex; justify-content: space-between; margin-bottom: 10px; }
+.unit-card .u-price { font-weight: 700; font-size: 14px; }
+.unit-card .u-buyer { font-size: 12px; color: var(--primary); margin-top: 8px; }
+.dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }

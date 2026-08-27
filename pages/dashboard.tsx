@@ -22,15 +22,16 @@ export default function Dashboard() {
 
   return (
     <div className="dash">
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
         <h1>Portfolio</h1>
-        <button
-          className="btn-primary"
-          style={{ width: "auto", padding: "9px 16px" }}
-          onClick={() => api("/api/auth/logout", { method: "POST" }).then(() => router.push("/login"))}
-        >
-          Sign out
-        </button>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button className="btn-primary" style={{ width: "auto", padding: "9px 16px", background: "var(--text)" }} onClick={() => router.push("/inventory")}>
+            Inventory
+          </button>
+          <button className="btn-primary" style={{ width: "auto", padding: "9px 16px" }} onClick={() => api("/api/auth/logout", { method: "POST" }).then(() => router.push("/login"))}>
+            Sign out
+          </button>
+        </div>
       </div>
 
       <div className="kpi-grid">
