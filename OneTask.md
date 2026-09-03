@@ -6,11 +6,9 @@
 ## Push (current branch + what to push)
 > Branch-per-task rule (see AGENTS.md): never push directly to main. Update this section per task.
 
-- Current task: _none — last task done & merged to `main`_
 - Current branch: `main` (clean)
-- Pending code to push:
-  - AGENTS.md — added mandatory branch-per-task + push-tracking rule
-  - OneTask.md — added this Push section
+- Last task: `chore/branch-per-task-workflow` — AGENTS.md + OneTask.md workflow changes **merged to main** (`bbf1257`)
+- Pending code to push: none
 - Push command: `git add <files>; git commit -m "<msg>"; git push origin <branch>`
 
 ## Today's Focus
