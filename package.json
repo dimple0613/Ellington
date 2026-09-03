@@ -14,28 +14,25 @@
     "pages:deploy": "npx wrangler pages deploy .vercel/output/static"
   },
   "dependencies": {
-    "date-fns": "^4.0.0",
-    "formik": "^2.4.9",
-    "jspdf": "^4.2.1",
-    "jspdf-autotable": "^5.0.8",
-    "next": "^15.1.6",
-    "pg": "^8.23.0",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "yup": "^1.7.1"
+    "date-fns": "4.4.0",
+    "formik": "2.4.9",
+    "jspdf": "4.2.1",
+    "jspdf-autotable": "5.0.8",
+    "next": "15.5.2",
+    "pg": "8.23.0",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "yup": "1.7.1"
   },
   "devDependencies": {
-    "@cloudflare/next-on-pages": "^1.13.16",
-    "@types/node": "^22.10.0",
-    "@types/pg": "^8.23.1",
-    "@types/react": "^19.0.0",
-    "@types/react-dom": "^19.0.0",
-    "dotenv": "^17.4.2",
-    "tsx": "^4.19.2",
-    "typescript": "^5.7.2",
-    "wrangler": "^4.128.0"
-  },
-  "allowScripts": {
-    "esbuild@0.28.2": true
+    "@cloudflare/next-on-pages": "1.13.16",
+    "@types/node": "22.20.1",
+    "@types/pg": "8.23.1",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.7",
+    "dotenv": "17.4.2",
+    "tsx": "4.23.13",
+    "typescript": "5.9.3",
+    "wrangler": "4.128.0"
   }
 }
