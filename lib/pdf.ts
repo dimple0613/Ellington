@@ -725,3 +725,80 @@ export function exportCollectionNotice(
   docFooter(doc, "30-day default notice");
   downloadBlob(doc, "notice-30d-" + buyer.toLowerCase().replace(/[^a-z]+/g, "-") + ".pdf");
 }
+
+export function exportOaData(rows: { unit: string; buyer: string; oqood: string; dld: string; deed: string; issued: string; keys: string; oa: string }[]) {
+  const header = ["Unit", "Owner", "Oqood", "DLD 4%", "Deed", "Issued", "Keys", "Mollak"];
+  const lines = rows.map((r) => [r.unit, r.buyer, r.oqood, r.dld, r.deed, r.issued, r.keys, r.oa].map((c) => '"' + String(c).replace(/"/g, '""') + '"').join(","));
+  const csv = "\uFEFF" + [header.join(","), ...lines].join("\r\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "oa-title-data.csv";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+
+export function exportHandoverCert(unit: string, buyer: string, oqood: string, dld: string) {
+  const doc = docBase("Ellington Holdings \u00b7 Handover certificate");
+  const pageW = doc.internal.pageSize.getWidth();
+
+  let y = 52;
+  doc.setTextColor(20, 22, 31);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(16);
+  doc.text("Handover Certificate", 14, y, { align: "center" });
+  y += 10;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(11);
+  doc.text("THIS IS TO CERTIFY THAT", 14, y, { align: "center" });
+  y += 12;
+  doc.setFont("helvetica", "bolditalic");
+  doc.setFontSize(20);
+  doc.setTextColor(79, 70, 245);
+  doc.text(buyer, 14, y, { align: "center" });
+  y += 12;
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(11);
+  doc.setTextColor(90, 93, 110);
+  const body = doc.splitTextToSize(
+    "having fulfilled all payment and completion obligations under the Sales and Purchase Agreement, is hereby awarded full and vacant possession of the residential unit described below at Wilton Park Residences, and its keys are released to the Owner.",
+    pageW - 40
+  );
+  doc.text(body, 14, y, { align: "center" });
+  y += body.length * 5.6 + 14;
+
+  autoTable(doc, {
+    startY: y,
+    head: [["Field", "Detail"]],
+    body: [
+      ["Unit reference", unit],
+      ["Owner", buyer],
+      ["Oqood reference", oqood],
+      ["DLD 4% registration", dld],
+      ["Keys", "Released to owner"],
+      ["Owners association", "Registered \u00b7 Mollak"],
+      ["Warranty \u00b7 general", "1 year to 04 Aug 2027"],
+      ["Warranty \u00b7 structural", "10 years to 04 Aug 2036"],
+      ["Issue date", "04 Aug 2026"],
+    ],
+    theme: "grid",
+    headStyles: { fillColor: [20, 22, 31], fontSize: 9 },
+    styles: { fontSize: 9, cellPadding: 3 },
+    columnStyles: { 0: { fontStyle: "bold" } },
+    margin: { left: 30, right: 30 },
+  });
+  y = (doc as any).lastAutoTable.finalY + 16;
+
+  line(doc, 30, y, pageW - 60, [237, 238, 243]);
+  y += 8;
+  doc.setFont("helvetica", "italic");
+  doc.setFontSize(9);
+  doc.setTextColor(110, 113, 128);
+  doc.text("Authorised signature \u00b7 Ellington Holdings Development LLC", 14, y, { align: "center" });
+
+  docFooter(doc, "Handover certificate");
+  downloadBlob(doc, "handover-cert-" + unit.toLowerCase() + ".pdf");
+}

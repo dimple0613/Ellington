@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { AC } from "../../lib/format";
+import { exportOaData, exportHandoverCert } from "../../lib/pdf";
 
 type DeedRow = { unit: string; buyer: string; oqood: string; dld: string; deed: string; issued: string; keys: string; oa: string };
 
@@ -31,15 +32,34 @@ const pill = (v: string, map: Record<string, { bg: string; color: string }>) => 
 };
 
 export default function DeedsScreen() {
+  const [notice, setNotice] = useState("");
+  const [certOpen, setCertOpen] = useState(false);
+  const [certUnit, setCertUnit] = useState("WPK-T1-0402");
+
+  const banner = (m: string) => { setNotice(m); setTimeout(() => setNotice(""), 3000); };
+
+  const doExport = () => {
+    exportOaData(ROWS);
+    banner("OA data exported \u00b7 6 rows \u00b7 CSV");
+  };
+
+  const doIssue = () => {
+    const row = ROWS.find((r) => r.unit === certUnit) || ROWS[0];
+    exportHandoverCert(row.unit, row.buyer, row.oqood, row.dld);
+    setCertOpen(false);
+    banner("Certificate issued \u00b7 " + row.unit + " \u00b7 " + row.buyer);
+  };
+
   return (
     <div>
+      {notice && <div style={{ background: "#E9F8F1", color: "#1F9D6B", borderRadius: 12, padding: "11px 16px", fontSize: 12, fontWeight: 700, marginBottom: 16 }}>{notice}</div>}
       <div style={{ display: "flex", alignItems: "flex-end", gap: 16, marginBottom: 18 }}>
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: "-.03em", lineHeight: 1.15 }}>Title deeds &amp; owners association</div>
           <div style={{ fontSize: 13, color: "#6B7180", fontWeight: 500, marginTop: 5 }}>Deed issuance, key release, warranty pack and the Mollak service charge handoff</div>
         </div>
-        <button style={{ height: 38, borderRadius: 12, border: "1px solid #EDEEF3", background: "#fff", padding: "0 14px", fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, color: "#4A5060", cursor: "pointer" }}>Export OA data</button>
-        <button style={{ height: 38, borderRadius: 12, background: AC, color: "#fff", border: 0, padding: "0 16px", fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}>Issue handover certificate</button>
+        <button onClick={doExport} style={{ height: 38, borderRadius: 12, border: "1px solid #EDEEF3", background: "#fff", padding: "0 14px", fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, color: "#4A5060", cursor: "pointer" }}>Export OA data</button>
+        <button onClick={() => setCertOpen(true)} style={{ height: 38, borderRadius: 12, background: AC, color: "#fff", border: 0, padding: "0 16px", fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}>Issue handover certificate</button>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 300px", gap: 16, alignItems: "start" }}>
@@ -81,6 +101,32 @@ export default function DeedsScreen() {
           </div>
         </div>
       </div>
+
+      {certOpen && (
+        <div onMouseDown={() => setCertOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(20,22,31,.42)", display: "grid", placeItems: "center", zIndex: 80, padding: 24 }}>
+          <div onMouseDown={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: 22, padding: "26px 28px", width: "100%", maxWidth: 480, boxShadow: "0 24px 60px rgba(20,22,31,.25)" }}>
+            <div style={{ fontSize: 18, fontWeight: 800, letterSpacing: "-.02em" }}>Issue handover certificate</div>
+            <div style={{ fontSize: 12.5, color: "#6B7180", fontWeight: 500, marginTop: 4, lineHeight: 1.5 }}>Select a unit to issue the owner's handover certificate, key release record and warranty pack.</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 14, marginTop: 20 }}>
+              <div>
+                <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".05em", color: "#9AA0AE", textTransform: "uppercase", marginBottom: 6 }}>Unit</div>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  {ROWS.map((r) => (
+                    <span key={r.unit} onClick={() => setCertUnit(r.unit)} style={{ fontSize: 11.5, fontWeight: 700, padding: "7px 12px", borderRadius: 10, cursor: "pointer", fontFamily: "monospace", background: certUnit === r.unit ? AC : "#F1F2F6", color: certUnit === r.unit ? "#fff" : "#4A5060" }}>{r.unit}</span>
+                  ))}
+                </div>
+              </div>
+              <div style={{ background: "#FAFBFD", borderRadius: 12, padding: "12px 14px", fontSize: 11.5, color: "#4A5060", fontWeight: 600, lineHeight: 1.6 }}>
+                {(ROWS.find((r) => r.unit === certUnit) || ROWS[0]).buyer}
+              </div>
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 22 }}>
+              <button onClick={() => setCertOpen(false)} style={{ height: 38, borderRadius: 12, border: "1px solid #EDEEF3", background: "#fff", padding: "0 16px", fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, color: "#4A5060", cursor: "pointer" }}>Cancel</button>
+              <button onClick={doIssue} style={{ height: 38, borderRadius: 12, background: AC, color: "#fff", border: 0, padding: "0 20px", fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}>Issue certificate</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
