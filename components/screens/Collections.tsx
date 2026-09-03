@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useRouter } from "next/router";
 import { AC } from "../../lib/format";
+import { exportCollectionNotice } from "../../lib/pdf";
 
 type CollRow = { buyer: string; unit: string; amount: string; days: number; stage: string; action: string };
 type StageMap = Record<string, { bg: string; color: string }>;
@@ -18,6 +19,7 @@ export default function CollectionsScreen() {
   const [sel, setSel] = useState(0);
   const [notice, setNotice] = useState("");
   const [logEntry, setLogEntry] = useState<string | null>(null);
+  const [ladderOpen, setLadderOpen] = useState(false);
 
   const buckets = [
     { label: "Current", value: "AED 439.6M", note: "428 buyers", idx: 0 },
@@ -52,9 +54,22 @@ export default function CollectionsScreen() {
     ["Refund payable", "AED 206,000", 800 as const],
   ];
 
+  const ladder: { stage: string; trigger: string; action: string; count: number; color: string }[] = [
+    { stage: "Upcoming", trigger: "14\u201330 days before due", action: "Auto-reminder \u00b7 email + SMS", count: 1, color: "#6B7180" },
+    { stage: "Reminder 1", trigger: "0\u201330 days overdue", action: "Email + SMS \u00b7 soft reminder", count: 3, color: "#B07B14" },
+    { stage: "Reminder 2", trigger: "31\u201360 days overdue", action: "Promise-to-pay + cheque follow-up", count: 2, color: "#B07B14" },
+    { stage: "30-day notice", trigger: "61\u201390 days overdue", action: "Formal notice \u00b7 legal review", count: 1, color: "#E5484D" },
+    { stage: "Final notice", trigger: "90+ days overdue", action: "Cancellation + retention per Law 19", count: 1, color: "#E5484D" },
+  ];
+
   const remind = (buyer: string) => { setNotice("Reminder queued for " + buyer + " \u00b7 email + SMS"); setTimeout(() => setNotice(""), 3000); };
   const logCall = (buyer: string) => { setLogEntry(buyer); setTimeout(() => setLogEntry(null), 3000); };
   const escalate = (row: CollRow) => { router.push({ pathname: "/finance", query: { s: "escrow" } }, undefined, { shallow: true }); };
+  const genNotice = () => {
+    exportCollectionNotice("Sunil Rathore", "H21-T1-2705", "4,120,000", 118, "1,030,000", "206,000");
+    setNotice("30-day notice generated for Sunil Rathore \u00b7 sent to legal review");
+    setTimeout(() => setNotice(""), 3000);
+  };
 
   const pill = (stage: string) => {
     const s = STAGE_PILL[stage] || { bg: "#F1F2F6", color: "#6B7180" };
@@ -70,7 +85,7 @@ export default function CollectionsScreen() {
           <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: "-.03em", lineHeight: 1.15 }}>Collections</div>
           <div style={{ fontSize: 13, color: "#6B7180", fontWeight: 500, marginTop: 5 }}>31 overdue instalments \u00b7 AED 31.4M \u00b7 sorted by priority score</div>
         </div>
-        <button style={{ height: 38, borderRadius: 12, border: "1px solid #EDEEF3", background: "#fff", padding: "0 14px", fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, color: "#4A5060", cursor: "pointer" }}>Dunning ladder</button>
+        <button onClick={() => setLadderOpen(true)} style={{ height: 38, borderRadius: 12, border: "1px solid #EDEEF3", background: "#fff", padding: "0 14px", fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, color: "#4A5060", cursor: "pointer" }}>Dunning ladder</button>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(6,1fr)", gap: 12, marginBottom: 16 }}>
@@ -134,10 +149,45 @@ export default function CollectionsScreen() {
               </div>
             ))}
           </div>
-          <button style={{ marginTop: 18, width: "100%", height: 42, borderRadius: 12, background: "#14161F", color: "#fff", border: 0, fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}>Generate 30-day notice</button>
+          <button onClick={genNotice} style={{ marginTop: 18, width: "100%", height: 42, borderRadius: 12, background: "#14161F", color: "#fff", border: 0, fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}>Generate 30-day notice</button>
           <div style={{ fontSize: 10, color: "#9AA0AE", fontWeight: 500, marginTop: 8, textAlign: "center" }}>Requires legal review before issue</div>
         </div>
       </div>
+
+      {ladderOpen && (
+        <div onMouseDown={() => setLadderOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(20,22,31,.42)", display: "grid", placeItems: "center", zIndex: 80, padding: 24 }}>
+          <div onMouseDown={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: 22, padding: "26px 28px", width: "100%", maxWidth: 680, boxShadow: "0 24px 60px rgba(20,22,31,.25)" }}>
+            <div style={{ fontSize: 18, fontWeight: 800, letterSpacing: "-.02em" }}>Dunning ladder</div>
+            <div style={{ fontSize: 12.5, color: "#6B7180", fontWeight: 500, marginTop: 4, lineHeight: 1.5 }}>Automated collection escalation \u00b7 Dubai Law No. 19 of 2017 \u00b7 stages are triggered by overdue days.</div>
+            <div style={{ marginTop: 18 }}>
+              <div style={{ display: "flex", gap: 8, paddingBottom: 12, borderBottom: "1px solid #EDEEF3" }}>
+                {ladder.map((s, i) => (
+                  <div key={s.stage} style={{ flex: 1, textAlign: "center" }}>
+                    <div style={{ width: 18, height: 18, borderRadius: 9, border: "2px solid " + s.color, background: "#fff", margin: "0 auto", position: "relative" }}>
+                      {i < ladder.length - 1 && <span style={{ position: "absolute", left: 18, top: 7, width: "200%", height: 2, background: s.color, opacity: 0.3 }} />}
+                    </div>
+                    <div style={{ fontSize: 10.5, fontWeight: 700, color: s.color, marginTop: 6 }}>{s.stage}</div>
+                    <div style={{ fontSize: 9, color: "#9AA0AE", fontWeight: 600, marginTop: 2 }}>{s.count} live</div>
+                  </div>
+                ))}
+              </div>
+              <div style={{ marginTop: 4 }}>
+                {ladder.map((s) => (
+                  <div key={s.stage} style={{ display: "grid", gridTemplateColumns: "150px 1fr 1.2fr 60px", gap: 10, alignItems: "center", padding: "10px 4px", borderBottom: "1px solid #F6F7FA" }}>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: s.color }}>{s.stage}</span>
+                    <span style={{ fontSize: 11.5, color: "#6B7180", fontWeight: 600 }}>{s.trigger}</span>
+                    <span style={{ fontSize: 11.5, color: "#4A5060", fontWeight: 600 }}>{s.action}</span>
+                    <span style={{ fontSize: 12, fontWeight: 800, textAlign: "right" }}>{s.count}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
+              <button onClick={() => setLadderOpen(false)} style={{ height: 38, borderRadius: 12, border: "1px solid #EDEEF3", background: "#fff", padding: "0 20px", fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, color: "#4A5060", cursor: "pointer" }}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

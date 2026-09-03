@@ -653,3 +653,75 @@ export function exportInvoicesLedger(
   docFooter(doc, "Invoice register");
   downloadBlob(doc, "invoice-register.pdf");
 }
+
+export function exportCollectionNotice(
+  buyer: string,
+  unit: string,
+  amount: string,
+  days: number,
+  retention: string,
+  refund: string
+) {
+  const doc = docBase("Ellington Holdings \u00b7 Default notice");
+  const pageW = doc.internal.pageSize.getWidth();
+
+  let y = 46;
+  doc.setTextColor(20, 22, 31);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(15);
+  doc.text("30-Day Default Notice", 14, y);
+  y += 4;
+  doc.setFontSize(9.5);
+  doc.setTextColor(110, 113, 128);
+  doc.setFont("helvetica", "normal");
+  doc.text("Issued in accordance with Dubai Law No. 19 of 2017 \u00b7 Terms and Conditions of Sale", 14, y + 5);
+  y += 26;
+
+  autoTable(doc, {
+    startY: y,
+    head: [["Party", "Detail"]],
+    body: [
+      ["Buyer", buyer],
+      ["Unit", unit],
+      ["Outstanding amount", "AED " + amount],
+      ["Days overdue", String(days)],
+      ["Permissible retention", retention],
+      ["Refund payable", "AED " + refund],
+    ],
+    theme: "striped",
+    headStyles: { fillColor: [20, 22, 31], fontSize: 9 },
+    styles: { fontSize: 9, cellPadding: 3 },
+    columnStyles: { 0: { fontStyle: "bold" } },
+    margin: { left: 14, right: 14 },
+  });
+  y = (doc as any).lastAutoTable.finalY + 14;
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9.5);
+  doc.setTextColor(90, 93, 110);
+  const bodyText = doc.splitTextToSize(
+    "Unless the outstanding amount \u00b7 AED " + amount + " \u00b7 is settled within thirty (30) days from the date of this notice, the Developer may, in accordance with the Terms and Conditions of Sale and Dubai Law No. 19 of 2017, treat the contract as terminated and retain up to the permissible percentage of the sums paid, refunding the balance to the buyer.",
+    pageW - 28
+  );
+  doc.text(bodyText, 14, y);
+  y += bodyText.length * 4.6 + 8;
+
+  autoTable(doc, {
+    startY: y,
+    head: [["Notice terms", ""]],
+    body: [
+      ["Retention tier", "Construction < 60% \u00b7 up to 25% of sums paid"],
+      ["Retention held", "AED " + retention],
+      ["Refund payable to buyer", "AED " + refund],
+      ["Legal review", "Required before issue \u00b7 Escrow & Legal"],
+    ],
+    theme: "grid",
+    headStyles: { fillColor: [79, 70, 245], fontSize: 9 },
+    styles: { fontSize: 9, cellPadding: 3 },
+    columnStyles: { 0: { fontStyle: "bold" } },
+    margin: { left: 14, right: 14 },
+  });
+
+  docFooter(doc, "30-day default notice");
+  downloadBlob(doc, "notice-30d-" + buyer.toLowerCase().replace(/[^a-z]+/g, "-") + ".pdf");
+}
