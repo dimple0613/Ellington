@@ -27,9 +27,51 @@ const INTEGRATIONS: { name: string; status: string; note: string; ok: boolean }[
 export default function SettingsScreen() {
   const [tab, setTab] = useState<Tab>("company");
   const [notice, setNotice] = useState("");
-  const save = () => { setNotice("Changes saved \u00b7 will take effect immediately"); setTimeout(() => setNotice(""), 3000); };
+  const [notif, setNotif] = useState<[string, boolean, boolean, boolean][]>(NOTIF_ROWS);
+  const [integrations, setIntegrations] = useState(INTEGRATIONS);
+  const [company, setCompany] = useState<Record<string, string>>({
+    "Legal name": "Ellington Properties Development LLC",
+    "Trade licence": "CN-2847192",
+    "ORN": "21281",
+    "RERA": "1884",
+    "VAT TRN": "100234567800003",
+  });
+  const [brand, setBrand] = useState<Record<string, string>>({
+    "Primary color": "#4F46F5",
+    "Currency": "AED",
+    "Date format": "DD MMM YYYY",
+    "Timezone": "Asia/Dubai (GMT+4)",
+    "Fiscal year": "Jan \u2013 Dec",
+  });
+
+  const banner = (m: string) => { setNotice(m); setTimeout(() => setNotice(""), 3000); };
+
+  const save = () => { banner("Changes saved \u00b7 will take effect immediately"); };
+
+  const flipNotif = (rowIdx: number, colIdx: number) => {
+    setNotif((prev) => prev.map((row, ri) => ri !== rowIdx ? row : [row[0], colIdx === 0 ? !row[1] : row[1], colIdx === 1 ? !row[2] : row[2], colIdx === 2 ? !row[3] : row[3]] as [string, boolean, boolean, boolean]));
+    banner("Notification " + (["In-app", "Email", "Slack"][colIdx]) + " toggled for " + notif[rowIdx][0]);
+  };
+
+  const connectIntegration = (name: string) => {
+    if (name === "Salesforce CRM") {
+      setIntegrations((prev) => prev.map((i) => i.name === name ? { ...i, status: "Connected", note: "Optional \u00b7 lead import", ok: true } : i));
+      banner("Salesforce CRM connected \u00b7 lead import enabled");
+    } else {
+      banner("Manage " + name + " \u00b7 connection healthy");
+    }
+  };
 
   const tabBtn = (on: boolean) => ({ height: 32, border: 0, borderRadius: 10, padding: "0 15px", cursor: "pointer", fontFamily: "inherit", fontSize: 12, fontWeight: 700, background: on ? "#F0EFFE" : "transparent", color: on ? AC : "#9AA0AE" });
+
+  const fieldInput = (key: string, val: string, change: (k: string, v: string) => void) => (
+    <input
+      value={val}
+      onChange={(e) => change(key, e.target.value)}
+      onKeyDown={(e) => { if (e.key === "Enter") save(); }}
+      style={{ height: 32, borderRadius: 9, border: "1px solid #E4E6EE", padding: "0 10px", fontSize: 12, fontWeight: 600, fontFamily: "inherit", background: "#fff", width: 180, boxSizing: "border-box", textAlign: "right" }}
+    />
+  );
 
   return (
     <div>
@@ -52,19 +94,19 @@ export default function SettingsScreen() {
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
           <div style={{ background: "#fff", borderRadius: 20, padding: "22px 24px", boxShadow: "0 1px 3px rgba(20,22,31,.04)" }}>
             <div style={{ fontSize: 15, fontWeight: 700, letterSpacing: "-.015em", marginBottom: 14 }}>Company identity</div>
-            {[["Legal name", "Ellington Properties Development LLC"], ["Trade licence", "CN-2847192"], ["ORN", "21281"], ["RERA", "1884"], ["VAT TRN", "100234567800003"]].map(([k, v]) => (
-              <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "9px 0", borderBottom: "1px solid #F6F7FA" }}>
+            {Object.keys(company).map((k) => (
+              <div key={k} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "7px 0", borderBottom: "1px solid #F6F7FA" }}>
                 <span style={{ fontSize: 12, color: "#6B7180", fontWeight: 600 }}>{k}</span>
-                <span style={{ fontSize: 12, fontWeight: 700 }}>{v}</span>
+                {fieldInput(k, company[k], (key, v) => setCompany((p) => ({ ...p, [key]: v })))}
               </div>
             ))}
           </div>
           <div style={{ background: "#fff", borderRadius: 20, padding: "22px 24px", boxShadow: "0 1px 3px rgba(20,22,31,.04)" }}>
             <div style={{ fontSize: 15, fontWeight: 700, letterSpacing: "-.015em", marginBottom: 14 }}>Brand &amp; locale</div>
-            {[["Primary color", "#4F46F5"], ["Currency", "AED"], ["Date format", "DD MMM YYYY"], ["Timezone", "Asia/Dubai (GMT+4)"], ["Fiscal year", "Jan \u2013 Dec"]].map(([k, v]) => (
-              <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "9px 0", borderBottom: "1px solid #F6F7FA" }}>
+            {Object.keys(brand).map((k) => (
+              <div key={k} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "7px 0", borderBottom: "1px solid #F6F7FA" }}>
                 <span style={{ fontSize: 12, color: "#6B7180", fontWeight: 600 }}>{k}</span>
-                <span style={{ fontSize: 12, fontWeight: 700 }}>{v}</span>
+                {fieldInput(k, brand[k], (key, v) => setBrand((p) => ({ ...p, [key]: v })))}
               </div>
             ))}
           </div>
@@ -97,11 +139,11 @@ export default function SettingsScreen() {
           <div style={{ display: "grid", gridTemplateColumns: "1.5fr 100px 100px 100px", gap: 8, padding: "12px 22px", fontSize: 9.5, fontWeight: 700, letterSpacing: ".07em", color: "#9AA0AE", textTransform: "uppercase", borderBottom: "1px solid #F6F7FA" }}>
             <span>Event</span><span style={{ textAlign: "center" }}>In-app</span><span style={{ textAlign: "center" }}>Email</span><span style={{ textAlign: "center" }}>Slack</span>
           </div>
-          {NOTIF_ROWS.map(([event, app, email, slack]) => (
-            <div key={event} style={{ display: "grid", gridTemplateColumns: "1.5fr 100px 100px 100px", gap: 8, alignItems: "center", padding: "0 22px", height: 44, borderBottom: "1px solid #F6F7FA" }}>
-              <span style={{ fontSize: 12, fontWeight: 600 }}>{event}</span>
-              {[app, email, slack].map((on, i) => (
-                <span key={i} style={{ display: "block", width: 28, height: 16, borderRadius: 9, background: on ? AC : "#DDE0E8", cursor: "pointer", position: "relative", margin: "0 auto" }}>
+          {notif.map((row, ri) => (
+            <div key={row[0]} style={{ display: "grid", gridTemplateColumns: "1.5fr 100px 100px 100px", gap: 8, alignItems: "center", padding: "0 22px", height: 44, borderBottom: "1px solid #F6F7FA" }}>
+              <span style={{ fontSize: 12, fontWeight: 600 }}>{row[0]}</span>
+              {[row[1], row[2], row[3]].map((on, i) => (
+                <span onClick={() => flipNotif(ri, i)} style={{ display: "block", width: 28, height: 16, borderRadius: 9, background: on ? AC : "#DDE0E8", cursor: "pointer", position: "relative", margin: "0 auto" }}>
                   <span style={{ position: "absolute", top: 2, width: 12, height: 12, borderRadius: 7, background: "#fff", left: on ? "14px" : "2px" }} />
                 </span>
               ))}
@@ -112,14 +154,17 @@ export default function SettingsScreen() {
 
       {tab === "integr" && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 14 }}>
-          {INTEGRATIONS.map((i) => (
+          {integrations.map((i) => (
             <div key={i.name} style={{ background: "#fff", borderRadius: 20, padding: "20px 22px", boxShadow: "0 1px 3px rgba(20,22,31,.04)" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
                 <span style={{ width: 8, height: 8, borderRadius: 4, background: i.ok ? "#34C08A" : "#DDE0E8" }} />
                 <span style={{ fontSize: 13, fontWeight: 700 }}>{i.name}</span>
               </div>
               <div style={{ fontSize: 11.5, color: "#6B7180", fontWeight: 500 }}>{i.note}</div>
-              <button style={{ marginTop: 12, height: 32, borderRadius: 10, border: "1px solid " + (i.ok ? "#EDEEF3" : AC), background: i.ok ? "#fff" : AC, color: i.ok ? "#4A5060" : "#fff", padding: "0 14px", fontFamily: "inherit", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>{i.ok ? "Manage" : "Connect"}</button>
+              <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 8 }}>
+                {i.ok && <span style={{ fontSize: 10, fontWeight: 700, color: "#1F9D6B" }}>{i.status}</span>}
+                <button onClick={() => connectIntegration(i.name)} style={{ height: 32, borderRadius: 10, border: "1px solid " + (i.ok ? "#EDEEF3" : AC), background: i.ok ? "#fff" : AC, color: i.ok ? "#4A5060" : "#fff", padding: "0 14px", fontFamily: "inherit", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>{i.ok ? "Manage" : "Connect"}</button>
+              </div>
             </div>
           ))}
         </div>
