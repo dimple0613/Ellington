@@ -1,6 +1,7 @@
 name = "ellington"
 compatibility_date = "2024-01-01"
 compatibility_flags = ["nodejs_compat"]
+pages_build_output_dir = ".vercel/output/static"
 
 [vars]
 DATABASE_URL = "postgresql://neondb_owner:npg_5Av2oRzTwtdE@ep-aged-hat-axkhq856-pooler.c-4.us-east-2.aws.neon.tech/neondb?sslmode=require"
