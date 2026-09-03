@@ -40,18 +40,42 @@ const maxF = Math.max(...FORECAST);
 export default function PipelineScreen() {
   const router = useRouter();
   const [sel, setSel] = useState<number | null>(null);
+  const [notice, setNotice] = useState("");
+  const [open, setOpen] = useState(false);
+  const [unit, setUnit] = useState("WPK-T1-0211");
+  const [date, setDate] = useState("06 Sep 26");
+  const [cards, setCards] = useState<Record<number, PipeCard[]>>(() => {
+    const m: Record<number, PipeCard[]> = {};
+    PIPE.forEach((c, i) => { m[i] = c.cards; });
+    return m;
+  });
+  const [counts, setCounts] = useState<Record<number, number>>(() => {
+    const m: Record<number, number> = {};
+    PIPE.forEach((c, i) => { m[i] = c.count; });
+    return m;
+  });
 
   const goSnag = () => router.push({ pathname: "/handover", query: { s: "snagging" } }, undefined, { shallow: true });
 
+  const schedule = () => {
+    const newCard: PipeCard = { no: unit, buyer: "Buyer", meta: "Handover " + date };
+    setCards((c) => ({ ...c, 0: [newCard, ...(c[0] || [])] }));
+    setCounts((c) => ({ ...c, 0: (c[0] || 0) + 1 }));
+    setOpen(false);
+    setNotice("Handover scheduled for " + unit + " on " + date + " \u00b7 added to Payment cleared");
+    setTimeout(() => setNotice(""), 3800);
+  };
+
   return (
     <div>
+      {notice && <div style={{ background: "#E9F8F1", color: "#1F9D6B", borderRadius: 12, padding: "11px 16px", fontSize: 12, fontWeight: 700, marginBottom: 16 }}>{notice}</div>}
       <div style={{ display: "flex", alignItems: "flex-end", gap: 16, marginBottom: 18 }}>
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: "-.03em", lineHeight: 1.15 }}>Handover pipeline</div>
           <div style={{ fontSize: 13, color: "#6B7180", fontWeight: 500, marginTop: 5 }}>Wilton Park Residences \u00b7 140 units \u00b7 a unit cannot pass Payment cleared with any balance outstanding</div>
         </div>
         <button onClick={goSnag} style={{ height: 38, borderRadius: 12, border: "1px solid #EDEEF3", background: "#fff", padding: "0 14px", fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, color: "#4A5060", cursor: "pointer" }}>Open snag list</button>
-        <button style={{ height: 38, borderRadius: 12, background: AC, color: "#fff", border: 0, padding: "0 16px", fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}>Schedule handover</button>
+        <button onClick={() => setOpen(true)} style={{ height: 38, borderRadius: 12, background: AC, color: "#fff", border: 0, padding: "0 16px", fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}>Schedule handover</button>
       </div>
 
       <div style={{ display: "flex", gap: 12, overflowX: "auto", paddingBottom: 8, alignItems: "flex-start" }}>
@@ -60,14 +84,15 @@ export default function PipelineScreen() {
             <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "2px 6px 12px" }}>
               <span style={{ width: 8, height: 8, borderRadius: 4, flex: "none", background: col.color }} />
               <span style={{ flex: 1, fontSize: 11.5, fontWeight: 700, lineHeight: 1.3 }}>{col.label}</span>
-              <span style={{ fontSize: 11, fontWeight: 800, color: "#6B7180" }}>{col.count}</span>
+              <span style={{ fontSize: 11, fontWeight: 800, color: "#6B7180" }}>{counts[ci]}</span>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {col.cards.map((k) => (
-                <div key={k.no} style={{ background: "#fff", borderRadius: 14, padding: "12px 13px", boxShadow: "0 1px 2px rgba(20,22,31,.05)", cursor: "grab" }}>
+              {(cards[ci] || []).map((k, ki) => (
+                <div key={k.no + ki} onClick={() => setSel(sel === ci * 100 + ki ? null : ci * 100 + ki)} style={{ background: "#fff", borderRadius: 14, padding: "12px 13px", boxShadow: "0 1px 2px rgba(20,22,31,.05)", cursor: "pointer", border: sel === ci * 100 + ki ? "2px solid " + col.color : "1px solid transparent" }}>
                   <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11.5, fontWeight: 600 }}>{k.no}</div>
                   <div style={{ fontSize: 11.5, fontWeight: 700, marginTop: 6 }}>{k.buyer}</div>
                   <div style={{ fontSize: 10.5, color: "#9AA0AE", fontWeight: 600, marginTop: 4 }}>{k.meta}</div>
+                  {sel === ci * 100 + ki && <div style={{ fontSize: 10, fontWeight: 700, color: col.color, marginTop: 8, paddingTop: 8, borderTop: "1px solid #F1F2F6" }}>Selected \u00b7 ready to advance</div>}
                 </div>
               ))}
             </div>
@@ -123,6 +148,37 @@ export default function PipelineScreen() {
           </div>
         </div>
       </div>
+
+      {open && (
+        <div onMouseDown={() => setOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(20,22,31,.42)", display: "grid", placeItems: "center", zIndex: 80, padding: 24 }}>
+          <div onMouseDown={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: 22, padding: "26px 28px", width: "100%", maxWidth: 540, boxShadow: "0 24px 60px rgba(20,22,31,.25)" }}>
+            <div style={{ fontSize: 18, fontWeight: 800, letterSpacing: "-.02em" }}>Schedule handover</div>
+            <div style={{ fontSize: 12.5, color: "#6B7180", fontWeight: 500, marginTop: 4, lineHeight: 1.5 }}>Pick a completed unit and a handover date. The unit is added to Payment cleared, then flows through snagging, documents and keys.</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 14, marginTop: 20 }}>
+              <div>
+                <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".05em", color: "#9AA0AE", textTransform: "uppercase", marginBottom: 6 }}>Unit</div>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  {["WPK-T1-0211", "WPK-T1-0509", "WPK-T1-0708", "WPK-T1-0303", "WPK-T1-0610"].map((u) => (
+                    <span key={u} onClick={() => setUnit(u)} style={{ fontFamily: "monospace", fontSize: 11.5, fontWeight: 700, padding: "7px 12px", borderRadius: 10, cursor: "pointer", background: unit === u ? AC : "#F1F2F6", color: unit === u ? "#fff" : "#4A5060" }}>{u}</span>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".05em", color: "#9AA0AE", textTransform: "uppercase", marginBottom: 6 }}>Handover date</div>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  {["06 Sep 26", "08 Sep 26", "10 Sep 26", "13 Sep 26", "15 Sep 26"].map((d) => (
+                    <span key={d} onClick={() => setDate(d)} style={{ fontSize: 11.5, fontWeight: 700, padding: "7px 12px", borderRadius: 10, cursor: "pointer", background: date === d ? AC : "#F1F2F6", color: date === d ? "#fff" : "#4A5060" }}>{d}</span>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 22 }}>
+              <button onClick={() => setOpen(false)} style={{ height: 38, borderRadius: 12, border: "1px solid #EDEEF3", background: "#fff", padding: "0 16px", fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, color: "#4A5060", cursor: "pointer" }}>Cancel</button>
+              <button onClick={schedule} style={{ height: 38, borderRadius: 12, background: AC, color: "#fff", border: 0, padding: "0 20px", fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}>Schedule handover</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
