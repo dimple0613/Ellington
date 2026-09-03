@@ -1,3 +1,5 @@
+export const runtime = "edge";
+
 import type { NextApiRequest, NextApiResponse } from "next";
 import { withSession } from "../../lib/session";
 import { query } from "../../lib/db";

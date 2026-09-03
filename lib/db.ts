@@ -1,14 +1,11 @@
-import { Pool, QueryResult, QueryResultRow } from "pg";
+import { neon } from "@neondatabase/serverless";
 
-export const pool = new Pool({
-  connectionString:
-    process.env.DATABASE_URL ||
-    "postgresql://postgres@localhost:5432/developer_inventory",
-});
+const sql = neon(process.env.DATABASE_URL!);
 
-export async function query<T extends QueryResultRow = any>(
+export async function query<T extends Record<string, any> = any>(
   text: string,
   params?: any[]
-): Promise<QueryResult<T>> {
-  return pool.query<T>(text, params);
+): Promise<{ rows: T[] }> {
+  const result = await sql.query(text, params ?? []);
+  return { rows: result as T[] };
 }
