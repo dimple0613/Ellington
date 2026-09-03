@@ -1,3 +1,5 @@
+export const runtime = "edge";
+
 import { withSession } from "../../lib/session";
 import { PROJECTS } from "../../lib/data";
 

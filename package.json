@@ -14,6 +14,7 @@
     "pages:deploy": "npx wrangler pages deploy .vercel/output/static"
   },
   "dependencies": {
+    "@neondatabase/serverless": "1.1.0",
     "date-fns": "4.4.0",
     "formik": "2.4.9",
     "jspdf": "4.2.1",
