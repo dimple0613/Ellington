@@ -12,6 +12,13 @@
 .env
 .env.local
 .env*.local
+.dev.vars
+
+# opennext build output
+/.open-next/
+/cloudflare-env.d.ts
+/.vercel/
+/.wrangler/
 
 # misc
 .DS_Store
@@ -22,3 +29,7 @@ tsconfig.tsbuildinfo
 next-env.d.ts
 *.tsbuildinfo
 .vscode/.idea/
+
+# local tools
+.playwright-mcp/
+dev-server.log
