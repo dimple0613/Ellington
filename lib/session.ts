@@ -1,3 +1,5 @@
+import type { NextApiRequest, NextApiResponse } from "next";
+
 export type Session = {
   userId: number;
   email: string;
@@ -21,7 +23,7 @@ async function hmacSign(data: string, secret: string): Promise<string> {
 const SECRET_DEFAULT = "dev-secret-change-me";
 
 export async function sign(payload: Omit<Session, "exp"> & { exp?: number }): Promise<string> {
-  const SECRET = (globalThis as any).process?.env?.JWT_SECRET || SECRET_DEFAULT;
+  const SECRET = process.env.JWT_SECRET || SECRET_DEFAULT;
   const exp = payload.exp ?? Date.now() + 86400000;
   const body = btoa(JSON.stringify({ ...payload, exp }));
   const sig = await hmacSign(body, SECRET);
@@ -30,7 +32,7 @@ export async function sign(payload: Omit<Session, "exp"> & { exp?: number }): Pr
 
 export async function verify(token: string | undefined | null): Promise<Session | null> {
   if (!token) return null;
-  const SECRET = (globalThis as any).process?.env?.JWT_SECRET || SECRET_DEFAULT;
+  const SECRET = process.env.JWT_SECRET || SECRET_DEFAULT;
   const [body, sig] = token.split(".");
   if (!body || !sig) return null;
   const expectedSig = await hmacSign(body, SECRET);
@@ -44,17 +46,46 @@ export async function verify(token: string | undefined | null): Promise<Session 
   }
 }
 
-import { NextRequest, NextResponse } from "next/server";
+function parseCookies(req: NextApiRequest): Record<string, string> {
+  const out: Record<string, string> = {};
+  const header = req.headers.cookie;
+  if (!header) return out;
+  for (const part of header.split(";")) {
+    const idx = part.indexOf("=");
+    if (idx === -1) continue;
+    const name = part.slice(0, idx).trim();
+    const value = part.slice(idx + 1).trim();
+    if (name) out[name] = decodeURIComponent(value);
+  }
+  return out;
+}
 
-export function withSession(
-  handler: (req: NextRequest, session: Session) => Response | Promise<Response>
+export function serializeCookie(
+  name: string,
+  value: string,
+  opts: { maxAge?: number; httpOnly?: boolean; path?: string; sameSite?: "lax" | "strict" | "none" } = {}
+): string {
+  const parts = [`${name}=${encodeURIComponent(value)}`];
+  if (opts.maxAge != null) parts.push(`Max-Age=${opts.maxAge}`);
+  if (opts.path) parts.push(`Path=${opts.path}`);
+  if (opts.httpOnly) parts.push("HttpOnly");
+  if (opts.sameSite) parts.push(`SameSite=${opts.sameSite}`);
+  return parts.join("; ");
+}
+
+export function withSession<
+  R extends NextApiRequest,
+  S extends NextApiResponse
+>(
+  handler: (req: R, res: S, session: Session) => void | Promise<void>
 ) {
-  return async (req: NextRequest): Promise<Response> => {
-    const token = req.cookies.get("session")?.value;
-    const session = await verify(token);
+  return async (req: R, res: S): Promise<void> => {
+    const cookies = parseCookies(req);
+    const session = await verify(cookies["session"]);
     if (!session) {
-      return NextResponse.json({ error: "Not signed in" }, { status: 401 });
+      res.status(401).json({ error: "Not signed in" });
+      return;
     }
-    return handler(req, session);
+    await handler(req, res, session);
   };
 }
