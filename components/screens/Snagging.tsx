@@ -26,17 +26,51 @@ const statusPill = (v: string) => { const s = STATUS_PILL[v] || STATUS_PILL.Open
 export default function SnaggingScreen() {
   const [closed, setClosed] = useState<Set<number>>(new Set());
   const [notice, setNotice] = useState("");
+  const [rows, setRows] = useState<SnagRow[]>(ROWS);
+  const [raiseOpen, setRaiseOpen] = useState(false);
+  const [assignOpen, setAssignOpen] = useState(false);
+  const [unit, setUnit] = useState("WPK-T1-0211");
+  const [loc, setLoc] = useState("Living room");
+  const [trade, setTrade] = useState("Finishes");
+  const [desc, setDesc] = useState("");
+  const [sev, setSev] = useState("Major");
+  const [assignUnit, setAssignUnit] = useState(ROWS[0].unit);
+  const [contractor, setContractor] = useState("ALEC \u00b7 MEP");
+  const [err, setErr] = useState("");
 
   const closeSnag = (idx: number) => {
     setClosed((prev) => { const next = new Set(prev); next.add(idx); return next; });
-    setNotice("Snag closed \u00b7 " + ROWS[idx].unit + " \u00b7 " + ROWS[idx].desc.substring(0, 30) + "...");
+    setNotice("Snag closed \u00b7 " + rows[idx].unit + " \u00b7 " + rows[idx].desc.substring(0, 30) + "...");
     setTimeout(() => setNotice(""), 3000);
   };
 
-  const openCount = ROWS.filter((_, i) => !closed.has(i)).filter((r) => r.status !== "Closed").length;
-  const critCount = ROWS.filter((_, i) => !closed.has(i)).filter((r) => r.sev === "Critical").length;
-  const reinspCount = ROWS.filter((_, i) => !closed.has(i)).filter((r) => r.reinspect !== "\u2014" && r.reinspect !== "Closed").length;
-  const closedCount = ROWS.filter((_, i) => closed.has(i)).length + ROWS.filter((r) => r.status === "Closed").length;
+  const raiseSnag = () => {
+    if (!desc.trim()) { setErr("Add a short snag description"); return; }
+    const newRow: SnagRow = { unit, loc, trade, desc: desc.trim(), sev, contractor: "Unassigned", status: "Open", reinspect: "To schedule" };
+    setRows((r) => [newRow, ...r]);
+    setRaiseOpen(false);
+    setDesc("");
+    setErr("");
+    setNotice("Snag raised \u00b7 " + unit + " \u00b7 " + sev);
+    setTimeout(() => setNotice(""), 3000);
+  };
+
+  const assignContractor = () => {
+    setRows((r) => r.map((row) => row.unit === assignUnit ? { ...row, contractor } : row));
+    setAssignOpen(false);
+    setNotice("Contractor updated \u00b7 " + assignUnit + " \u00b7 " + contractor);
+    setTimeout(() => setNotice(""), 3000);
+  };
+
+  const photo = (idx: number) => { setNotice("Photo captured \u00b7 " + rows[idx].unit + " \u00b7 saved to snag record"); setTimeout(() => setNotice(""), 3000); };
+
+  const openCount = rows.filter((_, i) => !closed.has(i)).filter((r) => r.status !== "Closed").length;
+  const critCount = rows.filter((_, i) => !closed.has(i)).filter((r) => r.sev === "Critical").length;
+  const reinspCount = rows.filter((_, i) => !closed.has(i)).filter((r) => r.reinspect !== "\u2014" && r.reinspect !== "Closed").length;
+  const closedCount = rows.filter((_, i) => closed.has(i)).length + rows.filter((r) => r.status === "Closed").length;
+
+  const selPill = (on: boolean) => ({ fontSize: 11.5, fontWeight: 700, padding: "7px 12px", borderRadius: 10, cursor: "pointer", background: on ? AC : "#F1F2F6", color: on ? "#fff" : "#4A5060" });
+  const label = (t: string) => <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".05em", color: "#9AA0AE", textTransform: "uppercase", marginBottom: 6 }}>{t}</div>;
 
   return (
     <div>
@@ -46,8 +80,8 @@ export default function SnaggingScreen() {
           <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: "-.03em", lineHeight: 1.15 }}>Snagging</div>
           <div style={{ fontSize: 13, color: "#6B7180", fontWeight: 500, marginTop: 5 }}>Wilton Park Residences \u00b7 reputation is made or lost here</div>
         </div>
-        <button style={{ height: 38, borderRadius: 12, border: "1px solid #EDEEF3", background: "#fff", padding: "0 14px", fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, color: "#4A5060", cursor: "pointer" }}>Assign contractor</button>
-        <button style={{ height: 38, borderRadius: 12, background: AC, color: "#fff", border: 0, padding: "0 16px", fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}>Raise snag</button>
+        <button onClick={() => setAssignOpen(true)} style={{ height: 38, borderRadius: 12, border: "1px solid #EDEEF3", background: "#fff", padding: "0 14px", fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, color: "#4A5060", cursor: "pointer" }}>Assign contractor</button>
+        <button onClick={() => setRaiseOpen(true)} style={{ height: 38, borderRadius: 12, background: AC, color: "#fff", border: 0, padding: "0 16px", fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}>Raise snag</button>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr) 1.4fr", gap: 14, marginBottom: 16 }}>
@@ -81,7 +115,7 @@ export default function SnaggingScreen() {
         <div style={{ display: "grid", gridTemplateColumns: "110px 110px 88px 1.4fr 76px 1fr 88px 76px 100px", gap: 8, padding: "13px 20px", fontSize: 9.5, fontWeight: 700, letterSpacing: ".07em", color: "#9AA0AE", textTransform: "uppercase", background: "#FAFBFD", borderBottom: "1px solid #EDEEF3" }}>
           <span>Unit</span><span>Location</span><span>Trade</span><span>Description</span><span>Severity</span><span>Contractor</span><span>Status</span><span>Re-inspect</span><span style={{ textAlign: "right" }}></span>
         </div>
-        {ROWS.map((r, i) => {
+        {rows.map((r, i) => {
           const isClosed = closed.has(i) || r.status === "Closed";
           return (
             <div key={i} style={{ display: "grid", gridTemplateColumns: "110px 110px 88px 1.4fr 76px 1fr 88px 76px 100px", gap: 8, alignItems: "center", padding: "0 20px", height: 50, borderBottom: "1px solid #F6F7FA", opacity: isClosed ? 0.5 : 1 }}>
@@ -94,13 +128,92 @@ export default function SnaggingScreen() {
               <span style={statusPill(isClosed ? "Closed" : r.status)}>{isClosed ? "Closed" : r.status}</span>
               <span style={{ fontSize: 10.5, color: "#9AA0AE", fontWeight: 600 }}>{r.reinspect}</span>
               <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
-                <button style={{ height: 28, borderRadius: 8, border: "1px solid #EDEEF3", background: "#fff", padding: "0 9px", fontFamily: "inherit", fontSize: 10, fontWeight: 700, color: "#4A5060", cursor: "pointer" }}>Photo</button>
+                <button onClick={() => photo(i)} style={{ height: 28, borderRadius: 8, border: "1px solid #EDEEF3", background: "#fff", padding: "0 9px", fontFamily: "inherit", fontSize: 10, fontWeight: 700, color: "#4A5060", cursor: "pointer" }}>Photo</button>
                 {!isClosed && <button onClick={() => closeSnag(i)} style={{ height: 28, borderRadius: 8, border: 0, background: "#F0EFFE", padding: "0 9px", fontFamily: "inherit", fontSize: 10, fontWeight: 700, color: AC, cursor: "pointer" }}>Close</button>}
               </div>
             </div>
           );
         })}
       </div>
+
+      {raiseOpen && (
+        <div onMouseDown={() => { setRaiseOpen(false); setErr(""); }} style={{ position: "fixed", inset: 0, background: "rgba(20,22,31,.42)", display: "grid", placeItems: "center", zIndex: 80, padding: 24 }}>
+          <div onMouseDown={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: 22, padding: "26px 28px", width: "100%", maxWidth: 560, boxShadow: "0 24px 60px rgba(20,22,31,.25)" }}>
+            <div style={{ fontSize: 18, fontWeight: 800, letterSpacing: "-.02em" }}>Raise snag</div>
+            <div style={{ fontSize: 12.5, color: "#6B7180", fontWeight: 500, marginTop: 4, lineHeight: 1.5 }}>Log a defect against a unit. It is raised as Open and scheduled for re-inspection before handover.</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 14, marginTop: 20 }}>
+              <div>
+                {label("Unit")}
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  {["WPK-T1-0211", "WPK-T1-0509", "WPK-T1-0708", "WPK-T1-0303", "WPK-T1-0610"].map((u) => (
+                    <span key={u} onClick={() => setUnit(u)} style={{ ...selPill(unit === u), fontFamily: "monospace" }}>{u}</span>
+                  ))}
+                </div>
+              </div>
+              <div>
+                {label("Location")}
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  {["Living room", "Master bedroom", "Kitchen", "Bathroom", "Balcony"].map((l) => (
+                    <span key={l} onClick={() => setLoc(l)} style={selPill(loc === l)}>{l}</span>
+                  ))}
+                </div>
+              </div>
+              <div>
+                {label("Trade")}
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  {["MEP", "Finishes", "Joinery", "Glazing", "Waterproofing", "Smart home"].map((x) => (
+                    <span key={x} onClick={() => setTrade(x)} style={selPill(trade === x)}>{x}</span>
+                  ))}
+                </div>
+              </div>
+              <div>
+                {label("Severity")}
+                <div style={{ display: "flex", gap: 6 }}>
+                  {["Critical", "Major", "Minor"].map((s) => (
+                    <span key={s} onClick={() => setSev(s)} style={selPill(sev === s)}>{s}</span>
+                  ))}
+                </div>
+              </div>
+              <div>
+                {label("Description")}
+                <input value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="e.g. Crack in tile at threshold, 150mm" style={{ width: "100%", boxSizing: "border-box", height: 40, borderRadius: 12, border: "1px solid #E4E6EE", padding: "0 12px", fontSize: 12.5, fontWeight: 600, outline: "none" }} />
+              </div>
+              {err && <div style={{ fontSize: 11.5, fontWeight: 600, color: "#E5484D" }}>{err}</div>}
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 22 }}>
+              <button onClick={() => { setRaiseOpen(false); setErr(""); }} style={{ height: 38, borderRadius: 12, border: "1px solid #EDEEF3", background: "#fff", padding: "0 16px", fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, color: "#4A5060", cursor: "pointer" }}>Cancel</button>
+              <button onClick={raiseSnag} style={{ height: 38, borderRadius: 12, background: AC, color: "#fff", border: 0, padding: "0 20px", fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}>Raise snag</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {assignOpen && (
+        <div onMouseDown={() => setAssignOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(20,22,31,.42)", display: "grid", placeItems: "center", zIndex: 80, padding: 24 }}>
+          <div onMouseDown={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: 22, padding: "26px 28px", width: "100%", maxWidth: 480, boxShadow: "0 24px 60px rgba(20,22,31,.25)" }}>
+            <div style={{ fontSize: 18, fontWeight: 800, letterSpacing: "-.02em" }}>Assign contractor</div>
+            <div style={{ fontSize: 12.5, color: "#6B7180", fontWeight: 500, marginTop: 4, lineHeight: 1.5 }}>Reassign the contractor responsible for a unit's open snags.</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 14, marginTop: 20 }}>
+              <div>
+                {label("Unit")}
+                <select value={assignUnit} onChange={(e) => setAssignUnit(e.target.value)} style={{ width: "100%", height: 40, borderRadius: 12, border: "1px solid #E4E6EE", padding: "0 12px", fontSize: 12.5, fontWeight: 600, fontFamily: "inherit", background: "#fff" }}>
+                  {[...new Set(rows.map((r) => r.unit))].map((u) => <option key={u} value={u}>{u}</option>)}
+                </select>
+              </div>
+              <div>
+                {label("Contractor")}
+                <select value={contractor} onChange={(e) => setContractor(e.target.value)} style={{ width: "100%", height: 40, borderRadius: 12, border: "1px solid #E4E6EE", padding: "0 12px", fontSize: 12.5, fontWeight: 600, fontFamily: "inherit", background: "#fff" }}>
+                  {["ALEC \u00b7 MEP", "ALEC \u00b7 Finishes", "ALEC \u00b7 Joinery", "ALEC \u00b7 Civil", "Siemens \u00b7 warranty", "Alumco", "Loxone"].map((c) => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 22 }}>
+              <button onClick={() => setAssignOpen(false)} style={{ height: 38, borderRadius: 12, border: "1px solid #EDEEF3", background: "#fff", padding: "0 16px", fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, color: "#4A5060", cursor: "pointer" }}>Cancel</button>
+              <button onClick={assignContractor} style={{ height: 38, borderRadius: 12, background: AC, color: "#fff", border: 0, padding: "0 20px", fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}>Assign</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
