@@ -590,3 +590,66 @@ export function exportBuyerStatement(
   docFooter(doc, "Buyer statement");
   downloadBlob(doc, "statement-" + buyer.toLowerCase().replace(/[^a-z]+/g, "-") + ".pdf");
 }
+
+export function exportInvoicesLedger(
+  invRows: { no: string; buyer: string; unit: string; inst: string; issued: string; due: string; amount: string; paid: string; status: string }[],
+  summary: { issued: string; paid: string; outstanding: string; overdue: string }
+) {
+  const doc = docBase("Ellington Holdings \u00b7 Invoice register");
+  const pageW = doc.internal.pageSize.getWidth();
+
+  let y = 46;
+  doc.setTextColor(20, 22, 31);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(13);
+  doc.text("Invoices & Statements", 14, y);
+  y += 8;
+  doc.setFontSize(9.5);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(110, 113, 128);
+  doc.text("Invoice register \u00b7 auto-issued 14 days before due \u00b7 VAT shown as a separate line", 14, y);
+  y += 18;
+
+  line(doc, 14, y, pageW - 28, [237, 238, 243]);
+  y += 4;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(11);
+  doc.setTextColor(20, 22, 31);
+  doc.text("Summary", 14, y);
+  y += 3;
+  autoTable(doc, {
+    startY: y,
+    head: [["Issued this month", "Paid", "Outstanding", "Overdue"]],
+    body: [[summary.issued, summary.paid, summary.outstanding, summary.overdue]],
+    theme: "striped",
+    headStyles: { fillColor: [79, 70, 245], fontSize: 9 },
+    styles: { fontSize: 9, cellPadding: 3 },
+    margin: { left: 14, right: 14 },
+  });
+  y = (doc as any).lastAutoTable.finalY + 12;
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(11);
+  doc.text("Invoice register", 14, y);
+  y += 3;
+  autoTable(doc, {
+    startY: y,
+    head: [["Invoice", "Buyer", "Unit", "Instalment", "Issued", "Due", "Amount", "Paid", "Status"]],
+    body: invRows.map((r) => [r.no, r.buyer, r.unit, r.inst, r.issued, r.due, r.amount, r.paid, r.status]),
+    theme: "striped",
+    headStyles: { fillColor: [20, 22, 31], fontSize: 8 },
+    styles: { fontSize: 8, cellPadding: 2 },
+    columnStyles: { 6: { halign: "right" }, 7: { halign: "right" } },
+    margin: { left: 14, right: 14 },
+  });
+  y = (doc as any).lastAutoTable.finalY + 10;
+
+  doc.setFont("helvetica", "italic");
+  doc.setFontSize(9);
+  doc.setTextColor(110, 113, 128);
+  const note = doc.splitTextToSize("Generated automatically by Ellington ERP. VAT is shown as a separate line and never baked into the instalment.", pageW - 28);
+  doc.text(note, 14, y);
+
+  docFooter(doc, "Invoice register");
+  downloadBlob(doc, "invoice-register.pdf");
+}

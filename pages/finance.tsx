@@ -3,6 +3,7 @@ import GroupPage from "../components/app/GroupPage";
 import PaymentsScreen from "../components/screens/Payments";
 import CollectionsScreen from "../components/screens/Collections";
 import EscrowScreen from "../components/screens/Escrow";
+import InvoicesScreen from "../components/screens/Invoices";
 
 export default function Finance() {
   const router = useRouter();
@@ -12,6 +13,7 @@ export default function Finance() {
       if (screen === "payments") return <PaymentsScreen buyer={buyer} />;
       if (screen === "collections") return <CollectionsScreen />;
       if (screen === "escrow") return <EscrowScreen />;
+      if (screen === "invoices") return <InvoicesScreen />;
       return null;
     }} />
   );
