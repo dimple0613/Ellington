@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState, ReactNode, CSSProperties } fr
 import { PROJECTS, UNITS, BUYERS, ST, Unit } from "../lib/data";
 import { money, AC } from "../lib/format";
 import { groupUrl, screenUrl, GROUP_PAGE } from "../lib/nav";
+import { useWindowSize } from "../lib/useWindowSize";
 
 export type GroupId =
   | "portfolio"
@@ -39,7 +40,7 @@ const NAV: Record<GroupId, { label: string; items: NavItem[] }> = {
     ],
   },
   project: {
-    label: "Project · BLG",
+    label: "Project Â· BLG",
     items: [
       { screen: "inventory", label: "Inventory", count: String(UNITS.filter((u) => u.status === "Available").length) },
       { screen: "pricing", label: "Pricing & availability" },
@@ -115,8 +116,8 @@ const NOTIFS = [
   { id: "n1", who: "R. Menon", what: "requested a 7.5% discount on T2-0806", time: "2 min ago", unread: true },
   { id: "n2", who: "Oqood", what: "3 registrations pending >14 days", time: "18 min ago", unread: true },
   { id: "n3", who: "Escrow", what: "AED 340,000 variance unmatched", time: "41 min ago", unread: true },
-  { id: "n4", who: "Collections", what: "4 units overdue >90 days — AED 8.2M", time: "1 hr ago", unread: true },
-  { id: "n5", who: "Handover", what: "Wilton Park — 12 SPAs unsigned beyond 21 days", time: "2 hr ago", unread: false },
+  { id: "n4", who: "Collections", what: "4 units overdue >90 days â€” AED 8.2M", time: "1 hr ago", unread: true },
+  { id: "n5", who: "Handover", what: "Wilton Park â€” 12 SPAs unsigned beyond 21 days", time: "2 hr ago", unread: false },
   { id: "n6", who: "Compliance", what: "6 buyer passports expiring within 60 days", time: "Yesterday", unread: false },
 ];
 
@@ -133,10 +134,13 @@ export default function Shell({
 }: Props) {
   const router = useRouter();
   const gi = RAIL.findIndex((g) => g.id === group);
+  const win = useWindowSize();
   const [switcher, setSwitcher] = useState(false);
   const [cmdk, setCmdk] = useState(false);
   const [q, setQ] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
+  const [drawer, setDrawer] = useState(false);
+  const dlg = win.bp === "mobile";
 
   const [notif, setNotif] = useState(false);
   const [profileMenu, setProfileMenu] = useState(false);
@@ -177,6 +181,7 @@ export default function Shell({
         closeMenus();
         setSwitcher(false);
         setNewProj(false);
+        setDrawer(false);
       }
     };
     window.addEventListener("keydown", k);
@@ -190,6 +195,7 @@ export default function Shell({
   const navigate = (screen: string, g: GroupId, extra?: Record<string, string>) => {
     const url = screenUrl(screen, g, scopeCode);
     if (extra) url.query = { ...url.query, ...extra };
+    setDrawer(false);
     router.push(url);
   };
 
@@ -266,7 +272,7 @@ export default function Shell({
     ...PROJECTS.map((p) => ({ code: p.code, name: p.name, pct: Math.round((p.sold / p.units) * 100), units: p.units })),
   ];
   const proj = PROJECTS.find((p) => p.code === scopeCode);
-  const groupLabel = group === "project" ? "Project · " + (proj ? proj.code : scopeCode || "ALL") : NAV[group].label;
+  const groupLabel = group === "project" ? "Project Â· " + (proj ? proj.code : scopeCode || "ALL") : NAV[group].label;
 
   const hitUnits = UNITS.filter(
     (u) => !q || u.id.toLowerCase().includes(q.toLowerCase()) || u.typ.toLowerCase().includes(q.toLowerCase())
@@ -279,11 +285,87 @@ export default function Shell({
     { title: "Collections worklist", screen: "collections", group: "finance" as GroupId },
   ].filter((a) => !q || a.title.toLowerCase().includes(q.toLowerCase()));
 
+  const sideInFlow = win.bp === "laptop" || win.bp === "desktop";
+  const railVisible = win.bp !== "mobile";
+  const goGroup = (id: GroupId) => {
+    if ((id === "project" || id === "sales") && scopeLocked) {
+      showToast("Select a project to access " + (id === "project" ? "the Project module" : "Sales"));
+      return;
+    }
+    setDrawer(false);
+    router.push(groupUrl(id, scopeCode));
+  };
+
+  const renderSidebar = () => (
+    <>
+      <div style={{ fontSize: 15, fontWeight: 800, letterSpacing: "-.02em", padding: "0 8px" }}>Ellington</div>
+      <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: ".06em", color: "#9AA0AE", textTransform: "uppercase", padding: "3px 8px 0" }}>ORN 21281 · H21</div>
+      <button
+        onClick={() => {
+          closeMenus();
+          setSwitcher((s) => !s);
+        }}
+        style={{ marginTop: 16, width: "100%", textAlign: "left", background: "#F5F6FA", border: "1px solid #EDEEF3", borderRadius: 14, padding: "11px 12px", cursor: "pointer", display: "flex", gap: 10, alignItems: "center", fontFamily: "inherit" }}
+      >
+        <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10, fontWeight: 700, padding: "4px 6px", borderRadius: 8, background: "#EDECFE", color: AC }}>{scopeCode || (onScope ? "ALL" : "")}</span>
+        <span style={{ flex: 1, minWidth: 0 }}>
+          <span style={{ display: "block", fontSize: 12.5, fontWeight: 700, letterSpacing: "-.01em", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{proj ? proj.name : "All projects"}</span>
+          <span style={{ display: "block", fontSize: 10.5, color: "#6B7180", fontWeight: 500, marginTop: 2 }}>{proj ? proj.units + " units · " + Math.round((proj.sold / proj.units) * 100) + "% sold" : "850 units · 68% sold"}</span>
+        </span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9AA0AE" strokeWidth="2" strokeLinecap="round"><path d="m6 9 6 6 6-6" /></svg>
+      </button>
+      {switcher && (
+        <div style={{ marginTop: 8, background: "#fff", border: "1px solid #EDEEF3", borderRadius: 14, boxShadow: "0 12px 32px rgba(20,22,31,.10)", padding: 6, display: "flex", flexDirection: "column", gap: 2 }}>
+          {scopes.map((s) => {
+            const on = (scopeCode || "ALL") === s.code;
+            return (
+              <button key={s.code} onClick={() => { onScope && onScope(s.code); setSwitcher(false); }} style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 8px", border: 0, borderRadius: 11, cursor: "pointer", fontFamily: "inherit", background: on ? "#F5F6FA" : "transparent" }}>
+                <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 9.5, fontWeight: 700, padding: "3px 5px", borderRadius: 6, background: "#EDECFE", color: AC }}>{s.code}</span>
+                <span style={{ flex: 1, minWidth: 0, textAlign: "left" }}>
+                  <span style={{ display: "block", fontSize: 12, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.name}</span>
+                  <span style={{ display: "block", height: 3, borderRadius: 3, background: "#EDEEF3", marginTop: 5, overflow: "hidden" }}><span style={{ display: "block", height: "100%", width: s.pct + "%", background: AC }} /></span>
+                </span>
+                <span style={{ fontSize: 10.5, color: "#6B7180", fontWeight: 600, fontFamily: "'JetBrains Mono',monospace" }}>{s.pct}%</span>
+              </button>
+            );
+          })}
+          <button onClick={() => { setSwitcher(false); setNewProj(true); }} style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 10px", border: 0, background: "transparent", borderRadius: 10, cursor: "pointer", color: "#4F46F5", fontSize: 12, fontWeight: 700, fontFamily: "inherit", marginTop: 2, borderTop: "1px solid #EDEEF3" }}>+ New project</button>
+        </div>
+      )}
+      <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 2 }}>
+        <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: ".09em", color: "#9AA0AE", textTransform: "uppercase", padding: "6px 10px 8px" }}>{groupLabel}</div>
+        {navItems.map((n) => (
+          <button key={n.screen} title={n.locked ? "Select a project to access" : undefined} disabled={n.locked} onClick={() => { if (n.locked) { showToast("Select a project to access the " + n.label + " screen"); return; } navigate(n.screen, group); }} style={n.btn} onMouseEnter={(e) => { if (!n.locked) e.currentTarget.style.background = "#F5F6FA"; }} onMouseLeave={(e) => { if (!n.locked) e.currentTarget.style.background = n.btn.background as string; }}>
+            <span style={n.dot} />
+            <span style={{ flex: 1, textAlign: "left" }}>{n.label}</span>
+            <span style={n.badge}>{n.count}</span>
+            <span style={n.lock}>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="4" y="11" width="16" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg>
+            </span>
+          </button>
+        ))}
+      </div>
+      <div style={{ flex: 1, minHeight: 24 }} />
+      <div style={{ borderTop: "1px solid #EDEEF3", paddingTop: 12, display: "flex", alignItems: "center", gap: 10 }}>
+        <div style={{ width: 32, height: 32, flex: "none", borderRadius: 11, background: "#E7E9F0", display: "grid", placeItems: "center", fontSize: 11, fontWeight: 700, color: "#4A5060" }}>RM</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>Rania Mansour</div>
+          <div style={{ fontSize: 10, color: "#6B7180", fontWeight: 600 }}>Super Admin</div>
+        </div>
+        <button onClick={() => { closeMenus(); setProfileMenu((p) => !p); }} title="Account menu" style={{ width: 30, height: 30, border: 0, background: "#F5F6FA", borderRadius: 10, display: "grid", placeItems: "center", cursor: "pointer", color: "#4A5060" }}>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /><circle cx="5" cy="12" r="1" /></svg>
+        </button>
+      </div>
+    </>
+  );
+
   return (
     <div
       dir={rtl ? "rtl" : "ltr"}
-      style={{ display: "flex", height: "100vh", width: "100%", overflow: "hidden", background: "#F3F4F8", color: "#14161F", fontSize: 13 }}
+      style={{ display: "flex", flexDirection: "column", height: "100vh", width: "100%", overflow: "hidden", background: "#F3F4F8", color: "#14161F", fontSize: 13 }}
     >
+      <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
+      {railVisible && (
       <Rail
         group={group}
         gi={gi}
@@ -293,139 +375,34 @@ export default function Shell({
             showToast("Select a project to access " + (id === "project" ? "the Project module" : "Sales"));
             return;
           }
+          setDrawer(false);
           router.push(groupUrl(id, scopeCode));
         }}
         onSignOut={signOut}
       />
+      )}
 
-      <div style={{ width: 222, flex: "none", background: "#fff", display: "flex", flexDirection: "column", padding: "18px 14px 14px", borderRight: "1px solid #EDEEF3", overflow: "auto" }}>
-        <div style={{ fontSize: 15, fontWeight: 800, letterSpacing: "-.02em", padding: "0 8px" }}>Ellington</div>
-        <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: ".06em", color: "#9AA0AE", textTransform: "uppercase", padding: "3px 8px 0" }}>ORN 21281 · H21</div>
-
-        <button
-          onClick={() => {
-            closeMenus();
-            setSwitcher((s) => !s);
-          }}
-          style={{ marginTop: 16, width: "100%", textAlign: "left", background: "#F5F6FA", border: "1px solid #EDEEF3", borderRadius: 14, padding: "11px 12px", cursor: "pointer", display: "flex", gap: 10, alignItems: "center", fontFamily: "inherit" }}
-        >
-          <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10, fontWeight: 700, padding: "4px 6px", borderRadius: 8, background: "#EDECFE", color: AC }}>
-            {scopeCode || (onScope ? "ALL" : "")}
-          </span>
-          <span style={{ flex: 1, minWidth: 0 }}>
-            <span style={{ display: "block", fontSize: 12.5, fontWeight: 700, letterSpacing: "-.01em", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-              {proj ? proj.name : "All projects"}
-            </span>
-            <span style={{ display: "block", fontSize: 10.5, color: "#6B7180", fontWeight: 500, marginTop: 2 }}>
-              {proj ? proj.units + " units · " + Math.round((proj.sold / proj.units) * 100) + "% sold" : "850 units · 68% sold"}
-            </span>
-          </span>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9AA0AE" strokeWidth="2" strokeLinecap="round"><path d="m6 9 6 6 6-6" /></svg>
-        </button>
-
-        {switcher && (
-          <div style={{ marginTop: 8, background: "#fff", border: "1px solid #EDEEF3", borderRadius: 14, boxShadow: "0 12px 32px rgba(20,22,31,.10)", padding: 6, display: "flex", flexDirection: "column", gap: 2 }}>
-            {scopes.map((s) => {
-              const on = (scopeCode || "ALL") === s.code;
-              return (
-                <button
-                  key={s.code}
-                  onClick={() => {
-                    onScope && onScope(s.code);
-                    setSwitcher(false);
-                  }}
-                  style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 8px", border: 0, borderRadius: 11, cursor: "pointer", fontFamily: "inherit", background: on ? "#F5F6FA" : "transparent" }}
-                >
-                  <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 9.5, fontWeight: 700, padding: "3px 5px", borderRadius: 6, background: "#EDECFE", color: AC }}>{s.code}</span>
-                  <span style={{ flex: 1, minWidth: 0, textAlign: "left" }}>
-                    <span style={{ display: "block", fontSize: 12, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.name}</span>
-                    <span style={{ display: "block", height: 3, borderRadius: 3, background: "#EDEEF3", marginTop: 5, overflow: "hidden" }}>
-                      <span style={{ display: "block", height: "100%", width: s.pct + "%", background: AC }} />
-                    </span>
-                  </span>
-                  <span style={{ fontSize: 10.5, color: "#6B7180", fontWeight: 600, fontFamily: "'JetBrains Mono',monospace" }}>{s.pct}%</span>
-                </button>
-              );
-            })}
-            <button
-              onClick={() => {
-                setSwitcher(false);
-                setNewProj(true);
-              }}
-              style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 10px", border: 0, background: "transparent", borderRadius: 10, cursor: "pointer", color: "#4F46F5", fontSize: 12, fontWeight: 700, fontFamily: "inherit", marginTop: 2, borderTop: "1px solid #EDEEF3" }}
-            >
-              + New project
-            </button>
-          </div>
-        )}
-
-        <div style={{ marginTop: 18, display: "flex", flexDirection: "column", gap: 2 }}>
-          <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: ".09em", color: "#9AA0AE", textTransform: "uppercase", padding: "6px 10px 8px" }}>{groupLabel}</div>
-          {navItems.map((n) => (
-            <button
-              key={n.screen}
-              title={n.locked ? "Select a project to access" : undefined}
-              disabled={n.locked}
-              onClick={() => {
-                if (n.locked) {
-                  showToast("Select a project to access the " + n.label + " screen");
-                  return;
-                }
-                navigate(n.screen, group);
-              }}
-              style={n.btn}
-              onMouseEnter={(e) => {
-                if (!n.locked) e.currentTarget.style.background = "#F5F6FA";
-              }}
-              onMouseLeave={(e) => {
-                if (!n.locked) e.currentTarget.style.background = n.btn.background as string;
-              }}
-            >
-              <span style={n.dot} />
-              <span style={{ flex: 1, textAlign: "left" }}>{n.label}</span>
-              <span style={n.badge}>{n.count}</span>
-              <span style={n.lock}>
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="4" y="11" width="16" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg>
-              </span>
-            </button>
-          ))}
-        </div>
-
-        <div style={{ flex: 1, minHeight: 24 }} />
-
-        <div style={{ borderTop: "1px solid #EDEEF3", paddingTop: 12, display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ width: 32, height: 32, flex: "none", borderRadius: 11, background: "#E7E9F0", display: "grid", placeItems: "center", fontSize: 11, fontWeight: 700, color: "#4A5060" }}>RM</div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 12, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>Rania Mansour</div>
-            <div style={{ fontSize: 10, color: "#6B7180", fontWeight: 600 }}>Super Admin</div>
-          </div>
-          <button
-            onClick={() => {
-              closeMenus();
-              setProfileMenu((p) => !p);
-            }}
-            title="Account menu"
-            style={{ width: 30, height: 30, border: 0, background: "#F5F6FA", borderRadius: 10, display: "grid", placeItems: "center", cursor: "pointer", color: "#4A5060" }}
-          >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /><circle cx="5" cy="12" r="1" /></svg>
-          </button>
-        </div>
+      {sideInFlow && (
+      <div style={{ width: 216, flex: "none", background: "#fff", display: "flex", flexDirection: "column", padding: "18px 14px 14px", borderRight: "1px solid #EDEEF3", overflow: "auto" }}>
+        {renderSidebar()}
       </div>
+      )}
 
-      <div style={{ flex: 1, minWidth: 0, overflowX: "auto", overflowY: "hidden" }}>
-        <div style={{ minWidth: 1180, height: "100%", display: "flex", flexDirection: "column" }}>
-          <Topbar
-            crumbs={crumbs}
-            onOpenCmdk={() => setCmdk(true)}
-            onCollections={() => navigate("collections", "finance")}
-            notifOpen={notif}
-            onNotif={() => { closeMenus(); setNotif((n) => !n); }}
-            profileOpen={profileMenu}
-            onProfile={() => { closeMenus(); setProfileMenu((p) => !p); }}
-            unread={unread}
-            helpOpen={help}
-            onHelp={() => { closeMenus(); setHelp((h) => !h); }}
-          />
+      <div style={{ flex: 1, minWidth: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+        <Topbar
+          crumbs={crumbs}
+          onOpenCmdk={() => setCmdk(true)}
+          onCollections={() => navigate("collections", "finance")}
+          notifOpen={notif}
+          onNotif={() => { closeMenus(); setNotif((n) => !n); }}
+          profileOpen={profileMenu}
+          onProfile={() => { closeMenus(); setProfileMenu((p) => !p); }}
+          unread={unread}
+          helpOpen={help}
+          onHelp={() => { closeMenus(); setHelp((h) => !h); }}
+          onMenu={dlg || win.bp === "tablet" ? () => setDrawer(true) : undefined}
+          group={group}
+        /> 
 
           <div style={{ flex: 1, overflowY: "auto", overflowX: "hidden", padding: "24px 26px 40px" }}>
             {title && (
@@ -439,8 +416,23 @@ export default function Shell({
             )}
             {children}
           </div>
-        </div>
       </div>
+      </div>
+
+      {dlg && <MobileBar groups={RAIL} group={group} locked={scopeLocked} onGo={goGroup} onOpen={() => setDrawer(true)} />}
+
+      {(dlg || win.bp === "tablet") && drawer && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 90, background: "rgba(20,22,31,.4)", display: "flex" }}>
+          <div onClick={() => setDrawer(false)} style={{ flex: 1 }} />
+          <div style={{ width: Math.min(300, win.w - 40), height: "100%", background: "#fff", display: "flex", flexDirection: "column", padding: "18px 14px 14px", overflowY: "auto", boxShadow: "-12px 0 40px rgba(20,22,31,.16)" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+              <div style={{ fontSize: 16, fontWeight: 800, letterSpacing: "-.02em" }}>Ellington</div>
+              <button onClick={() => setDrawer(false)} style={{ width: 32, height: 32, border: 0, background: "#F1F2F7", borderRadius: 10, display: "grid", placeItems: "center", cursor: "pointer", fontWeight: 700, fontSize: 16, color: "#4A5060", fontFamily: "inherit" }}>×</button>
+            </div>
+            {renderSidebar()}
+          </div>
+        </div>
+      )}
 
       <TopbarFloating
         notifOpen={notif}
@@ -468,15 +460,15 @@ export default function Shell({
                 ref={inputRef}
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
-                placeholder="Search units, buyers, receipts…"
+                placeholder="Search units, buyers, receiptsâ€¦"
                 style={{ flex: 1, border: 0, outline: "none", fontFamily: "inherit", fontSize: 13.5, color: "#14161F", background: "transparent" }}
               />
               <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10, fontWeight: 600, background: "#F5F6FA", border: "1px solid #E4E6EE", borderRadius: 6, padding: "2px 6px", color: "#6B7180" }}>Esc</span>
             </div>
             <div style={{ maxHeight: 360, overflow: "auto", padding: "8px" }}>
-              {hitUnits.length > 0 && <Group label="Units" items={hitUnits.map((u) => ({ key: u.id, title: u.id, sub: u.typ + " · L" + u.f + " · " + u.area + " sq.ft", trail: money(u.price), icon: "⌗", bg: ST[u.status][1], fg: ST[u.status][0], onClick: () => { closeCmdk(); navigate("unit", "project", { unit: u.id }); } }))} />}
-              {hitBuyers.length > 0 && <Group label="Buyers" items={hitBuyers.map((b, i) => ({ key: b, title: b, sub: "H21-B-00" + (147 + i) + " · 2 units", trail: "AED " + (1.9 - i * 0.4).toFixed(1) + "M out", icon: b[0], bg: "#E7E9F0", fg: "#4A5060", onClick: () => { closeCmdk(); navigate("buyer", "sales", { name: b }); } }))} />}
-              {hitActions.length > 0 && <Group label="Actions" items={hitActions.map((a) => ({ key: a.title, title: a.title, sub: "Action", trail: "↵", icon: "›", bg: "#EDECFE", fg: AC, onClick: () => { closeCmdk(); navigate(a.screen, a.group); } }))} />}
+              {hitUnits.length > 0 && <Group label="Units" items={hitUnits.map((u) => ({ key: u.id, title: u.id, sub: u.typ + " Â· L" + u.f + " Â· " + u.area + " sq.ft", trail: money(u.price), icon: "âŒ—", bg: ST[u.status][1], fg: ST[u.status][0], onClick: () => { closeCmdk(); navigate("unit", "project", { unit: u.id }); } }))} />}
+              {hitBuyers.length > 0 && <Group label="Buyers" items={hitBuyers.map((b, i) => ({ key: b, title: b, sub: "H21-B-00" + (147 + i) + " Â· 2 units", trail: "AED " + (1.9 - i * 0.4).toFixed(1) + "M out", icon: b[0], bg: "#E7E9F0", fg: "#4A5060", onClick: () => { closeCmdk(); navigate("buyer", "sales", { name: b }); } }))} />}
+              {hitActions.length > 0 && <Group label="Actions" items={hitActions.map((a) => ({ key: a.title, title: a.title, sub: "Action", trail: "â†µ", icon: "â€º", bg: "#EDECFE", fg: AC, onClick: () => { closeCmdk(); navigate(a.screen, a.group); } }))} />}
             </div>
           </div>
         </div>
@@ -487,7 +479,7 @@ export default function Shell({
           onClose={() => setNewProj(false)}
           onCreate={(name, code) => {
             setNewProj(false);
-            showToast("Project " + code + " · " + name + " created");
+            showToast("Project " + code + " Â· " + name + " created");
           }}
         />
       )}
@@ -556,7 +548,7 @@ function Rail({ group, gi, locked, onGo, onSignOut }: { group: GroupId; gi: numb
             <button
               key={g.id}
               onClick={() => onGo(g.id)}
-              title={isLocked ? "Select a project to access — " + g.label : g.label}
+              title={isLocked ? "Select a project to access â€” " + g.label : g.label}
               style={{ ...railBtn(group === g.id, isLocked ? "#C7CBD6" : "#9AA0AE"), opacity: isLocked && group !== g.id ? 0.5 : 1, cursor: isLocked && group !== g.id ? "not-allowed" : "pointer" } as CSSProperties}
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d={g.d} /></svg>
@@ -587,6 +579,8 @@ function Topbar({
   unread,
   helpOpen,
   onHelp,
+  onMenu,
+  group,
 }: {
   crumbs: string[];
   onOpenCmdk: () => void;
@@ -598,10 +592,17 @@ function Topbar({
   unread: number;
   helpOpen: boolean;
   onHelp: () => void;
+  onMenu?: () => void;
+  group?: GroupId;
 }) {
   return (
-    <div style={{ height: 60, flex: "none", background: "#fff", borderBottom: "1px solid #EDEEF3", display: "flex", alignItems: "center", gap: 18, padding: "0 24px", position: "relative", zIndex: 30 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12, fontWeight: 600, color: "#9AA0AE", whiteSpace: "nowrap" }}>
+    <div style={{ height: 60, flex: "none", background: "#fff", borderBottom: "1px solid #EDEEF3", display: "flex", alignItems: "center", gap: 14, padding: "0 18px", position: "relative", zIndex: 30 }}>
+      {onMenu && (
+        <button onClick={onMenu} title="Menu" style={{ width: 38, height: 38, flex: "none", borderRadius: 12, border: "1px solid #EDEEF3", background: "#fff", display: "grid", placeItems: "center", cursor: "pointer" }}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#14161F" strokeWidth="1.8" strokeLinecap="round"><path d="M4 6h16M4 12h16M4 18h10" /></svg>
+        </button>
+      )}
+      <div style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12, fontWeight: 600, color: "#9AA0AE", whiteSpace: "nowrap", minWidth: 0, overflow: "hidden" }}>
         {crumbs.map((c, i) => (
           <span key={i} style={{ fontSize: 12, fontWeight: i === crumbs.length - 1 ? "700" : "600", color: i === crumbs.length - 1 ? "#14161F" : "#9AA0AE" }}>
             {c}
@@ -610,7 +611,7 @@ function Topbar({
         ))}
       </div>
       <div style={{ flex: 1 }} />
-      <button onClick={onOpenCmdk} style={{ width: 400, height: 38, background: "#F5F6FA", border: "1px solid #EDEEF3", borderRadius: 12, display: "flex", alignItems: "center", gap: 9, padding: "0 12px", cursor: "text", color: "#9AA0AE", fontFamily: "inherit", fontSize: 12.5 }}>
+      <button onClick={onOpenCmdk} style={{ width: 300, maxWidth: "34vw", height: 38, background: "#F5F6FA", border: "1px solid #EDEEF3", borderRadius: 12, display: "flex", alignItems: "center", gap: 9, padding: "0 12px", cursor: "text", color: "#9AA0AE", fontFamily: "inherit", fontSize: 12.5 }}>
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
         <span style={{ flex: 1, textAlign: "left", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>Search units, buyers, receipts…</span>
         <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10, fontWeight: 600, background: "#fff", border: "1px solid #E4E6EE", borderRadius: 6, padding: "2px 6px", color: "#6B7180" }}>⌘K</span>
@@ -645,6 +646,26 @@ function Topbar({
           RM
         </button>
       </div>
+    </div>
+  );
+}
+
+function MobileBar({ groups, group, locked, onGo, onOpen }: { groups: RailDef[]; group: GroupId; locked: boolean; onGo: (id: GroupId) => void; onOpen: () => void }) {
+  return (
+    <div style={{ flex: "none", height: 62, background: "#fff", borderTop: "1px solid #EDEEF3", display: "flex", alignItems: "center", justifyContent: "space-around", position: "relative", zIndex: 60 }}>
+      {groups.slice(0, 6).map((g) => {
+        const gLocked = (g.id === "project" || g.id === "sales") && locked;
+        return (
+          <button key={g.id} onClick={() => onGo(g.id)} title={gLocked ? "Select a project" : g.label} style={{ height: "100%", flex: 1, border: 0, background: "transparent", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 3, cursor: gLocked && group !== g.id ? "not-allowed" : "pointer", opacity: gLocked && group !== g.id ? 0.5 : 1, fontFamily: "inherit" }}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={group === g.id ? "#14161F" : "#9AA0AE"} strokeWidth={group === g.id ? 2 : 1.7} strokeLinecap="round" strokeLinejoin="round"><path d={g.d} /></svg>
+            <span style={{ fontSize: 9.5, fontWeight: group === g.id ? "800" : "600", color: group === g.id ? "#14161F" : "#9AA0AE" }}>{g.label.split(" ")[0]}</span>
+          </button>
+        );
+      })}
+      <button onClick={onOpen} title="Menu" style={{ height: "100%", flex: 1, border: 0, background: "transparent", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 3, cursor: "pointer", fontFamily: "inherit" }}>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#14161F" strokeWidth="1.8" strokeLinecap="round"><path d="M4 6h16M4 12h16M4 18h16" /></svg>
+        <span style={{ fontSize: 9.5, fontWeight: 600, color: "#9AA0AE" }}>Menu</span>
+      </button>
     </div>
   );
 }
@@ -690,10 +711,10 @@ function TopbarFloating({
             <span style={{ display: "inline-block", marginTop: 6, fontSize: 10, fontWeight: 700, background: "#EDECFE", color: AC, borderRadius: 7, padding: "2px 7px" }}>Super Admin</span>
           </div>
           <div style={{ borderTop: "1px solid #EDEEF3", margin: "6px 8px" }} />
-          <MenuRow icon="◎" label="My profile" sub="Identity & preferences" onClick={() => { onCloseProfile(); onToast("Profile settings opened"); }} />
-          <MenuRow icon="⚙" label="Preferences" sub="Notifications & quiet hours" onClick={() => { onCloseProfile(); onToast("Preferences opened"); }} />
-          <MenuRow icon="⟳" label="Offline cache" sub="Last synced 09:39" onClick={() => { onCloseProfile(); onToast("Offline cache synced"); }} />
-          <MenuRow icon="⇄" label={rtl ? "Direction: RTL" : "Direction: LTR"} sub="Mirror the shell" onClick={() => { onToggleRtl(); onCloseProfile(); }} />
+          <MenuRow icon="â—Ž" label="My profile" sub="Identity & preferences" onClick={() => { onCloseProfile(); onToast("Profile settings opened"); }} />
+          <MenuRow icon="âš™" label="Preferences" sub="Notifications & quiet hours" onClick={() => { onCloseProfile(); onToast("Preferences opened"); }} />
+          <MenuRow icon="âŸ³" label="Offline cache" sub="Last synced 09:39" onClick={() => { onCloseProfile(); onToast("Offline cache synced"); }} />
+          <MenuRow icon="â‡„" label={rtl ? "Direction: RTL" : "Direction: LTR"} sub="Mirror the shell" onClick={() => { onToggleRtl(); onCloseProfile(); }} />
           <div style={{ borderTop: "1px solid #EDEEF3", margin: "6px 8px" }} />
           <button onClick={() => { onCloseProfile(); onSignOut(); }} style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 10px", border: 0, background: "transparent", borderRadius: 10, cursor: "pointer", fontFamily: "inherit", color: "#E5484D", fontSize: 12, fontWeight: 700, textAlign: "left", width: "100%" }}>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" /></svg>
@@ -709,7 +730,7 @@ function TopbarFloating({
               {unread > 0 && (
                 <button onClick={onMarkAll} style={{ border: 0, background: "transparent", color: AC, fontSize: 11.5, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", padding: 0 }}>Mark all read</button>
               )}
-              <button onClick={onClose} style={{ border: 0, background: "#F1F2F7", color: "#4A5060", width: 24, height: 24, borderRadius: 8, cursor: "pointer", fontFamily: "inherit", fontWeight: 700, fontSize: 12, lineHeight: 1 }}>×</button>
+              <button onClick={onClose} style={{ border: 0, background: "#F1F2F7", color: "#4A5060", width: 24, height: 24, borderRadius: 8, cursor: "pointer", fontFamily: "inherit", fontWeight: 700, fontSize: 12, lineHeight: 1 }}>Ã—</button>
             </div>
           </div>
           <div style={{ maxHeight: 380, overflow: "auto" }}>
@@ -721,9 +742,9 @@ function TopbarFloating({
                   <div style={{ fontSize: 12, fontWeight: 600, lineHeight: 1.45 }}>
                     <span style={{ fontWeight: 800 }}>{n.who}</span> {n.what}
                   </div>
-                  <div style={{ fontSize: 10.5, color: "#9AA0AE", fontWeight: 500, marginTop: 2 }}>{n.time}{n.unread ? " · unread" : ""}</div>
+                  <div style={{ fontSize: 10.5, color: "#9AA0AE", fontWeight: 500, marginTop: 2 }}>{n.time}{n.unread ? " Â· unread" : ""}</div>
                 </div>
-                <button onClick={() => onDismiss(n.id)} title="Dismiss" style={{ border: 0, background: "transparent", color: "#C7CBD6", cursor: "pointer", fontSize: 13, fontFamily: "inherit", alignSelf: "flex-start" }}>×</button>
+                <button onClick={() => onDismiss(n.id)} title="Dismiss" style={{ border: 0, background: "transparent", color: "#C7CBD6", cursor: "pointer", fontSize: 13, fontFamily: "inherit", alignSelf: "flex-start" }}>Ã—</button>
               </div>
             ))}
           </div>
@@ -737,7 +758,7 @@ function TopbarFloating({
             <span style={{ fontSize: 12, fontWeight: 600 }}>Documentation & guides</span>
           </button>
           <button onClick={onCloseHelp} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 10px", border: 0, background: "transparent", borderRadius: 10, cursor: "pointer", fontFamily: "inherit", textAlign: "left", width: "100%" }}>
-            <span style={{ width: 26, height: 24, flex: "none", borderRadius: 8, background: "#F1F2F7", color: "#4A5060", display: "grid", placeItems: "center", fontSize: 12 }}>⌘K</span>
+            <span style={{ width: 26, height: 24, flex: "none", borderRadius: 8, background: "#F1F2F7", color: "#4A5060", display: "grid", placeItems: "center", fontSize: 12 }}>âŒ˜K</span>
             <span style={{ fontSize: 12, fontWeight: 600 }}>Keyboard shortcuts</span>
           </button>
           <button onClick={onCloseHelp} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 10px", border: 0, background: "transparent", borderRadius: 10, cursor: "pointer", fontFamily: "inherit", textAlign: "left", width: "100%" }}>

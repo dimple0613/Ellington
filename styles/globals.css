@@ -83,3 +83,83 @@ input {
 .unit-card .u-price { font-weight: 700; font-size: 14px; }
 .unit-card .u-buyer { font-size: 12px; color: var(--primary); margin-top: 8px; }
 .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+
+/* ── Responsive layout helpers ── */
+[style*="min-width: 1180"] { min-width: 0 !important; }
+[style*="overflow-x: auto"] { overflow-x: visible !important; }
+[style*="overflowX: auto"] { overflowX: visible !important; }
+
+/* Content area responsive padding */
+@media (max-width: 1024px) {
+  [style*="padding: 24px 26px"] { padding: 18px 16px !important; }
+  [style*="padding: 24px 26px 40px"] { padding: 18px 16px 32px !important; }
+}
+@media (max-width: 640px) {
+  [style*="padding: 24px 26px"] { padding: 14px 12px !important; }
+  [style*="padding: 24px 26px 40px"] { padding: 14px 12px 24px !important; }
+}
+
+/* Table overflow — wrap any child that has a min-width grid inside a scrollable container */
+@media (max-width: 1280px) {
+  .overflow-x-auto { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+}
+
+/* Fluid cards: any button/div with borderRadius:20 should shrink gracefully */
+@media (max-width: 640px) {
+  [style*="border-radius: 20"] { border-radius: 14px !important; }
+  [style*="borderRadius: 20"] { borderRadius: 14px !important; }
+}
+
+/* ── Screen-specific responsive overrides via data attributes ── */
+/* KPI grids: repeat(6,1fr) -> auto-fit */
+@media (max-width: 1024px) {
+  [style*="repeat(6"] { grid-template-columns: repeat(3, 1fr) !important; }
+  [style*="repeat(6,"] { grid-template-columns: repeat(3, 1fr) !important; }
+}
+@media (max-width: 640px) {
+  [style*="repeat(6"] { grid-template-columns: repeat(2, 1fr) !important; }
+  [style*="repeat(6,"] { grid-template-columns: repeat(2, 1fr) !important; }
+}
+
+/* 2-col feature panels: 1.55fr 1fr, 1.35fr 1fr -> stack */
+@media (max-width: 900px) {
+  [style*="1.55fr 1fr"] { grid-template-columns: 1fr !important; }
+  [style*="1.35fr 1fr"] { grid-template-columns: 1fr !important; }
+}
+
+/* 3-col stats: repeat(3,1fr) -> 2-col on tablet, 1-col on mobile */
+@media (max-width: 900px) {
+  [style*="repeat(3,1fr)"] { grid-template-columns: repeat(2, 1fr) !important; }
+}
+@media (max-width: 640px) {
+  [style*="repeat(3,1fr)"] { grid-template-columns: 1fr !important; }
+}
+
+/* Projects table: fixed px columns -> horizontal scroll wrapper */
+.table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; max-width: 100%; }
+
+/* Topbar title font size responsive */
+@media (max-width: 640px) {
+  [style*="fontSize: 26"] { fontSize: 20px !important; }
+  [style*="font-size: 26"] { font-size: 20px !important; }
+}
+
+/* KPI card text responsive */
+@media (max-width: 640px) {
+  [style*="fontSize: 21"] { fontSize: 17px !important; }
+  [style*="font-size: 21"] { font-size: 17px !important; }
+  [style*="fontSize: 19"] { fontSize: 16px !important; }
+  [style*="font-size: 19"] { font-size: 16px !important; }
+}
+
+/* Hide "Due today" pill on very small screens */
+@media (max-width: 480px) {
+  [style*="Due today"] { display: none !important; }
+}
+
+/* Kanban/scrollable screens: make horizontal scroll smooth */
+.kanban-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; scroll-snap-type: x proximity; }
+.kanban-scroll > * { scroll-snap-align: start; }
+
+/* Login page already responsive, just ensure no overflow */
+.login-wrap { overflow: hidden; }
