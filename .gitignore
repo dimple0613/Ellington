@@ -22,3 +22,7 @@ tsconfig.tsbuildinfo
 next-env.d.ts
 *.tsbuildinfo
 .vscode/.idea/
+
+# local tools
+.playwright-mcp/
+dev-server.log

@@ -1,11 +1,13 @@
 export const runtime = "edge";
 
-import type { NextApiRequest, NextApiResponse } from "next";
-import { withSession } from "../../lib/session";
+import { NextRequest, NextResponse } from "next/server";
+import { withSession, Session } from "../../lib/session";
 import { query } from "../../lib/db";
 
-export default withSession(async function (req: NextApiRequest, res: NextApiResponse) {
-  const { project, status } = req.query as { project?: string; status?: string };
+export default withSession(async function (req: NextRequest, _session: Session) {
+  const project = req.nextUrl.searchParams.get("project") || "all";
+  const status = req.nextUrl.searchParams.get("status") || "all";
+
   const conds: string[] = [];
   const params: any[] = [];
 
@@ -28,19 +30,21 @@ export default withSession(async function (req: NextApiRequest, res: NextApiResp
      JOIN projects p ON p.id = u.project_id
      LEFT JOIN buyers b ON b.id = u.buyer_id
      ${where}
-     ORDER BY p.code, u.no`
-  , params);
+     ORDER BY p.code, u.no`,
+    params
+  );
 
   const summary = await query<any>(
     `SELECT u.status, COUNT(*)::int AS n FROM units u
      JOIN projects p ON p.id = u.project_id
      ${project && project !== "all" ? `WHERE p.code = $1` : ""}
-     GROUP BY u.status ORDER BY u.status`
-  , project && project !== "all" ? [project] : []);
+     GROUP BY u.status ORDER BY u.status`,
+    project && project !== "all" ? [project] : []
+  );
 
   const projects = await query<any>(
     `SELECT code, name FROM projects ORDER BY code`
   );
 
-  return res.status(200).json({ units: units.rows, summary: summary.rows, projects: projects.rows });
+  return NextResponse.json({ units: units.rows, summary: summary.rows, projects: projects.rows });
 });
