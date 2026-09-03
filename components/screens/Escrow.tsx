@@ -20,6 +20,17 @@ export default function EscrowScreen() {
     { date: "12 Aug 26", desc: "Cheque return \u00b7 CHQ-883964", amount: "268,000", side: "Bank only" },
   ]);
   const [notice, setNotice] = useState("");
+  const [drawdowns, setDrawdowns] = useState<Drawdown[]>([
+    { id: "DDR-0004", milestone: "Structure 40%", amount: "62,400,000", cert: "WSP \u00b7 A. Faruqi \u00b7 04 Aug 26", rera: "Submitted", status: "Awaiting trustee" },
+    { id: "DDR-0003", milestone: "Substructure complete", amount: "48,200,000", cert: "WSP \u00b7 A. Faruqi \u00b7 12 May 26", rera: "Approved", status: "Released" },
+    { id: "DDR-0002", milestone: "Enabling works", amount: "21,600,000", cert: "WSP \u00b7 A. Faruqi \u00b7 03 Feb 26", rera: "Approved", status: "Released" },
+    { id: "DDR-0001", milestone: "Mobilisation", amount: "14,800,000", cert: "WSP \u00b7 A. Faruqi \u00b7 18 Nov 25", rera: "Approved", status: "Released" },
+  ]);
+  const [ddrOpen, setDdrOpen] = useState(false);
+  const [ddrMilestone, setDdrMilestone] = useState("Structure 40%");
+  const [ddrAmount, setDdrAmount] = useState("");
+  const [ddrRera, setDdrRera] = useState("Submitted");
+  const [ddrErr, setDdrErr] = useState("");
 
   const escId: [string, string, boolean][] = [
     ["Escrow bank", "Emirates NBD \u00b7 Trustee", false],
@@ -51,14 +62,36 @@ export default function EscrowScreen() {
     { label: "5% retention held", value: "5.0%", flag: false },
   ];
 
-  const drawdowns: Drawdown[] = [
-    { id: "DDR-0004", milestone: "Structure 40%", amount: "62,400,000", cert: "WSP \u00b7 A. Faruqi \u00b7 04 Aug 26", rera: "Submitted", status: "Awaiting trustee" },
-    { id: "DDR-0003", milestone: "Substructure complete", amount: "48,200,000", cert: "WSP \u00b7 A. Faruqi \u00b7 12 May 26", rera: "Approved", status: "Released" },
-    { id: "DDR-0002", milestone: "Enabling works", amount: "21,600,000", cert: "WSP \u00b7 A. Faruqi \u00b7 03 Feb 26", rera: "Approved", status: "Released" },
-    { id: "DDR-0001", milestone: "Mobilisation", amount: "14,800,000", cert: "WSP \u00b7 A. Faruqi \u00b7 18 Nov 25", rera: "Approved", status: "Released" },
-  ];
-
   const matchRow = (idx: number) => { setQueue((q) => q.filter((_, i) => i !== idx)); setNotice("Row matched and reconciled \u00b7 escrow variance reduced"); setTimeout(() => setNotice(""), 3000); };
+
+  const submitDdr = () => {
+    const amt = ddrAmount.replace(/[^0-9]/g, "");
+    if (!amt || Number(amt) <= 0) { setDdrErr("Enter a valid drawdown amount"); return; }
+    const next = (Number(drawdowns[0]?.id.replace("DDR-", "") || "0004") + 1).toString().padStart(4, "0");
+    const newRow: Drawdown = {
+      id: "DDR-" + next,
+      milestone: ddrMilestone,
+      amount: Number(amt).toLocaleString("en-US"),
+      cert: "WSP \u00b7 A. Faruqi \u00b7 " + new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "2-digit" }),
+      rera: ddrRera,
+      status: "Awaiting trustee",
+    };
+    setDrawdowns((d) => [newRow, ...d]);
+    setDdrOpen(false);
+    setDdrErr("");
+    setDdrAmount("");
+    setNotice("Drawdown request " + newRow.id + " created \u00b7 " + ddrMilestone + " \u00b7 AED " + newRow.amount + " submitted to trustee");
+    setTimeout(() => setNotice(""), 4000);
+  };
+
+  const milestones = ["Structure 40%", "Structure 60%", "Substructure complete", "Enabling works", "Mobilisation", "Finishing works"];
+
+  const field = (label: string, v: string, set: (s: string) => void, placeholder: string, mono = false) => (
+    <div style={{ flex: 1 }}>
+      <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".05em", color: "#9AA0AE", textTransform: "uppercase", marginBottom: 6 }}>{label}</div>
+      <input value={v} onChange={(e) => set(e.target.value)} placeholder={placeholder} style={{ width: "100%", boxSizing: "border-box", height: 40, borderRadius: 12, border: "1px solid #E4E6EE", padding: "0 12px", fontFamily: mono ? "monospace" : "inherit", fontSize: 12.5, fontWeight: 600, outline: "none" }} />
+    </div>
+  );
 
   const pill = (v: string, type: "side" | "rera" | "status") => {
     let bg: string, col: string;
@@ -77,7 +110,7 @@ export default function EscrowScreen() {
             <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: "-.03em", lineHeight: 1.15 }}>Escrow reconciliation</div>
             <div style={{ fontSize: 13, color: "#6B7180", fontWeight: 500, marginTop: 5 }}>Belgravia Heights III \u00b7 Law No. 8 of 2007 \u00b7 last statement imported 24 Aug 2026, 18:04</div>
           </div>
-          <button style={{ height: 38, borderRadius: 12, background: AC, color: "#fff", border: 0, padding: "0 16px", fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}>New drawdown request</button>
+          <button onClick={() => setDdrOpen(true)} style={{ height: 38, borderRadius: 12, background: AC, color: "#fff", border: 0, padding: "0 16px", fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}>New drawdown request</button>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 14, marginTop: 16 }}>
           {escId.map(([k, v, mono]) => (
@@ -170,6 +203,41 @@ export default function EscrowScreen() {
           </div>
         ))}
       </div>
+
+      {ddrOpen && (
+        <div onMouseDown={() => { setDdrOpen(false); setDdrErr(""); }} style={{ position: "fixed", inset: 0, background: "rgba(20,22,31,.42)", display: "grid", placeItems: "center", zIndex: 80, padding: 24 }}>
+          <div onMouseDown={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: 22, padding: "26px 28px", width: "100%", maxWidth: 520, boxShadow: "0 24px 60px rgba(20,22,31,.25)" }}>
+            <div style={{ fontSize: 18, fontWeight: 800, letterSpacing: "-.02em" }}>New drawdown request</div>
+            <div style={{ fontSize: 12.5, color: "#6B7180", fontWeight: 500, marginTop: 4, lineHeight: 1.5 }}>Submit a drawdown against verified construction. Requires an engineer certificate below the certified ceiling to proceed.</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 14, marginTop: 20 }}>
+              <div>
+                <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".05em", color: "#9AA0AE", textTransform: "uppercase", marginBottom: 6 }}>Milestone</div>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  {milestones.map((m) => (
+                    <span key={m} onClick={() => setDdrMilestone(m)} style={{ fontSize: 11.5, fontWeight: 700, padding: "7px 12px", borderRadius: 10, cursor: "pointer", background: ddrMilestone === m ? AC : "#F1F2F6", color: ddrMilestone === m ? "#fff" : "#4A5060" }}>{m}</span>
+                  ))}
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: 12 }}>
+                {field("Amount (AED)", ddrAmount, setDdrAmount, "e.g. 12,400,000", true)}
+              </div>
+              <div>
+                <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".05em", color: "#9AA0AE", textTransform: "uppercase", marginBottom: 6 }}>RERA status</div>
+                <div style={{ display: "flex", gap: 6 }}>
+                  {["Submitted", "Draft", "Approved"].map((s) => (
+                    <span key={s} onClick={() => setDdrRera(s)} style={{ fontSize: 11.5, fontWeight: 700, padding: "7px 12px", borderRadius: 10, cursor: "pointer", background: ddrRera === s ? AC : "#F1F2F6", color: ddrRera === s ? "#fff" : "#4A5060" }}>{s}</span>
+                  ))}
+                </div>
+              </div>
+              {ddrErr && <div style={{ fontSize: 11.5, fontWeight: 600, color: "#E5484D" }}>{ddrErr}</div>}
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 22 }}>
+              <button onClick={() => { setDdrOpen(false); setDdrErr(""); }} style={{ height: 38, borderRadius: 12, border: "1px solid #EDEEF3", background: "#fff", padding: "0 16px", fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, color: "#4A5060", cursor: "pointer" }}>Cancel</button>
+              <button onClick={submitDdr} style={{ height: 38, borderRadius: 12, background: AC, color: "#fff", border: 0, padding: "0 20px", fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}>Create drawdown</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
