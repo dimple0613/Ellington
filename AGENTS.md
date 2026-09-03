@@ -10,6 +10,13 @@ Reference UI: `Archive/UI systems design review/Ellington ERP.dc.html`.
 - Server-side auth on all API routes.
 - One task at a time; update OneTask.md status per task.
 
+## Branching & Push (MANDATORY)
+- Never commit/push directly to `main` for a task.
+- Before starting a task, create a new branch off `main`: `git checkout -b <task>` (e.g. `feat/fix-invoices`).
+- Do all work on that branch; commit there; push that branch (NOT main).
+- Record the current branch + exactly what code to push in OneTask.md (Push section) so only intended code reaches git.
+- Merge/PR to `main` only after operator approval.
+
 ## Commands (once Next app exists)
 - `npm run dev` / `npm run build` / `npm run lint`
 

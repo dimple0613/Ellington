@@ -3,6 +3,16 @@
 > Live tracker. Updated by the CEO. An approved/completed task is marked here and
 > reflected in the status digest. Legend: [ ] todo | [~] in progress | [x] done | [!] blocked
 
+## Push (current branch + what to push)
+> Branch-per-task rule (see AGENTS.md): never push directly to main. Update this section per task.
+
+- Current task: _none — last task done & merged to `main`_
+- Current branch: `main` (clean)
+- Pending code to push:
+  - AGENTS.md — added mandatory branch-per-task + push-tracking rule
+  - OneTask.md — added this Push section
+- Push command: `git add <files>; git commit -m "<msg>"; git push origin <branch>`
+
 ## Today's Focus
 - [x] Task 1 — Scaffold project (complete md set)
 - [x] Task 2 — Set up GitHub issue/project management (repo + 8 issues created)
