@@ -1,12 +1,10 @@
-export const runtime = "edge";
-
-import { NextRequest, NextResponse } from "next/server";
+import type { NextApiRequest, NextApiResponse } from "next";
 import { withSession, Session } from "../../lib/session";
 import { query } from "../../lib/db";
 
-export default withSession(async function (req: NextRequest, _session: Session) {
-  const project = req.nextUrl.searchParams.get("project") || "all";
-  const status = req.nextUrl.searchParams.get("status") || "all";
+export default withSession(async function (req: NextApiRequest, res: NextApiResponse, _session: Session) {
+  const project = (req.query.project as string) || "all";
+  const status = (req.query.status as string) || "all";
 
   const conds: string[] = [];
   const params: any[] = [];
@@ -46,5 +44,5 @@ export default withSession(async function (req: NextRequest, _session: Session) 
     `SELECT code, name FROM projects ORDER BY code`
   );
 
-  return NextResponse.json({ units: units.rows, summary: summary.rows, projects: projects.rows });
+  res.status(200).json({ units: units.rows, summary: summary.rows, projects: projects.rows });
 });
