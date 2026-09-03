@@ -61,11 +61,21 @@ export default function UsersScreen() {
   const [iRole, setIRole] = useState("Sales Agent");
   const [iProj, setIProj] = useState("WPK");
   const [err, setErr] = useState("");
+  const [permByRole, setPermByRole] = useState<Record<string, PermRow[]>>(() => {
+    const init: Record<string, PermRow[]> = {};
+    for (const r of ROLES) init[r] = ROLE_PERMS.map((row) => ({ ...row, perm: { ...row.perm } }));
+    return init;
+  });
 
   const user = users[sel];
+  const matrix = permByRole[role] || ROLE_PERMS;
 
   const toggle = (module: string, perm: string) => {
-    setNotice(perm + " toggled for " + module + " \u00b7 role: " + role);
+    setPermByRole((prev) => {
+      const cur = prev[role].map((row) => row.module === module ? { ...row, perm: { ...row.perm, [perm]: !row.perm[perm] } } : row);
+      return { ...prev, [role]: cur };
+    });
+    setNotice(perm + " toggled " + (matrix.find((m) => m.module === module)?.perm[perm] ? "off" : "on") + " for " + module + " \u00b7 role: " + role);
     setTimeout(() => setNotice(""), 3000);
   };
 
@@ -124,7 +134,7 @@ export default function UsersScreen() {
               <span>Module</span>
               {PERMS.map((p) => <span key={p} style={{ textAlign: "center" }}>{p}</span>)}
             </div>
-            {ROLE_PERMS.map((r) => (
+            {matrix.map((r) => (
               <div key={r.module} style={{ display: "grid", gridTemplateColumns: "1.2fr repeat(6,38px)", gap: 4, alignItems: "center", padding: "8px 0", borderBottom: "1px solid #F6F7FA" }}>
                 <span style={{ fontSize: 12, fontWeight: 600 }}>{r.module}</span>
                 {PERMS.map((p) => (
