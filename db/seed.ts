@@ -42,7 +42,7 @@ async function main() {
   // admin
   await c.query(
     "INSERT INTO admins (full_name, email, password_hash, role) VALUES ($1,$2,$3,$4)",
-    ["Super Admin", process.env.ADMIN_EMAIL || "admin@developer.com", hashPassword(process.env.ADMIN_PASSWORD || "admin123"), "super_admin"]
+    ["Super Admin", process.env.ADMIN_EMAIL || "kartik1111gohil@gmail.com", hashPassword(process.env.ADMIN_PASSWORD || "admin123"), "super_admin"]
   );
 
   // projects + units
