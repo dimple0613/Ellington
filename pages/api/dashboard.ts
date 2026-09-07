@@ -1,8 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { withSession, Session } from "../../lib/session";
+import { withPerm } from "../../lib/permissions";
 import { query } from "../../lib/db";
 
-export default withSession(async function (_req: NextApiRequest, res: NextApiResponse, _session: Session) {
+export default withPerm("Dashboard", "REA", async function (_req: NextApiRequest, res: NextApiResponse) {
   const projects = await query<any>(
     `SELECT code, name, location, status, units_total, gdv, sold, collected, due_date
      FROM projects ORDER BY code`

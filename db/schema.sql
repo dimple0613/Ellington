@@ -9,6 +9,20 @@ CREATE TABLE IF NOT EXISTS admins (
   role TEXT DEFAULT 'super_admin'
 );
 
+-- Server-side RBAC: per-role module/action permissions.
+-- Actions: CRE (create), REA (read), UPD (update), DEL (delete), APR (approve), EXP (export).
+CREATE TABLE IF NOT EXISTS role_permissions (
+  role TEXT PRIMARY KEY,
+  perms JSONB NOT NULL DEFAULT '{}'
+);
+
+INSERT INTO role_permissions (role, perms) VALUES
+  ('super_admin', '{"Dashboard":{"CRE":true,"REA":true,"UPD":true,"DEL":false,"APR":true,"EXP":true},"Inventory":{"CRE":true,"REA":true,"UPD":true,"DEL":true,"APR":true,"EXP":true},"Sales":{"CRE":true,"REA":true,"UPD":true,"DEL":true,"APR":true,"EXP":true},"Finance":{"CRE":true,"REA":true,"UPD":true,"DEL":true,"APR":true,"EXP":true},"Handover":{"CRE":true,"REA":true,"UPD":true,"DEL":true,"APR":true,"EXP":true},"Settings":{"CRE":true,"REA":true,"UPD":true,"DEL":true,"APR":true,"EXP":true}}'),
+  ('ops', '{"Dashboard":{"CRE":false,"REA":true,"UPD":false,"DEL":false,"APR":false,"EXP":true},"Inventory":{"CRE":false,"REA":true,"UPD":true,"DEL":false,"APR":false,"EXP":true},"Sales":{"CRE":true,"REA":true,"UPD":true,"DEL":false,"APR":false,"EXP":true},"Finance":{"CRE":false,"REA":false,"UPD":false,"DEL":false,"APR":false,"EXP":false},"Handover":{"CRE":false,"REA":true,"UPD":true,"DEL":false,"APR":false,"EXP":false},"Settings":{"CRE":false,"REA":false,"UPD":false,"DEL":false,"APR":false,"EXP":false}}'),
+  ('finance', '{"Dashboard":{"CRE":false,"REA":true,"UPD":false,"DEL":false,"APR":false,"EXP":true},"Inventory":{"CRE":false,"REA":true,"UPD":false,"DEL":false,"APR":false,"EXP":false},"Sales":{"CRE":false,"REA":true,"UPD":false,"DEL":false,"APR":false,"EXP":true},"Finance":{"CRE":true,"REA":true,"UPD":true,"DEL":false,"APR":true,"EXP":true},"Handover":{"CRE":false,"REA":true,"UPD":false,"DEL":false,"APR":false,"EXP":false},"Settings":{"CRE":false,"REA":false,"UPD":false,"DEL":false,"APR":false,"EXP":false}}'),
+  ('viewer', '{"Dashboard":{"CRE":false,"REA":true,"UPD":false,"DEL":false,"APR":false,"EXP":true},"Inventory":{"CRE":false,"REA":true,"UPD":false,"DEL":false,"APR":false,"EXP":true},"Sales":{"CRE":false,"REA":true,"UPD":false,"DEL":false,"APR":false,"EXP":true},"Finance":{"CRE":false,"REA":true,"UPD":false,"DEL":false,"APR":false,"EXP":true},"Handover":{"CRE":false,"REA":true,"UPD":false,"DEL":false,"APR":false,"EXP":true},"Settings":{"CRE":false,"REA":false,"UPD":false,"DEL":false,"APR":false,"EXP":false}}')
+ON CONFLICT (role) DO NOTHING;
+
 CREATE TABLE IF NOT EXISTS password_resets (
   id SERIAL PRIMARY KEY,
   email TEXT NOT NULL,
