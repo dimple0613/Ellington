@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { verifyPassword } from "../../../lib/auth";
 import { query } from "../../../lib/db";
 import { serializeCookie, sign } from "../../../lib/session";
+import { ensureEnvAdmin } from "../../../lib/admin";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
@@ -12,6 +13,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!email || !password) {
       return res.status(400).json({ error: "Email and password required" });
     }
+
+    await ensureEnvAdmin();
 
     const r = await query<{ id: number; email: string; password_hash: string; role: string }>(
       "SELECT id, email, password_hash, role FROM admins WHERE email = lower($1) LIMIT 1",
