@@ -132,7 +132,7 @@ export default function ForgotPassword() {
                   autoComplete="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="kartik1111gohil@gmail.com"
+                  placeholder="admin@gmail.com"
                   style={{
                     width: "100%",
                     height: 44,

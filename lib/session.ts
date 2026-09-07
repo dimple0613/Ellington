@@ -4,6 +4,7 @@ export type Session = {
   userId: number;
   email: string;
   role: string;
+  full_name?: string;
   exp: number;
 };
 

@@ -2,7 +2,6 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { generateResetToken, hashToken } from "../../../lib/auth";
 import { query } from "../../../lib/db";
 import { sendPasswordReset } from "../../../lib/mail";
-import { ensureEnvAdmin } from "../../../lib/admin";
 
 const RESET_TTL_MS = 30 * 60 * 1000;
 
@@ -15,8 +14,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
       return res.status(400).json({ error: "Please enter a valid email address." });
     }
-
-    await ensureEnvAdmin();
 
     const found = await query<{ id: number }>("SELECT id FROM admins WHERE email = $1 LIMIT 1", [email]);
     if (found.rows.length === 0) {

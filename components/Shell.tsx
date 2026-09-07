@@ -4,7 +4,7 @@ import { PROJECTS, UNITS, BUYERS, ST, Unit } from "../lib/data";
 import { money, AC } from "../lib/format";
 import { groupUrl, screenUrl, GROUP_PAGE } from "../lib/nav";
 import { useWindowSize } from "../lib/useWindowSize";
-import { useSession } from "../lib/useSession";
+import { useSession, SessionUser } from "../lib/useSession";
 
 export type GroupId =
   | "portfolio"
@@ -233,6 +233,11 @@ export default function Shell({
     router.push("/login");
   };
 
+  const openProfile = () => {
+    setProfileMenu(false);
+    router.push("/profile");
+  };
+
   const countMap: Record<string, { n: number; v: number }> = {};
   UNITS.forEach((u) => {
     countMap[u.status] = countMap[u.status] || { n: 0, v: 0 };
@@ -427,6 +432,7 @@ export default function Shell({
           onHelp={() => { closeMenus(); setHelp((h) => !h); }}
           onMenu={dlg || win.bp === "tablet" ? () => setDrawer(true) : undefined}
           group={group}
+          user={user}
         /> 
 
           <div style={{ flex: 1, overflowY: "auto", overflowX: "hidden", padding: "24px 26px 40px" }}>
@@ -470,10 +476,12 @@ export default function Shell({
         onCloseHelp={() => setHelp(false)}
         profileOpen={profileMenu}
         onCloseProfile={() => setProfileMenu(false)}
+        onProfile={openProfile}
         rtl={rtl}
         onToggleRtl={() => setRtl((r) => !r)}
         onSignOut={signOut}
         onToast={showToast}
+        user={user}
       />
 
       {cmdk && (
@@ -606,6 +614,7 @@ function Topbar({
   onHelp,
   onMenu,
   group,
+  user,
 }: {
   crumbs: string[];
   onOpenCmdk: () => void;
@@ -619,7 +628,13 @@ function Topbar({
   onHelp: () => void;
   onMenu?: () => void;
   group?: GroupId;
+  user: SessionUser | null | undefined;
 }) {
+  const name = user?.full_name || "";
+  const local = (user?.email || "").split("@")[0] || "";
+  const initials = name
+    ? name.split(" ").filter(Boolean).map((w) => w[0]).slice(0, 2).join("").toUpperCase()
+    : (local.slice(0, 2) || "AD").toUpperCase();
   return (
     <div style={{ height: 60, flex: "none", background: "#fff", borderBottom: "1px solid #EDEEF3", display: "flex", alignItems: "center", gap: 14, padding: "0 18px", position: "relative", zIndex: 30 }}>
       {onMenu && (
@@ -668,7 +683,7 @@ function Topbar({
           title="Account"
           style={{ width: 36, height: 36, borderRadius: 12, background: profileOpen ? "#DDE0E8" : "#E7E9F0", display: "grid", placeItems: "center", fontSize: 11, fontWeight: 700, color: "#4A5060", border: 0, cursor: "pointer" }}
         >
-          RM
+          {initials}
         </button>
       </div>
     </div>
@@ -706,10 +721,12 @@ function TopbarFloating({
   onCloseHelp,
   profileOpen,
   onCloseProfile,
+  onProfile,
   rtl,
   onToggleRtl,
   onSignOut,
   onToast,
+  user,
 }: {
   notifOpen: boolean;
   unread: number;
@@ -721,22 +738,25 @@ function TopbarFloating({
   onCloseHelp: () => void;
   profileOpen: boolean;
   onCloseProfile: () => void;
+  onProfile: () => void;
   rtl: boolean;
   onToggleRtl: () => void;
   onSignOut: () => void;
   onToast: (m: string) => void;
+  user: SessionUser | null | undefined;
 }) {
+  const roleLabel = user?.role === "super_admin" ? "Super Admin" : user?.role === "editor" ? "Editor" : "Admin";
   return (
     <>
       {profileOpen && (
         <div style={{ position: "fixed", top: 56, right: 18, width: 236, background: "#fff", border: "1px solid #EDEEF3", borderRadius: 16, boxShadow: "0 20px 56px rgba(20,22,31,.18)", zIndex: 70, padding: 6 }}>
           <div style={{ padding: "8px 10px 4px" }}>
-            <div style={{ fontSize: 13, fontWeight: 800, letterSpacing: "-.01em" }}>Rania Mansour</div>
-            <div style={{ fontSize: 11, color: "#6B7180", fontWeight: 500, marginTop: 1 }}>r.mansour@ellington.ae</div>
-            <span style={{ display: "inline-block", marginTop: 6, fontSize: 10, fontWeight: 700, background: "#EDECFE", color: AC, borderRadius: 7, padding: "2px 7px" }}>Super Admin</span>
+            <div style={{ fontSize: 13, fontWeight: 800, letterSpacing: "-.01em" }}>{user?.full_name || "Administrator"}</div>
+            <div style={{ fontSize: 11, color: "#6B7180", fontWeight: 500, marginTop: 1 }}>{user?.email || ""}</div>
+            <span style={{ display: "inline-block", marginTop: 6, fontSize: 10, fontWeight: 700, background: "#EDECFE", color: AC, borderRadius: 7, padding: "2px 7px" }}>{roleLabel}</span>
           </div>
           <div style={{ borderTop: "1px solid #EDEEF3", margin: "6px 8px" }} />
-          <MenuRow icon="â—Ž" label="My profile" sub="Identity & preferences" onClick={() => { onCloseProfile(); onToast("Profile settings opened"); }} />
+          <MenuRow icon="â—Ž" label="My profile" sub="Identity & credentials" onClick={() => { onCloseProfile(); onProfile(); }} />
           <MenuRow icon="âš™" label="Preferences" sub="Notifications & quiet hours" onClick={() => { onCloseProfile(); onToast("Preferences opened"); }} />
           <MenuRow icon="âŸ³" label="Offline cache" sub="Last synced 09:39" onClick={() => { onCloseProfile(); onToast("Offline cache synced"); }} />
           <MenuRow icon="â‡„" label={rtl ? "Direction: RTL" : "Direction: LTR"} sub="Mirror the shell" onClick={() => { onToggleRtl(); onCloseProfile(); }} />

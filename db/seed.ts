@@ -39,10 +39,11 @@ async function main() {
   const cnt = await c.query("SELECT COUNT(*)::int AS n FROM projects");
   if (cnt.rows[0].n > 0) { console.log("already seeded, skipping"); await c.end(); return; }
 
-  // admin
+  // admin — initial default credentials (used only on first install)
+  const initialHash = await hashPassword(process.env.INITIAL_ADMIN_PASSWORD || "Admin123");
   await c.query(
     "INSERT INTO admins (full_name, email, password_hash, role) VALUES ($1,$2,$3,$4)",
-    ["Super Admin", process.env.ADMIN_EMAIL || "kartik1111gohil@gmail.com", hashPassword(process.env.ADMIN_PASSWORD || "admin123"), "super_admin"]
+    ["Super Admin", process.env.INITIAL_ADMIN_EMAIL || "admin@gmail.com", initialHash, "super_admin"]
   );
 
   // projects + units

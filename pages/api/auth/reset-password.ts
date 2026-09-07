@@ -31,6 +31,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     const email = match.rows[0].email;
+
+    // The admin may have changed their email after requesting the reset (profile
+    // update); in that case the token no longer applies.
+    const adminNow = await query<{ id: number }>("SELECT id FROM admins WHERE email = $1 LIMIT 1", [email]);
+    if (adminNow.rows.length === 0) {
+      return res.status(400).json({ error: "This reset link is invalid or has expired. Please request a new one." });
+    }
+
     const newPasswordHash = await hashPassword(password);
     await query("UPDATE admins SET password_hash = $1 WHERE email = $2", [newPasswordHash, email]);
     await query("UPDATE password_resets SET used = true WHERE email = $1 AND used = false", [email]);

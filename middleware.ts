@@ -11,6 +11,7 @@ const PROTECTED_PREFIXES = [
   "/handover",
   "/system",
   "/mobile",
+  "/profile",
 ];
 
 const PUBLIC_ONLY_PREFIXES = ["/login", "/forgot-password", "/reset-password"];
