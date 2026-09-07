@@ -96,7 +96,7 @@ export default function ForgotPassword() {
               </div>
               <h1 style={{ fontSize: 21, fontWeight: 800, letterSpacing: "-.03em", margin: "0 0 6px" }}>Check your inbox</h1>
               <p style={{ fontSize: 13, color: "#6B7180", fontWeight: 500, lineHeight: 1.6, margin: "0 0 22px" }}>
-                If an account exists for <strong style={{ color: "#14161F" }}>{email.trim()}</strong>, a password reset link has been sent. The link is valid for 30 minutes.
+                A password reset link has been sent to <strong style={{ color: "#14161F" }}>{email.trim()}</strong>. The link is valid for 30 minutes.
               </p>
               <button
                 onClick={() => setSent(false)}
