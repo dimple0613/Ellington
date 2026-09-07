@@ -163,3 +163,32 @@ input {
 
 /* Login page already responsive, just ensure no overflow */
 .login-wrap { overflow: hidden; }
+
+/* ---- Auth screens ---- */
+.auth-spinner {
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #fff;
+  animation: auth-spin 0.7s linear infinite;
+  flex: none;
+}
+@keyframes auth-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Split-screen login: show brand panel on wide screens only */
+@media (min-width: 900px) {
+  .auth-brand-panel { display: flex !important; }
+}
+
+@media (max-width: 640px) {
+  [id="password"] { font-size: 16px; }
+  [id="email"] { font-size: 16px; }
+}
+
+/* Keep password-input eye button clickable on touch */
+@media (max-width: 640px) {
+  button[aria-label$="password"] { min-width: 40px; min-height: 40px; }
+}

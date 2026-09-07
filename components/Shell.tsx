@@ -4,6 +4,7 @@ import { PROJECTS, UNITS, BUYERS, ST, Unit } from "../lib/data";
 import { money, AC } from "../lib/format";
 import { groupUrl, screenUrl, GROUP_PAGE } from "../lib/nav";
 import { useWindowSize } from "../lib/useWindowSize";
+import { useSession } from "../lib/useSession";
 
 export type GroupId =
   | "portfolio"
@@ -141,6 +142,30 @@ export default function Shell({
   const inputRef = useRef<HTMLInputElement>(null);
   const [drawer, setDrawer] = useState(false);
   const dlg = win.bp === "mobile";
+
+  const { user, ready } = useSession();
+  const authChecked = useRef(false);
+  useEffect(() => {
+    if (!ready || authChecked.current) return;
+    authChecked.current = true;
+    if (!user) {
+      const next = encodeURIComponent(router.asPath || "/dashboard");
+      router.replace(`/login?next=${next}`);
+      return;
+    }
+    if (typeof user.exp === "number" && user.exp > 0) {
+      const ms = user.exp - Date.now();
+      if (ms <= 0) {
+        router.replace("/login");
+        return;
+      }
+      const t = setTimeout(() => {
+        fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
+        router.replace("/login");
+      }, ms);
+      return () => clearTimeout(t);
+    }
+  }, [ready, user, router]);
 
   const [notif, setNotif] = useState(false);
   const [profileMenu, setProfileMenu] = useState(false);

@@ -9,6 +9,18 @@ CREATE TABLE IF NOT EXISTS admins (
   role TEXT DEFAULT 'super_admin'
 );
 
+CREATE TABLE IF NOT EXISTS password_resets (
+  id SERIAL PRIMARY KEY,
+  email TEXT NOT NULL,
+  token_hash TEXT NOT NULL,
+  expires_at TIMESTAMPTZ NOT NULL,
+  used BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_password_resets_email ON password_resets (email);
+CREATE INDEX IF NOT EXISTS idx_password_resets_token_hash ON password_resets (token_hash);
+
 CREATE TABLE IF NOT EXISTS projects (
   id SERIAL PRIMARY KEY,
   code TEXT UNIQUE NOT NULL,
