@@ -33,3 +33,5 @@ next-env.d.ts
 # local tools
 .playwright-mcp/
 dev-server.log
+dev-test.log
+dev-test.err

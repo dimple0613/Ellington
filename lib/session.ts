@@ -4,6 +4,7 @@ export type Session = {
   userId: number;
   email: string;
   role: string;
+  full_name?: string;
   exp: number;
 };
 
@@ -58,6 +59,17 @@ function parseCookies(req: NextApiRequest): Record<string, string> {
     if (name) out[name] = decodeURIComponent(value);
   }
   return out;
+}
+
+export async function getSessionFromReq(req: NextApiRequest): Promise<Session | null> {
+  return verify(parseCookies(req)["session"]);
+}
+
+export async function verifyFromCookieHeader(cookieHeader: string | null | undefined): Promise<Session | null> {
+  if (!cookieHeader) return null;
+  const match = /(?:^|;\s*)session=([^;]+)/.exec(cookieHeader);
+  if (!match) return null;
+  return verify(decodeURIComponent(match[1]));
 }
 
 export function serializeCookie(
