@@ -1,8 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { withSession, Session } from "../../lib/session";
+import { withPerm } from "../../lib/permissions";
 import { query } from "../../lib/db";
 
-export default withSession(async function (req: NextApiRequest, res: NextApiResponse, _session: Session) {
+export default withPerm("Inventory", "REA", async function (req: NextApiRequest, res: NextApiResponse) {
   const project = (req.query.project as string) || "all";
   const status = (req.query.status as string) || "all";
 

@@ -5,6 +5,7 @@ import { money, AC } from "../lib/format";
 import { groupUrl, screenUrl, GROUP_PAGE } from "../lib/nav";
 import { useWindowSize } from "../lib/useWindowSize";
 import { useSession, SessionUser } from "../lib/useSession";
+import { roleHasPerm, type PermModule } from "../lib/permission-map";
 
 export type GroupId =
   | "portfolio"
@@ -86,6 +87,17 @@ const NAV: Record<GroupId, { label: string; items: NavItem[] }> = {
   mobile: { label: "Executive app", items: [{ screen: "mobile", label: "All screens" }] },
 };
 
+// group -> permission module used to decide read access (mirrors middleware).
+const GROUP_MODULE: Partial<Record<GroupId, PermModule>> = {
+  portfolio: "Dashboard",
+  project: "Inventory",
+  sales: "Sales",
+  finance: "Finance",
+  handover: "Handover",
+  system: "Settings",
+  mobile: "Dashboard",
+};
+
 const railBtn = (on: boolean, color: string) =>
   ({
     width: 42,
@@ -134,7 +146,6 @@ export default function Shell({
   scopeCode,
 }: Props) {
   const router = useRouter();
-  const gi = RAIL.findIndex((g) => g.id === group);
   const win = useWindowSize();
   const [switcher, setSwitcher] = useState(false);
   const [cmdk, setCmdk] = useState(false);
@@ -144,6 +155,14 @@ export default function Shell({
   const dlg = win.bp === "mobile";
 
   const { user, ready } = useSession();
+  const role = user?.role || "";
+  const canRead = (id: GroupId) => {
+    const mod = GROUP_MODULE[id];
+    if (!mod) return true; // profile etc -> auth-only
+    return roleHasPerm(role, mod, "REA");
+  };
+  const visibleGroups = RAIL.filter((g) => canRead(g.id));
+  const gi = visibleGroups.findIndex((g) => g.id === group);
   const authChecked = useRef(false);
   useEffect(() => {
     if (!ready || authChecked.current) return;
@@ -397,6 +416,7 @@ export default function Shell({
       <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
       {railVisible && (
       <Rail
+        groups={visibleGroups}
         group={group}
         gi={gi}
         locked={scopeLocked}
@@ -450,7 +470,7 @@ export default function Shell({
       </div>
       </div>
 
-      {dlg && <MobileBar groups={RAIL} group={group} locked={scopeLocked} onGo={goGroup} onOpen={() => setDrawer(true)} />}
+      {dlg && <MobileBar groups={visibleGroups} group={group} locked={scopeLocked} onGo={goGroup} onOpen={() => setDrawer(true)} />}
 
       {(dlg || win.bp === "tablet") && drawer && (
         <div style={{ position: "fixed", inset: 0, zIndex: 90, background: "rgba(20,22,31,.4)", display: "flex" }}>
@@ -569,13 +589,13 @@ function NewProjectModal({ onClose, onCreate }: { onClose: () => void; onCreate:
   );
 }
 
-function Rail({ group, gi, locked, onGo, onSignOut }: { group: GroupId; gi: number; locked: boolean; onGo: (id: GroupId) => void; onSignOut: () => void }) {
+function Rail({ groups, group, gi, locked, onGo, onSignOut }: { groups: RailDef[]; group: GroupId; gi: number; locked: boolean; onGo: (id: GroupId) => void; onSignOut: () => void }) {
   return (
     <div style={{ width: 76, flex: "none", background: "#fff", display: "flex", flexDirection: "column", alignItems: "center", padding: "18px 0 14px", borderRight: "1px solid #EDEEF3" }}>
       <div style={{ width: 40, height: 40, borderRadius: 13, background: "#14161F", color: "#fff", display: "grid", placeItems: "center", fontWeight: 800, fontSize: 14, letterSpacing: "-.02em", marginBottom: 22 }}>EH</div>
       <div style={{ position: "relative", display: "flex", flexDirection: "column", gap: 10 }}>
         <div style={{ position: "absolute", left: 0, top: gi * 52, width: 42, height: 42, borderRadius: 13, background: "#14161F", transition: "top 200ms cubic-bezier(.2,0,0,1)", zIndex: 1 }} />
-        {RAIL.map((g) => {
+        {groups.map((g) => {
           const isLocked = (g.id === "project" || g.id === "sales") && locked;
           return (
             <button

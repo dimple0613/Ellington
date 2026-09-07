@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextFetchEvent, NextRequest } from "next/server";
 import { verifyFromCookieHeader } from "./lib/session";
+import { roleHasPerm, type PermModule } from "./lib/permission-map";
 
 const PROTECTED_PREFIXES = [
   "/dashboard",
@@ -13,6 +14,19 @@ const PROTECTED_PREFIXES = [
   "/mobile",
   "/profile",
 ];
+
+// Route group -> module the user must be able to READ to access the page.
+// /profile stays auth-only (it is the user's own account).
+const ROUTE_MODULE: Record<string, PermModule> = {
+  "/dashboard": "Dashboard",
+  "/project": "Inventory",
+  "/inventory": "Inventory",
+  "/sales": "Sales",
+  "/finance": "Finance",
+  "/handover": "Handover",
+  "/system": "Settings",
+  "/mobile": "Dashboard",
+};
 
 const PUBLIC_ONLY_PREFIXES = ["/login", "/forgot-password", "/reset-password"];
 
@@ -41,6 +55,19 @@ export async function middleware(req: NextRequest, _event: NextFetchEvent) {
     url.pathname = "/login";
     url.search = `?next=${encodeURIComponent(pathname + req.nextUrl.search)}`;
     return NextResponse.redirect(url);
+  }
+
+  if (session && isProtected) {
+    const module = ROUTE_MODULE[pathname];
+    if (module) {
+      if (!roleHasPerm(session.role, module, "REA")) {
+        // Authenticated but lacks read access to this module -> forbidden.
+        const url = req.nextUrl.clone();
+        url.pathname = "/403";
+        url.search = "";
+        return NextResponse.redirect(url);
+      }
+    }
   }
 
   if (isPublicOnly && session) {
