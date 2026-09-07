@@ -7,10 +7,10 @@
 > Branch-per-task rule (see AGENTS.md): never push directly to main. Update this section per task.
 
 - Current branch: `kartik-gohil`
-- Last task: `feat(auth)` — complete secure auth flow **pushed** on `kartik-gohil` (`80297f6`), runtime-verified end-to-end (login/session/forgot/reset), incl. fixes `c2ed4c7` (docs) and `d23b575` (local Postgres transport + nodemailer dep). Not yet merged to `main` (awaits operator approval)
+- Last task: `feat(auth)` — complete secure auth flow **pushed** on `kartik-gohil` (`80297f6`), runtime-verified end-to-end (login/session/forgot/reset), incl. fixes `c2ed4c7` (docs), `d23b575` (local Postgres transport + nodemailer dep), `907460e` (reject forgot-password for unregistered emails), `27c8aae` (admin = kartik1111gohil@gmail.com), `64c82a0` (admin account driven from ADMIN_EMAIL/ADMIN_PASSWORD env — no code changes needed to change the login email). Not yet merged to `main` (awaits operator approval)
 - Pending code to push: none
 - Push command: `git add <files>; git commit -m "<msg>"; git push origin <branch>`
-- NOTE: accidental private repo `kartik-gohil/auth_issue_login` still exists — deletion blocked on `delete_repo` scope; run `gh auth refresh -h github.com -s delete_repo`
+- NOTE: `kartik-gohil/auth_issue_login` deleted (`gh auth refresh -s delete_repo` complete)
 
 ## Today's Focus
 - [x] Task 1 — Scaffold project (complete md set)
