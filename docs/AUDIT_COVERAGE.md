@@ -47,8 +47,8 @@ Note: prior `console-error` reports on these screens (incl. an `Invariant: attem
 | ID | Severity | Finding |
 |---|---|---|
 | A1 | **Medium** | No server-side role/permission enforcement. Middleware checks session only; every signed-in user — regardless of role — can access all 9 protected groups. The System → Users permission matrix (`components/screens/Users.tsx`) and Roles doc are client-side mock only. Single seeded role `super_admin` is a mitigant for a solo operator, but this should be a conscious decision, not silent. **RESOLVED 2026-09-07** — server-side RBAC implemented: `role_permissions` table (seeded `super_admin`/`ops`/`finance`/`viewer`), `lib/permissions.ts` + `withPerm` for API 403s, `middleware.ts` page gating → `/403`, client nav filtering. Verified 18/18 RBAC + regression. See `ROLES_AND_PERMISSIONS.md`. |
-| A2 | Low | No site favicon — `/favicon.ico` 404s on every page load. |
-| A3 | Ops | Deployment surface needs operator action: `wrangler.toml` `pages_build_output_dir = ".vercel/output/static"` points to a non-existent dir; `origin/main` (currently without auth) is 12 commits behind `kartik-gohil`; production Neon admin row seeded via env at first boot only. |
+| A2 | Low | No site favicon — `/favicon.ico` 404s on every page load. **RESOLVED 2026-09-07** — SVG favicon added (`public/favicon.svg` + `<link>` in `_app.tsx`), verified 200. |
+| A3 | Ops | Deployment surface needs operator action. **PARTIALLY RESOLVED 2026-09-07** — erroneous `wrangler.toml` (`pages_build_output_dir = ".vercel/output/static"`, non-existent dir) removed; correct config is `wrangler.jsonc` (Worker `ellington-worker`, `main: .open-next/worker.js`, assets from `.open-next/assets`), verified local `build:cf` emits valid output. **OUTSTANDING:** `origin/main` is 17 commits behind `kartik-gohil`; production not redeployed; no Cloudflare credentials available locally to run `wrangler deploy` (requires `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID` or interactive `wrangler login`); production Neon admin row seeded via env at first boot only. |
 | A4 | Low (informational) | `/` and `/inventory` use client-side redirects (brief intermediate render) instead of server headless redirects; behavior is correct. |
 
 ## 5. DB-backed surface (verified at HTTP level, `test-api.mjs`)
@@ -62,7 +62,7 @@ Note: prior `console-error` reports on these screens (incl. an `Invariant: attem
 
 ## 7. Recommended next actions
 
-1. Decide + implement server-side RBAC (or explicitly accept auth-only for the intended single-operator deployment) — closes A1.
-2. Add a favicon — closes A2.
-3. Operator: approve merge `kartik-gohil` → `main`, fix `wrangler.toml` output dir, seed production DB — closes A3.
+1. Decide + implement server-side RBAC (or explicitly accept auth-only for the intended single-operator deployment) — closes A1. **DONE 2026-09-07** (see `ROLES_AND_PERMISSIONS.md`).
+2. Add a favicon — closes A2. **DONE 2026-09-07**.
+3. Operator: approve merge `kartik-gohil` → `main`, then deploy `wrangler deploy` (Worker `ellington-worker`) with Cloudflare auth (`CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID` or `wrangler login`); seed production Neon — closes A3.
 4. Optional: add custom `404.tsx`/`500.tsx`.
