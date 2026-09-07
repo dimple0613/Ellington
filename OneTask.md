@@ -7,7 +7,7 @@
 > Branch-per-task rule (see AGENTS.md): never push directly to main. Update this section per task.
 
 - Current branch: `kartik-gohil`
-- Last task: `feat(auth)` — complete secure auth flow **pushed** (`80297f6`) on `kartik-gohil`
+- Last task: `feat(auth)` — complete secure auth flow **pushed** on `kartik-gohil` (`80297f6`), runtime-verified end-to-end (login/session/forgot/reset), incl. fixes `c2ed4c7` (docs) and `d23b575` (local Postgres transport + nodemailer dep). Not yet merged to `main` (awaits operator approval)
 - Pending code to push: none
 - Push command: `git add <files>; git commit -m "<msg>"; git push origin <branch>`
 - NOTE: accidental private repo `kartik-gohil/auth_issue_login` still exists — deletion blocked on `delete_repo` scope; run `gh auth refresh -h github.com -s delete_repo`
