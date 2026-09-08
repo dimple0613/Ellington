@@ -164,6 +164,38 @@ CREATE TABLE IF NOT EXISTS bookings (
 CREATE INDEX IF NOT EXISTS idx_bookings_unit ON bookings(unit_id);
 CREATE INDEX IF NOT EXISTS idx_bookings_status ON bookings(status);
 
+-- Brokers & agencies (T15): registered agencies, their agents, and the activity feed.
+CREATE TABLE IF NOT EXISTS broker_agencies (
+  id SERIAL PRIMARY KEY,
+  name TEXT NOT NULL UNIQUE,
+  orn TEXT,
+  alloc_units INT DEFAULT 0,
+  deals INT DEFAULT 0,
+  accrued NUMERIC DEFAULT 0,             -- AED commission accrued
+  paid NUMERIC DEFAULT 0,                -- AED commission paid out
+  commission_rate TEXT DEFAULT '2.0%',
+  status TEXT DEFAULT 'onboarding',      -- onboarding / active / suspended
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS broker_agents (
+  id SERIAL PRIMARY KEY,
+  name TEXT NOT NULL,
+  agency TEXT NOT NULL,                  -- agency display name
+  brn TEXT,
+  deals INT DEFAULT 0,
+  value NUMERIC DEFAULT 0,               -- AED value sold by this agent
+  discount_pct NUMERIC DEFAULT 0,
+  days_to_close INT DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS broker_activity (
+  id SERIAL PRIMARY KEY,
+  text TEXT NOT NULL,
+  meta TEXT,
+  kind TEXT DEFAULT 'note',              -- reservation / commission / clawback / download / suspend / onboard
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
 CREATE TABLE IF NOT EXISTS escrow_ledger (
   id SERIAL PRIMARY KEY,
   project_id INT REFERENCES projects(id),

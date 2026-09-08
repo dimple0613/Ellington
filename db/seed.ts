@@ -33,6 +33,32 @@ const H21_UNITS = [
 ];
 const AGENTS = ["Reema", "John D", "Sana", "Yusuf"];
 
+// brokers & agencies (T15) — mirrors the static dashboard rows now stored live.
+const BROKER_AGENCIES = [
+  { name: "Betterhomes", orn: "ORN 1470", alloc_units: 30, deals: 9, accrued: 8420000, paid: 6100000, rate: "2.0%", status: "active" },
+  { name: "Allsopp & Allsopp", orn: "ORN 2058", alloc_units: 24, deals: 7, accrued: 6180000, paid: 6180000, rate: "2.0%", status: "active" },
+  { name: "Haus & Haus", orn: "ORN 11498", alloc_units: 18, deals: 4, accrued: 4020000, paid: 2400000, rate: "2.5%", status: "active" },
+  { name: "Driven Properties", orn: "ORN 11917", alloc_units: 14, deals: 3, accrued: 3120000, paid: 1800000, rate: "2.0%", status: "active" },
+  { name: "Metropolitan Premium", orn: "ORN 11899", alloc_units: 0, deals: 0, accrued: 0, paid: 0, rate: "2.0%", status: "onboarding" },
+  { name: "Espace Real Estate", orn: "ORN 1170", alloc_units: 0, deals: 0, accrued: 0, paid: 0, rate: "2.0%", status: "suspended" },
+];
+const BROKER_AGENTS = [
+  { name: "Layla Haddad", agency: "Betterhomes", brn: "BRN 48812", deals: 4, value: 9800000, discount_pct: 3.2, days_to_close: 28 },
+  { name: "James Cartwright", agency: "Allsopp & Allsopp", brn: "BRN 51204", deals: 3, value: 7100000, discount_pct: 2.8, days_to_close: 34 },
+  { name: "Zainab Qureshi", agency: "Haus & Haus", brn: "BRN 44117", deals: 2, value: 5400000, discount_pct: 4.1, days_to_close: 41 },
+  { name: "Dmitri Volkov", agency: "Driven Properties", brn: "BRN 60288", deals: 2, value: 4900000, discount_pct: 2.1, days_to_close: 22 },
+  { name: "Sara El Amrani", agency: "Betterhomes", brn: "BRN 48910", deals: 3, value: 6600000, discount_pct: 3.6, days_to_close: 31 },
+];
+const BROKER_ACTIVITY = [
+  { text: "Betterhomes reserved H21-T1-2801", meta: "L. Haddad · 24h hold placed", kind: "reservation", hours_ago: 2 },
+  { text: "Allsopp & Allsopp submitted reservation", meta: "J. Cartwright · H21-T1-1905 · under review", kind: "reservation", hours_ago: 5 },
+  { text: "Commission invoice uploaded", meta: "Haus & Haus · AED 1.62M · INV-BRK-0088", kind: "commission", hours_ago: 24 },
+  { text: "Clawback raised", meta: "Driven Properties · cancelled H21-T1-4102 · AED 98,400", kind: "clawback", hours_ago: 48 },
+  { text: "Price list downloaded", meta: "Betterhomes · watermarked · logged", kind: "download", hours_ago: 50 },
+  { text: "Espace Real Estate suspended", meta: "Trade licence expired 30 Jun 2026", kind: "suspend", hours_ago: 96 },
+  { text: "Phase 2 allocation published", meta: "82 units across 4 agencies", kind: "note", hours_ago: 144 },
+];
+
 // bookings register (T14) — row set mirrors the register screen (confirmed / draft / cancelled).
 const BOOKINGS = [
   { unit: "H21-T1-2705", buyer: "Sunil Rathore", mobile: "+971 50 4140312", ref: "BKG-2026-00891", discount_pct: 7.5, discount_amt: 309000, list_price: 4120000, net_price: 3811000, booking_amount: 381100, expected_spa: "2027-03-30", status: "confirmed", payment_method: "bank_transfer", escrow_ref: "ESC-2026-9021", age_days: 24 },
@@ -123,9 +149,31 @@ async function main() {
       `INSERT INTO bookings (project_id, unit_id, buyer_name, buyer_mobile, ref, discount_pct, discount_amt,
          list_price, net_price, booking_amount, expected_spa, status, payment_method, escrow_ref, created_at)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14, now() - $15::interval)`,
-      [h21Id, u.rows[0].id, bk.buyer, bk.mobile, bk.ref, bk.discount_pct, bk.discount_amt,
-       bk.list_price, bk.net_price, bk.booking_amount, bk.expected_spa, bk.status, bk.payment_method,
-       bk.escrow_ref, bk.age_days]
+[h21Id, u.rows[0].id, bk.buyer, bk.mobile, bk.ref, bk.discount_pct, bk.discount_amt,
+        bk.list_price, bk.net_price, bk.booking_amount, bk.expected_spa, bk.status, bk.payment_method,
+        bk.escrow_ref, bk.age_days]
+    );
+  }
+
+  // brokers & agencies (T15) — register, agents, activity feed.
+  for (const a of BROKER_AGENCIES) {
+    await c.query(
+      `INSERT INTO broker_agencies (name, orn, alloc_units, deals, accrued, paid, commission_rate, status)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+      [a.name, a.orn, a.alloc_units, a.deals, a.accrued, a.paid, a.rate, a.status]
+    );
+  }
+  for (const g of BROKER_AGENTS) {
+    await c.query(
+      `INSERT INTO broker_agents (name, agency, brn, deals, value, discount_pct, days_to_close)
+       VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+      [g.name, g.agency, g.brn, g.deals, g.value, g.discount_pct, g.days_to_close]
+    );
+  }
+  for (const a of BROKER_ACTIVITY) {
+    await c.query(
+      `INSERT INTO broker_activity (text, meta, kind, created_at) VALUES ($1,$2,$3, now() - $4::interval)`,
+      [a.text, a.meta, a.kind, a.hours_ago + " hours"]
     );
   }
 

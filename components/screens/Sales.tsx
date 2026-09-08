@@ -1134,15 +1134,95 @@ function Buyer360({ btab, setBtab, goUnit }: { btab:string; setBtab:(v:any)=>voi
 /* ═══════════════════════════════════════════════════════════════════
    BROKERS
    ═══════════════════════════════════════════════════════════════════ */
+type BrokAgency = { id: number; name: string; orn: string; alloc_units: number; deals: number; accrued: number; paid: number; rate: string; status: string };
+type BrokAgent = { id: number; name: string; agency: string; brn: string; deals: number; value: number; discount_pct: number; days_to_close: number };
+type BrokAct = { id: number; text: string; meta: string; kind: string; created_at: string };
+type BrokData = { kpis: { agencies: number; pending: number; alloc_units: number; deals: number; accrued: number; unpaid: number }; agencies: BrokAgency[]; agents: BrokAgent[]; activity: BrokAct[] };
+const BROK_FALLBACK: BrokData = {
+  kpis: { agencies: AGENCIES.length, pending: AGENCIES.filter((a) => a.status === "Onboarding").length, alloc_units: AGENCIES.reduce((a, b) => a + (parseInt(b.alloc) || 0), 0), deals: AGENCIES.reduce((a, b) => a + b.deals, 0), accrued: 26100000, unpaid: 6700000 },
+  agencies: AGENCIES.map((a, i) => ({ id: i + 1, name: a.name, orn: a.orn, alloc_units: parseInt(a.alloc) || 0, deals: a.deals, accrued: parseInt(a.accrued.replace(/[^0-9.]/g, "")) * (a.accrued.includes("M") ? 1000000 : 1), paid: parseInt(a.paid.replace(/[^0-9.]/g, "")) * (a.paid.includes("M") ? 1000000 : 1), rate: a.rate, status: a.status.toLowerCase() })),
+  agents: AGENTS.map((g, i) => ({ id: i + 1, name: g.name, agency: g.agency, brn: g.brn, deals: g.deals, value: parseFloat(g.value.replace(/[^0-9.]/g, "")) * 1000000, discount_pct: parseFloat(g.disc.replace("%", "")), days_to_close: parseInt(g.days) })),
+  activity: BROK_ACT.map((a, i) => ({ id: i + 1, text: a.text, meta: a.meta, kind: a.meta.includes("Clawback") || a.meta.includes("suspended") ? "suspend" : a.meta.includes("reservation") ? "reservation" : "note", created_at: new Date().toISOString() })),
+};
+const brokPill = (st: string) => st === "active" ? { bg: "#E9F8F1", color: "#1F9D6B" } : st === "onboarding" ? { bg: "#FDF4E5", color: "#B07B14" } : { bg: "#FDECEC", color: "#E5484D" };
+const brokLabel = (st: string) => st === "active" ? "Active" : st === "onboarding" ? "Onboarding" : "Suspended";
+const relAgo = (iso: string) => {
+  const s = (Date.now() - new Date(iso).getTime()) / 1000;
+  if (s < 3600) return Math.max(1, Math.round(s / 60)) + " min ago";
+  if (s < 86400) return Math.round(s / 3600) + " h ago";
+  return Math.round(s / 86400) + " d ago";
+};
+
 function Brokers({ brtab, setBrtab, brstep, setBrstep }: { brtab:string; setBrtab:(v:any)=>void; brstep:number; setBrstep:(n:number)=>void }) {
+  const [data, setData] = useState<BrokData | null>(null);
+  const [apiError, setApiError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+
+  const banner = (m: string) => { setNotice(m); setTimeout(() => setNotice(""), 3800); };
+
+  useEffect(() => {
+    let active = true;
+    fetchJSON<BrokData>("/api/brokers")
+      .then((j) => { if (active) setData(j); })
+      .catch((e) => { if (active) setApiError(e?.message || "Failed to load brokers"); })
+      .finally(() => { if (active) setLoaded(true); });
+    return () => { active = false; };
+  }, []);
+
+  const refresh = async () => {
+    const j = await fetchJSON<BrokData>("/api/brokers");
+    setData(j);
+    return j;
+  };
+
+  const toggleStatus = async (a: BrokAgency) => {
+    const action = a.status === "active" ? "suspend" : a.status === "suspended" ? "activate" : "activate";
+    try {
+      await fetchJSON<any>("/api/brokers?id=" + a.id, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action }) });
+      const j = await refresh();
+      banner((action === "suspend" ? "Agency suspended · " : "Agency " + a.name + " set live · ") + (action === "suspend" ? a.name : ""));
+    } catch (e: any) { banner("Update failed: " + (e?.message || "request failed")); }
+  };
+
+  const submitOnboard = async () => {
+    setBusy(true);
+    try {
+      await fetchJSON<any>("/api/brokers", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: ONBOARD_FIELDS[0][1], orn: ONBOARD_FIELDS[3][1], commission_rate: ONBOARD_FIELDS[6][1].split(" ")[0] }) });
+      const j = await refresh();
+      setData(j);
+      banner(ONBOARD_FIELDS[0][1] + " submitted for onboarding");
+      setBrtab("agencies");
+    } catch (e: any) { banner("Onboard failed: " + (e?.message || "request failed")); }
+    finally { setBusy(false); }
+  };
+
   const brokerTabs: [string,string][] = [["agencies","Agencies"],["agents","Agents"],["onboard","Onboard agency"],["activity","Activity"]];
   const showAgencies = brtab === "agencies";
   const showAgents = brtab === "agents";
   const showOnboard = brtab === "onboard";
   const showActivity = brtab === "activity";
 
+  if (!loaded) {
+    return (
+      <div>
+        <PanelSkeleton headerW={260} rows={9} cols={6} />
+      </div>
+    );
+  }
+
+  const show = data || BROK_FALLBACK;
+  const k = show.kpis;
+
   return (
     <div>
+      {apiError && (
+        <div style={{ background: "#FDECEC", color: "#E5484D", borderRadius: 12, padding: "11px 16px", fontSize: 12, fontWeight: 700, marginBottom: 16 }}>
+          Live data unavailable ({apiError}) — showing sample rows
+        </div>
+      )}
+      {notice && <div style={{ background: "#E9F8F1", color: "#1F9D6B", borderRadius: 12, padding: "11px 16px", fontSize: 12, fontWeight: 700, marginBottom: 16 }}>{notice}</div>}
       <div style={{display:"flex",alignItems:"flex-end",gap:16,marginBottom:18}}>
         <div style={{flex:1}}>
           <div style={{fontSize:26,fontWeight:800,letterSpacing:"-.03em",lineHeight:1.15}}>Brokers &amp; agencies</div>
@@ -1157,7 +1237,7 @@ function Brokers({ brtab, setBrtab, brstep, setBrstep }: { brtab:string; setBrta
 
       {/* KPIs */}
       <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:14,marginBottom:16}}>
-        {[["Registered agencies","14","3 pending onboarding"],["Allocated inventory","86 units","AED 184.2M"],["Deals in progress","23","AED 52.6M"],["Commission accrued","AED 26.1M","AED 7.7M unpaid"],["Broker share of sales","64%","of units booked YTD"]].map(([l,v,n]) => (
+        {[["Registered agencies",String(k.agencies),k.pending + " pending onboarding"],["Allocated inventory",k.alloc_units + " units","live portfolio allocation"],["Deals in progress",String(k.deals),"across all agencies"],["Commission accrued",moneyM(k.accrued),moneyM(k.unpaid) + " unpaid"],["Broker share of sales","64%","of units booked YTD"]].map(([l,v,n]) => (
           <div key={l} style={{background:"#fff",borderRadius:20,padding:"18px 20px",boxShadow:"0 1px 3px rgba(20,22,31,.04)"}}>
             <div style={{fontSize:10.5,fontWeight:700,letterSpacing:".06em",color:"#9AA0AE",textTransform:"uppercase"}}>{l}</div>
             <div style={{fontSize:20,fontWeight:800,letterSpacing:"-.03em",marginTop:11}}>{v}</div>
@@ -1172,25 +1252,28 @@ function Brokers({ brtab, setBrtab, brstep, setBrstep }: { brtab:string; setBrta
           <div style={{display:"grid",gridTemplateColumns:"1.5fr 90px 92px 64px 104px 104px 64px 96px 1fr",gap:10,padding:"14px 24px",fontSize:9.5,fontWeight:700,letterSpacing:".07em",color:"#9AA0AE",textTransform:"uppercase",background:"#FAFBFD",borderBottom:"1px solid #EDEEF3"}}>
             <span>Agency</span><span>ORN</span><span>Allocated</span><span style={{textAlign:"right"}}>Deals</span><span style={{textAlign:"right"}}>Accrued</span><span style={{textAlign:"right"}}>Paid</span><span style={{textAlign:"right"}}>Rate</span><span>Status</span><span></span>
           </div>
-          {AGENCIES.map(a => (
-            <div key={a.name} style={{display:"grid",gridTemplateColumns:"1.5fr 90px 92px 64px 104px 104px 64px 96px 1fr",gap:10,alignItems:"center",padding:"0 24px",height:56,borderBottom:"1px solid #F6F7FA"}}>
-              <span style={{display:"flex",alignItems:"center",gap:11,minWidth:0}}>
-                <span style={{width:32,height:32,flex:"none",borderRadius:11,background:"#EDECFE",display:"grid",placeItems:"center",fontSize:11,fontWeight:800,color:AC}}>{a.init}</span>
-                <span style={{fontSize:12.5,fontWeight:700,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{a.name}</span>
-              </span>
-              <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:10.5,color:"#6B7180"}}>{a.orn}</span>
-              <span style={{fontSize:11.5,fontWeight:600,color:"#6B7180"}}>{a.alloc}</span>
-              <span style={{textAlign:"right",fontSize:11.5,fontWeight:700}}>{a.deals}</span>
-              <span style={{textAlign:"right",fontSize:11.5,fontWeight:700}}>{a.accrued}</span>
-              <span style={{textAlign:"right",fontSize:11.5,fontWeight:600,color:"#6B7180"}}>{a.paid}</span>
-              <span style={{textAlign:"right",fontSize:11.5,fontWeight:700}}>{a.rate}</span>
-              <span style={{fontSize:10,fontWeight:700,borderRadius:7,padding:"3px 8px",textAlign:"center", background:a.status==="Active"?"#E9F8F1":a.status==="Onboarding"?"#FDF4E5":"#FDECEC", color:a.status==="Active"?"#1F9D6B":a.status==="Onboarding"?"#B07B14":"#E5484D"}}>{a.status}</span>
-              <span style={{display:"flex",gap:6,justifyContent:"flex-end"}}>
-                <button style={{height:28,borderRadius:9,border:"1px solid #EDEEF3",background:"#fff",padding:"0 10px",fontFamily:"inherit",fontSize:10.5,fontWeight:700,color:"#4A5060",cursor:"pointer"}}>Allocation</button>
-                <button style={{height:28,borderRadius:9,border:0,background:"#F0EFFE",padding:"0 10px",fontFamily:"inherit",fontSize:10.5,fontWeight:700,color:AC,cursor:"pointer"}}>Commission</button>
-              </span>
-            </div>
-          ))}
+          {show.agencies.map(a => {
+            const pill = brokPill(a.status);
+            return (
+              <div key={a.id} style={{display:"grid",gridTemplateColumns:"1.5fr 90px 92px 64px 104px 104px 64px 96px 1fr",gap:10,alignItems:"center",padding:"0 24px",height:56,borderBottom:"1px solid #F6F7FA"}}>
+                <span style={{display:"flex",alignItems:"center",gap:11,minWidth:0}}>
+                  <span style={{width:32,height:32,flex:"none",borderRadius:11,background:"#EDECFE",display:"grid",placeItems:"center",fontSize:11,fontWeight:800,color:AC}}>{a.name.split(" ").map((x) => x[0]).join("").slice(0, 2)}</span>
+                  <span style={{fontSize:12.5,fontWeight:700,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{a.name}</span>
+                </span>
+                <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:10.5,color:"#6B7180"}}>{a.orn}</span>
+                <span style={{fontSize:11.5,fontWeight:600,color:"#6B7180"}}>{Number(a.alloc_units)} units</span>
+                <span style={{textAlign:"right",fontSize:11.5,fontWeight:700}}>{Number(a.deals)}</span>
+                <span style={{textAlign:"right",fontSize:11.5,fontWeight:700}}>{moneyM(Number(a.accrued))}</span>
+                <span style={{textAlign:"right",fontSize:11.5,fontWeight:600,color:"#6B7180"}}>{moneyM(Number(a.paid))}</span>
+                <span style={{textAlign:"right",fontSize:11.5,fontWeight:700}}>{a.rate}</span>
+                <span style={{fontSize:10,fontWeight:700,borderRadius:7,padding:"3px 8px",textAlign:"center",background:pill.bg,color:pill.color}}>{brokLabel(a.status)}</span>
+                <span style={{display:"flex",gap:6,justifyContent:"flex-end"}}>
+                  <button style={{height:28,borderRadius:9,border:"1px solid #EDEEF3",background:"#fff",padding:"0 10px",fontFamily:"inherit",fontSize:10.5,fontWeight:700,color:"#4A5060",cursor:"pointer"}}>Allocation</button>
+                  <button onClick={() => toggleStatus(a)} disabled={busy} style={{height:28,borderRadius:9,border:0,background:"#F0EFFE",padding:"0 10px",fontFamily:"inherit",fontSize:10.5,fontWeight:700,color:AC,cursor:"pointer"}}>{a.status === "active" ? "Suspend" : a.status === "suspended" ? "Reinstate" : "Go live"}</button>
+                </span>
+              </div>
+            );
+          })}
         </div>
       )}
 
@@ -1200,18 +1283,18 @@ function Brokers({ brtab, setBrtab, brstep, setBrstep }: { brtab:string; setBrta
           <div style={{display:"grid",gridTemplateColumns:"1.3fr 1.2fr 100px 64px 104px 84px 84px",gap:10,padding:"14px 24px",fontSize:9.5,fontWeight:700,letterSpacing:".07em",color:"#9AA0AE",textTransform:"uppercase",background:"#FAFBFD",borderBottom:"1px solid #EDEEF3"}}>
             <span>Agent</span><span>Agency</span><span>BRN</span><span style={{textAlign:"right"}}>Deals</span><span style={{textAlign:"right"}}>Value</span><span style={{textAlign:"right"}}>Avg disc</span><span style={{textAlign:"right"}}>Days to close</span>
           </div>
-          {AGENTS.map(a => (
-            <div key={a.name} style={{display:"grid",gridTemplateColumns:"1.3fr 1.2fr 100px 64px 104px 84px 84px",gap:10,alignItems:"center",padding:"0 24px",height:52,borderBottom:"1px solid #F6F7FA"}}>
+          {show.agents.map(g => (
+            <div key={g.id} style={{display:"grid",gridTemplateColumns:"1.3fr 1.2fr 100px 64px 104px 84px 84px",gap:10,alignItems:"center",padding:"0 24px",height:52,borderBottom:"1px solid #F6F7FA"}}>
               <span style={{display:"flex",alignItems:"center",gap:11,minWidth:0}}>
-                <span style={{width:30,height:30,flex:"none",borderRadius:10,background:"#E7E9F0",display:"grid",placeItems:"center",fontSize:10.5,fontWeight:700,color:"#4A5060"}}>{a.name.split(" ").map(x=>x[0]).join("")}</span>
-                <span style={{fontSize:12.5,fontWeight:700,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{a.name}</span>
+                <span style={{width:30,height:30,flex:"none",borderRadius:10,background:"#E7E9F0",display:"grid",placeItems:"center",fontSize:10.5,fontWeight:700,color:"#4A5060"}}>{g.name.split(" ").map((x) => x[0]).join("")}</span>
+                <span style={{fontSize:12.5,fontWeight:700,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{g.name}</span>
               </span>
-              <span style={{fontSize:11.5,color:"#6B7180",fontWeight:600}}>{a.agency}</span>
-              <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:10.5,color:"#6B7180"}}>{a.brn}</span>
-              <span style={{textAlign:"right",fontSize:11.5,fontWeight:700}}>{a.deals}</span>
-              <span style={{textAlign:"right",fontSize:11.5,fontWeight:700}}>{a.value}</span>
-              <span style={{textAlign:"right",fontSize:11.5,fontWeight:600,color:"#6B7180"}}>{a.disc}</span>
-              <span style={{textAlign:"right",fontSize:11.5,fontWeight:600,color:"#6B7180"}}>{a.days}</span>
+              <span style={{fontSize:11.5,color:"#6B7180",fontWeight:600}}>{g.agency}</span>
+              <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:10.5,color:"#6B7180"}}>{g.brn}</span>
+              <span style={{textAlign:"right",fontSize:11.5,fontWeight:700}}>{Number(g.deals)}</span>
+              <span style={{textAlign:"right",fontSize:11.5,fontWeight:700}}>{moneyM(Number(g.value))}</span>
+              <span style={{textAlign:"right",fontSize:11.5,fontWeight:600,color:"#6B7180"}}>{Number(g.discount_pct).toFixed(1)}%</span>
+              <span style={{textAlign:"right",fontSize:11.5,fontWeight:600,color:"#6B7180"}}>{Number(g.days_to_close)} d</span>
             </div>
           ))}
         </div>
@@ -1237,7 +1320,7 @@ function Brokers({ brtab, setBrtab, brstep, setBrstep }: { brtab:string; setBrta
           </div>
           <div style={{background:"#fff",borderRadius:20,padding:"24px 26px",boxShadow:"0 1px 3px rgba(20,22,31,.04)"}}>
             <div style={{fontSize:18,fontWeight:800,letterSpacing:"-.025em"}}>Metropolitan Premium Properties</div>
-            <div style={{fontSize:12.5,color:"#6B7180",fontWeight:500,marginTop:6}}>Draft saved 2 minutes ago \u00b7 agency cannot see inventory until go live</div>
+            <div style={{fontSize:12.5,color:"#6B7180",fontWeight:500,marginTop:6}}>Draft saved 2 minutes ago · agency cannot see inventory until go live</div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"16px 20px",marginTop:24}}>
               {ONBOARD_FIELDS.map(([label,value,hintVal]) => (
                 <div key={label}>
@@ -1250,9 +1333,9 @@ function Brokers({ brtab, setBrtab, brstep, setBrstep }: { brtab:string; setBrta
               ))}
             </div>
             <div style={{display:"flex",gap:10,marginTop:26,paddingTop:20,borderTop:"1px solid #F1F2F7"}}>
-              <button style={{height:40,borderRadius:12,border:"1px solid #EDEEF3",background:"#fff",padding:"0 16px",fontFamily:"inherit",fontSize:12.5,fontWeight:700,color:"#4A5060",cursor:"pointer"}}>Save draft</button>
+              <button onClick={() => banner("Draft saved · " + ONBOARD_FIELDS[0][1])} style={{height:40,borderRadius:12,border:"1px solid #EDEEF3",background:"#fff",padding:"0 16px",fontFamily:"inherit",fontSize:12.5,fontWeight:700,color:"#4A5060",cursor:"pointer"}}>Save draft</button>
               <div style={{flex:1}} />
-              <button style={{height:40,borderRadius:12,background:AC,color:"#fff",border:0,padding:"0 20px",fontFamily:"inherit",fontSize:12.5,fontWeight:700,cursor:"pointer"}}>Continue to allocation</button>
+              <button onClick={submitOnboard} disabled={busy} style={{height:40,borderRadius:12,background:AC,color:"#fff",border:0,padding:"0 20px",fontFamily:"inherit",fontSize:12.5,fontWeight:700,cursor:busy?"progress":"pointer",opacity:busy?0.7:1}}>{busy ? "Submitting…" : "Continue to allocation"}</button>
             </div>
           </div>
           <div style={{display:"flex",flexDirection:"column",gap:16}}>
@@ -1285,16 +1368,19 @@ function Brokers({ brtab, setBrtab, brstep, setBrstep }: { brtab:string; setBrta
         <div style={{background:"#fff",borderRadius:20,padding:"22px 24px",boxShadow:"0 1px 3px rgba(20,22,31,.04)"}}>
           <div style={{fontSize:15,fontWeight:700,letterSpacing:"-.015em",marginBottom:4}}>Broker activity</div>
           <div style={{fontSize:11.5,color:"#9AA0AE",fontWeight:500,marginBottom:8}}>Every reservation, download and clawback, logged</div>
-          {BROK_ACT.map(a => (
-            <div key={a.text} style={{display:"flex",gap:13,alignItems:"flex-start",padding:"13px 0",borderBottom:"1px solid #F6F7FA"}}>
-              <span style={{width:9,height:9,borderRadius:5,flex:"none",marginTop:4,background:a.color}} />
-              <span style={{flex:1,minWidth:0}}>
-                <span style={{display:"block",fontSize:12.5,fontWeight:700}}>{a.text}</span>
-                <span style={{display:"block",fontSize:11,color:"#9AA0AE",fontWeight:600,marginTop:3}}>{a.meta}</span>
-              </span>
-              <span style={{fontSize:10.5,fontWeight:700,color:"#C2C6D2",whiteSpace:"nowrap"}}>{a.when}</span>
-            </div>
-          ))}
+          {show.activity.map(a => {
+            const dot = a.kind === "reservation" ? AC : a.kind === "commission" ? "#34C08A" : (a.kind === "clawback" || a.kind === "suspend") ? "#E5484D" : "#8A94A6";
+            return (
+              <div key={a.id} style={{display:"flex",gap:13,alignItems:"flex-start",padding:"13px 0",borderBottom:"1px solid #F6F7FA"}}>
+                <span style={{width:9,height:9,borderRadius:5,flex:"none",marginTop:4,background:dot}} />
+                <span style={{flex:1,minWidth:0}}>
+                  <span style={{display:"block",fontSize:12.5,fontWeight:700}}>{a.text}</span>
+                  <span style={{display:"block",fontSize:11,color:"#9AA0AE",fontWeight:600,marginTop:3}}>{a.meta}</span>
+                </span>
+                <span style={{fontSize:10.5,fontWeight:700,color:"#C2C6D2",whiteSpace:"nowrap"}}>{relAgo(a.created_at)}</span>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
