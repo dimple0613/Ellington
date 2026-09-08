@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AC } from "../../lib/format";
+import { fetchJSON } from "../../lib/api";
 
 type SnagRow = { unit: string; loc: string; trade: string; desc: string; sev: string; contractor: string; status: string; reinspect: string };
 
@@ -37,6 +38,30 @@ export default function SnaggingScreen() {
   const [assignUnit, setAssignUnit] = useState(ROWS[0].unit);
   const [contractor, setContractor] = useState("ALEC \u00b7 MEP");
   const [err, setErr] = useState("");
+  const [apiError, setApiError] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    fetchJSON<{ snagging: { unit_no: string; loc: string; trade: string; desc: string; sev: string; contractor: string; status: string; reinspect: string }[] }>("/api/handover")
+      .then((j) => {
+        if (!active || !Array.isArray(j.snagging)) return;
+        const mapped: SnagRow[] = j.snagging.map((s) => ({
+          unit: s.unit_no || "",
+          loc: s.loc || "",
+          trade: s.trade || "",
+          desc: s.desc || "",
+          sev: s.sev || "Minor",
+          contractor: s.contractor || "Unassigned",
+          status: s.status || "Open",
+          reinspect: s.reinspect || "—",
+        }));
+        if (mapped.length) setRows(mapped);
+      })
+      .catch((e) => {
+        if (active) setApiError(e?.message || "Failed to load snags");
+      });
+    return () => { active = false; };
+  }, []);
 
   const closeSnag = (idx: number) => {
     setClosed((prev) => { const next = new Set(prev); next.add(idx); return next; });
@@ -74,6 +99,11 @@ export default function SnaggingScreen() {
 
   return (
     <div>
+      {apiError && (
+        <div style={{ background: "#FDECEC", color: "#E5484D", borderRadius: 12, padding: "11px 16px", fontSize: 12, fontWeight: 700, marginBottom: 16 }}>
+          Live data unavailable ({apiError}) — showing sample rows
+        </div>
+      )}
       {notice && <div style={{ background: "#E9F8F1", color: "#1F9D6B", borderRadius: 12, padding: "11px 16px", fontSize: 12, fontWeight: 700, marginBottom: 16 }}>{notice}</div>}
       <div style={{ display: "flex", alignItems: "flex-end", gap: 16, marginBottom: 18 }}>
         <div style={{ flex: 1 }}>
