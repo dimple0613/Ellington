@@ -155,8 +155,14 @@ Only parameterized SQL is used. Seeds/scripts under `db/` (`schema.sql`, `seed.t
   (`7a2b0b4` on branch `fix/aud-006-system`): new `audit_log` + `app_settings` tables
   (idempotent DDL + seed guard), `pages/api/system.ts` (GET envelope + PUT upsert behind
   `Settings:UPD`), AuditLog and Settings screens live via `fetchJSON`, Settings saves
-  persist to `app_settings`. Remaining static screens to
-  wire: Finance ops (Collections/Ageing, Escrow, Cashflow, Invoices, Reports), Exec mobile — tracked in #22.
+  persist to `app_settings`. **Finance module (ledgers) wired** (`916a1f5` on branch
+  `fix/aud-006-finance`): new `collections`, `drawdowns`, `invoices` tables (+ `received_at`
+  on `escrow_ledger`) seeded idempotently, new `pages/api/finance.ts` (envelope returning
+  `{collections, escrow:{queue,drawdowns}, invoices}` behind `Finance:REA`), Collections /
+  Escrow / Invoices screens fetch live rows via `fetchJSON` with error banners. Cashflow and
+  Reports remain static analytics (`FC`/ladder dashboards) — noted as ANALYTIC MOCK in
+  DATA.md; remaining static screens to
+  wire: Exec mobile — tracked in #22.
 - **AUD-007 — Fetch error handling swallowed.** Screens use local `let active` blocks
   with `.catch(() => {})`, silent fallback to mock data; shared `lib/useApi.ts` exists
   but is unused. Fix: adopt `useApi` (or equivalent) with `loading/error/data` states
