@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { AC, compact, money } from "../../lib/format";
 import { ST, UnitStatus, UNITS, Unit } from "../../lib/data";
+import { fetchJSON } from "../../lib/api";
 
 type UnitRow = {
   id?: string | number | null;
@@ -98,17 +99,18 @@ export default function InventoryScreen({
   const [filter, setFilter] = useState<string>("all");
   const [heat, setHeat] = useState(false);
   const [dbUnits, setDbUnits] = useState<Unit[]>([]);
+  const [apiError, setApiError] = useState("");
 
   useEffect(() => {
     let active = true;
-    fetch("/api/inventory" + (scope && scope !== "ALL" ? "?project=" + encodeURIComponent(scope) : ""))
-      .then((r) => (r.ok ? r.json() : null))
+    fetchJSON<{ units: UnitRow[] }>("/api/inventory" + (scope && scope !== "ALL" ? "?project=" + encodeURIComponent(scope) : ""))
       .then((j) => {
-        const units = j?.data?.units;
-        if (!active || !Array.isArray(units)) return;
-        setDbUnits(units.map(toUnitShape));
+        if (!active || !Array.isArray(j.units)) return;
+        setDbUnits(j.units.map(toUnitShape));
       })
-      .catch(() => {});
+      .catch((e) => {
+        if (active) setApiError(e?.message || "Failed to load units");
+      });
     return () => { active = false; };
   }, [scope]);
 
@@ -195,6 +197,11 @@ export default function InventoryScreen({
 
   return (
     <div>
+      {apiError && (
+        <div style={{ background: "#FDECEC", color: "#E5484D", borderRadius: 12, padding: "11px 16px", fontSize: 12, fontWeight: 700, marginBottom: 16 }}>
+          Live data unavailable ({apiError}) — showing sample units
+        </div>
+      )}
       <div style={{ display: "flex", alignItems: "flex-end", gap: 16, marginBottom: 18 }}>
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: "-.03em", lineHeight: 1.15 }}>Inventory</div>

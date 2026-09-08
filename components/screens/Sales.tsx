@@ -3,6 +3,7 @@ import { useRouter } from "next/router";
 import { AC, money } from "../../lib/format";
 import { ALL_UNITS } from "../../lib/data";
 import { exportBuyerStatement, exportDocument } from "../../lib/pdf";
+import { fetchJSON } from "../../lib/api";
 
 const BUYERS = ["Rajesh Menon","Aisha Al Marri","Hassan Al Rayes","Chen Liu","Daniel Whitfield","Elena Petrova","Marcus Lindqvist","Wei Chen","Priya Nair","Nadia Khoury","Sunil Rathore","Grace Okonkwo","Omar Al Suwaidi","Fatima Al Hashimi"];
 const pill = (s: string, ok: boolean) =>
@@ -175,13 +176,13 @@ export default function Sales({ scope }: { scope: string }) {
    ═══════════════════════════════════════════════════════════════════ */
 function Leads({ onNewBooking, onBookLead }: { onNewBooking: () => void; onBookLead: (card: Card) => void }) {
   const [dbCols, setDbCols] = useState<Col[] | null>(null);
+  const [apiError, setApiError] = useState("");
 
   useEffect(() => {
     let active = true;
-    fetch("/api/leads")
-      .then((r) => (r.ok ? r.json() : null))
+    fetchJSON<{ leads: ApiLead[] }>("/api/leads")
       .then((j) => {
-        const leads = j?.data?.leads;
+        const leads = j.leads;
         if (!active || !Array.isArray(leads)) return;
         const order = ["new", "contacted", "qualified", "viewing", "negotiation", "eoi", "booked", "lost"];
         const byStage: Record<string, Card[]> = { new: [], contacted: [], qualified: [], viewing: [], negotiation: [], eoi: [], booked: [], lost: [] };
@@ -213,7 +214,9 @@ function Leads({ onNewBooking, onBookLead }: { onNewBooking: () => void; onBookL
         });
         setDbCols(cols);
       })
-      .catch(() => {});
+      .catch((e) => {
+        if (active) setApiError(e?.message || "Failed to load leads");
+      });
     return () => { active = false; };
   }, []);
 
@@ -221,6 +224,11 @@ function Leads({ onNewBooking, onBookLead }: { onNewBooking: () => void; onBookL
 
   return (
     <div>
+      {apiError && (
+        <div style={{ background: "#FDECEC", color: "#E5484D", borderRadius: 12, padding: "11px 16px", fontSize: 12, fontWeight: 700, marginBottom: 16 }}>
+          Live data unavailable ({apiError}) — showing sample columns
+        </div>
+      )}
       <div style={{display:"flex",alignItems:"flex-end",gap:16,marginBottom:18}}>
         <div style={{flex:1}}>
           <div style={{fontSize:26,fontWeight:800,letterSpacing:"-.03em",lineHeight:1.15}}>Leads</div>

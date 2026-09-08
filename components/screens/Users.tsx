@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { AC } from "../../lib/format";
+import { fetchJSON } from "../../lib/api";
 
 type UserRow = { name: string; email: string; role: string; projects: string; lastActive: string; tfa: string; status: string };
 
@@ -73,13 +74,13 @@ export default function UsersScreen() {
     return init;
   });
   const [dbUsers, setDbUsers] = useState<UserRow[] | null>(null);
+  const [apiError, setApiError] = useState("");
 
   useEffect(() => {
     let active = true;
-    fetch("/api/admins")
-      .then((r) => (r.ok ? r.json() : null))
+    fetchJSON<{ users: AdminRow[] }>("/api/admins")
       .then((j) => {
-        const users = j?.data?.users;
+        const users = j.users;
         if (!active || !Array.isArray(users)) return;
         const rows: UserRow[] = users.map((u: AdminRow) => ({
           name: u.name || u.email,
@@ -92,7 +93,9 @@ export default function UsersScreen() {
         }));
         if (rows.length) setDbUsers(rows);
       })
-      .catch(() => {});
+      .catch((e) => {
+        if (active) setApiError(e?.message || "Failed to load users");
+      });
     return () => { active = false; };
   }, []);
 
@@ -127,6 +130,7 @@ export default function UsersScreen() {
 
   return (
     <div>
+      {apiError && <div style={{ background: "#FDECEC", color: "#E5484D", borderRadius: 12, padding: "11px 16px", fontSize: 12, fontWeight: 700, marginBottom: 16 }}>Live data unavailable ({apiError}) — showing sample rows</div>}
       {notice && <div style={{ background: "#E9F8F1", color: "#1F9D6B", borderRadius: 12, padding: "11px 16px", fontSize: 12, fontWeight: 700, marginBottom: 16 }}>{notice}</div>}
       <div style={{ display: "flex", alignItems: "flex-end", gap: 16, marginBottom: 18 }}>
         <div style={{ flex: 1 }}>

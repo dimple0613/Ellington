@@ -31,3 +31,18 @@ export function missingFields(body: Record<string, unknown>, keys: string[]): st
   if (absent.length === 1) return `${absent[0]} is required`;
   return `${absent.slice(0, -1).join(", ")} and ${absent[absent.length - 1]} are required`;
 }
+
+export async function fetchJSON<T = unknown>(path: string, opts?: RequestInit): Promise<T> {
+  const res = await fetch(path, opts);
+  if (res.status === 401) {
+    if (typeof window !== "undefined") window.location.href = "/login";
+    throw new Error("Unauthorized");
+  }
+  const json = await res.json().catch(() => null);
+  if (json && typeof json === "object" && "ok" in json) {
+    if (!(json as { ok: boolean }).ok) throw new Error((json as { error: string | null }).error || "Request failed");
+    return (json as { data: T }).data ?? (null as T);
+  }
+  if (!res.ok) throw new Error("Request failed");
+  return json as T;
+}

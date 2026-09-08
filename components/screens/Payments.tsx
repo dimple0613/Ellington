@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { AC } from "../../lib/format";
+import { fetchJSON } from "../../lib/api";
 
 type ReceiptRow = {
   rcp: string;
@@ -42,16 +43,15 @@ export default function PaymentsScreen({ buyer }: { buyer?: string }) {
   const [saved, setSaved] = useState(false);
   const [extraRows, setExtraRows] = useState<ReceiptRow[]>([]);
   const [dbRows, setDbRows] = useState<ReceiptRow[]>([]);
+  const [apiError, setApiError] = useState("");
 
   useEffect(() => {
     let active = true;
-    fetch("/api/receipts")
-      .then((r) => (r.ok ? r.json() : null))
+    fetchJSON<{ receipts: ApiReceipt[] }>("/api/receipts")
       .then((j) => {
-        const receipts = j?.data?.receipts;
-        if (!active || !Array.isArray(receipts)) return;
+        if (!active || !Array.isArray(j.receipts)) return;
         setDbRows(
-          receipts.slice(0, 20).map((x: ApiReceipt) => ({
+          j.receipts.slice(0, 20).map((x: ApiReceipt) => ({
             rcp: "RCP-" + String(x.id).padStart(6, "0"),
             date: x.date || "",
             buyer: x.buyer || "",
@@ -63,7 +63,9 @@ export default function PaymentsScreen({ buyer }: { buyer?: string }) {
           }))
         );
       })
-      .catch(() => {});
+      .catch((e) => {
+        if (active) setApiError(e?.message || "Failed to load receipts");
+      });
     return () => { active = false; };
   }, []);
 
@@ -138,6 +140,11 @@ export default function PaymentsScreen({ buyer }: { buyer?: string }) {
 
   return (
     <div>
+      {apiError && (
+        <div style={{ background: "#FDECEC", color: "#E5484D", borderRadius: 12, padding: "11px 16px", fontSize: 12, fontWeight: 700, marginBottom: 16 }}>
+          Live data unavailable ({apiError}) — showing sample rows
+        </div>
+      )}
       {buyer && (
         <div style={{ background: "#F0EFFE", color: AC, borderRadius: 12, padding: "11px 16px", fontSize: 12, fontWeight: 700, marginBottom: 16 }}>
           Recording payment for <span style={{ fontWeight: 800 }}>{buyer}</span> \u00b7 sourced from Buyer 360 \u00b7 escrow deposit required
