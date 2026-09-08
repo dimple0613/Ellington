@@ -1,7 +1,8 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AC, money } from "../../lib/format";
 import { ramp } from "../../lib/data";
 import { PROJECTS } from "../../lib/data";
+import { fetchJSON } from "../../lib/api";
 
 const BANDS = ["L1-10", "L11-20", "L21-30", "L31-40", "L41-45"];
 
@@ -37,6 +38,26 @@ const pill = (s: string) =>
     ? { background: "#FDF4E5", color: "#B07B14" }
     : { background: "#F1F2F6", color: "#6B7180" };
 
+type InvRow = {
+  id?: string | number | null;
+  no?: string | number | null;
+  type?: string | null;
+  area?: string | number | null;
+  status?: string | null;
+  price?: string | number | null;
+};
+
+function psfOf(r: InvRow): number {
+  const price = Number(r.price) || 0;
+  const area = Number(r.area) || 0;
+  return area > 0 ? price / area : 0;
+}
+
+function isSold(r: InvRow): boolean {
+  const s = String(r.status || "").toLowerCase();
+  return s === "sold" || s === "booked" || s === "reserved";
+}
+
 export default function PricingScreen({ scope = "ALL" }: { scope?: string }) {
   const proj = PROJECTS.find((p) => p.code === scope);
   const projName = proj ? proj.name : "Belgravia Heights III";
@@ -48,23 +69,66 @@ export default function PricingScreen({ scope = "ALL" }: { scope?: string }) {
   const [reason, setReason] = useState("Required");
   const [submitted, setSubmitted] = useState(false);
   const [histOpen, setHistOpen] = useState(false);
+  const [rows, setRows] = useState<InvRow[]>([]);
 
-  const gdvImpact = useMemo(() => PREVIEWS.reduce((a, r) => a + r.price * 0.03, 0), []);
-  const previewRows = PREVIEWS;
+  useEffect(() => {
+    let active = true;
+    fetchJSON<{ units: InvRow[] }>("/api/inventory" + (scope && scope !== "ALL" ? "?project=" + encodeURIComponent(scope) : ""))
+      .then((j) => {
+        if (active && Array.isArray(j.units)) setRows(j.units);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [scope]);
 
-  const matrix = MATRIX_TYP.map((t, ti) => ({
-    typ: t,
-    cells: BANDS.map((b, bi) => {
-      const psf = 1450 + ti * 42 + bi * 118;
-      const inten = (psf - 1450) / 640;
-      return {
-        key: t + b,
-        psf: psf.toLocaleString("en-US"),
-        meta: (12 - bi) + " units \u00b7 " + Math.max(2, 10 - bi - ti) + " sold",
-        bg: ramp(inten),
-      };
-    }),
-  }));
+  const live = rows.length > 0;
+
+  const previewRows = useMemo(() => {
+    if (!rows.length) return PREVIEWS;
+    const unsold = rows.filter((r) => {
+      const s = String(r.status || "").toLowerCase();
+      return s === "available" || s === "held" || s === "blocked" || s === "reserved";
+    });
+    const top = unsold.slice(0, 4).map((r) => ({
+      no: String(r.no ?? r.id ?? ""),
+      typ: String(r.type ?? ""),
+      old: money(Number(r.price) || 0),
+      nw: money(Math.round((Number(r.price) || 0) * 1.03)),
+      d: "+3.0%",
+      price: Number(r.price) || 0,
+    }));
+    return top.length ? top : PREVIEWS;
+  }, [rows]);
+
+  const gdvImpact = useMemo(() => previewRows.reduce((a, r) => a + r.price * 0.03, 0), [previewRows]);
+
+  const baseOf = (t: string) => t.replace(/-.*/, "");
+  const poolOf = (t: string) => rows.filter((r) => baseOf(String(r.type || "")) === baseOf(t));
+  const isPrimary = (t: string) => t === "1BR-A" || t === "2BR-B" || t === "3BR-A";
+
+  const matrix = MATRIX_TYP.map((t, ti) => {
+    const arr = poolOf(t);
+    const share = Math.floor(arr.length / 2);
+    const used = live ? (isPrimary(t) ? arr.slice(0, share + (arr.length % 2)) : arr.slice(share)) : [];
+    const avgPsf = arr.length ? arr.reduce((a, r) => a + psfOf(r), 0) / arr.length : 1450 + ti * 42;
+    const n = used.length;
+    const s = used.filter(isSold).length;
+    return {
+      typ: t,
+      cells: BANDS.map((b, bi) => {
+        const psf = Math.round((avgPsf + bi * 118) / 5) * 5;
+        const inten = (psf - 1450) / 640;
+        return {
+          key: t + b,
+          psf: psf.toLocaleString("en-US"),
+          meta: live ? n + " units \u00b7 " + s + " sold" : (12 - bi) + " units \u00b7 " + Math.max(2, 10 - bi - ti) + " sold",
+          bg: ramp(inten),
+        };
+      }),
+    };
+  });
 
   const versions = [
     ["v11", "Effective 02 Mar 2026", "A. Haddad", "+2.0% increase, tower 2"],
@@ -188,7 +252,7 @@ export default function PricingScreen({ scope = "ALL" }: { scope?: string }) {
             </div>
           </div>
           <div style={{ marginTop: 18, borderTop: "1px solid #F1F2F7", paddingTop: 14 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".05em", color: "#9AA0AE", textTransform: "uppercase", marginBottom: 10 }}>Preview \u00b7 4 of 42 affected</div>
+            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".05em", color: "#9AA0AE", textTransform: "uppercase", marginBottom: 10 }}>{"Preview \u00b7 " + previewRows.length + " of " + (live ? Math.max(previewRows.length, rows.length) : 42) + " affected"}</div>
             {previewRows.map((r) => (
               <div key={r.no} style={{ display: "grid", gridTemplateColumns: "110px 90px 1fr 1fr 62px", gap: 10, alignItems: "center", padding: "8px 0", borderBottom: "1px solid #F6F7FA" }}>
                 <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, fontWeight: 600 }}>{r.no}</span>

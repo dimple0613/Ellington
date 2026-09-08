@@ -6,7 +6,7 @@
 ## Push (current branch + what to push)
 > Branch-per-task rule (see AGENTS.md): never push directly to main. Update this section per task.
 
-- Current branch: `fix/plinth-parity` (PLINTH Parity Program). Pushed: commits `81d9b7b` (T1) + T2 → `81d9b7b..HEAD` once pushed. To push: `pages/api/inventory.ts` unit filter (`?unit=`), `components/screens/Unit.tsx` live wiring (unit + milestone fetch with mock fallback via `mapLiveUnit`/`mileStatus`), OneTask.md statuses. lint green. Merge to main only after operator approval.
+- Current branch: `fix/plinth-parity` (PLINTH Parity Program). Pushed to that branch: `81d9b7b` (T1), `8e405db` (T2). In progress: `components/screens/Pricing.tsx` live wiring (T3 — matrix/counts/preview from `/api/inventory`, typology-base pools for 1BR/2BR/3BR). To push when T3 lands: T3 commit. Merge to main only after operator approval.
 - Closed on GitHub (no merge): issue #51 (dead `lib/useApi.ts` removed) on `fix/aud-051-dead-use-api` (`f8cbbd0` + `7a0bd8b`); issue #52 (any-type cleanups) on `fix/aud-052-any-types` (`164047b`).
 - Current branch: `main` (`ad22adf`; `fix/aud-006-system`, `fix/aud-006-finance`, `fix/aud-015-analytics` merged; `fix/aud-015-analytics` branch deleted local+remote).
 - **AUD-015 (#37) CLOSED/MERGED** — `fix/aud-015-analytics` (`ad22adf`): cashflow forecast + report exports live via `/api/finance-analytics` + `/api/report-export`; branch deleted.
@@ -51,7 +51,7 @@
 > (booking/buyer/brokers/documents) + missing write-APIs + loading states (#50). Do one at a time.
 > - [x] **T1** Wire `Financials` (`/dashboard?s=financials`) → live `/api/dashboard` project data
 > - [x] **T2** Wire `Unit Detail` (`/project?s=unit`) → `/api/inventory?unit=` + `/api/milestones?unit=`
-> - [ ] **T3** Wire `Pricing & Availability` (`/project?s=pricing`) → live units from `/api/inventory`
+> - [x] **T3** Wire `Pricing & Availability` (`/project?s=pricing`) → live units from `/api/inventory`
 > - [ ] **T4** `Construction Progress` → new `construction_milestones` table + `/api/construction` + wire screen
 > - [ ] **T5** `Mobile` exec app → new `/api/mobile` aggregate + wire the 5 tabs
 > - [ ] **T6** `Buyers` directory + Buyer 360 → new `/api/buyers` (GET) + wire Sales buyer subscreens
