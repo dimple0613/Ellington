@@ -1397,9 +1397,31 @@ function Documents({ dtab, setDtab, doc, setDoc }: { dtab:string; setDtab:(v:any
   const [media, setMedia] = useState<Record<string, boolean>>({ "Floor plan": true, "Key plan": true, "Unit render": true, "View photograph": true, "Site plan": false, "Amenities page": false });
   const [sent, setSent] = useState(false);
   const [sentLabel, setSentLabel] = useState("");
-  const [genLog, setGenLog] = useState<{ ref: string; type: string; when: string }[]>([]);
+  const [genLog, setGenLog] = useState<{ ref: string; type: string; when: string; buyer?: string }[]>([]);
   const [version, setVersion] = useState("v3");
+  const [templates, setTemplates] = useState<Record<string, { version: string; status: string; changed_at?: string }[]>>({});
   const [notice, setNotice] = useState("");
+
+  useEffect(() => {
+    let alive = true;
+    fetchJSON<{ docs: { ref: string; type: string; buyer: string; when: string }[]; templates: { doc_type: string; version: string; status: string; changed_at: string }[] }>("/api/documents")
+      .then((d) => {
+        if (!alive) return;
+        setGenLog(d.docs.slice(0, 5).map((x) => ({
+          ref: x.ref,
+          type: x.type,
+          buyer: x.buyer,
+          when: new Date(x.when).toLocaleDateString("en-GB", { day: "2-digit", month: "short" }),
+        })));
+        const grouped: Record<string, { version: string; status: string; changed_at?: string }[]> = {};
+        for (const t of d.templates) (grouped[t.doc_type] = grouped[t.doc_type] || []).push({ version: t.version, status: t.status, changed_at: t.changed_at });
+        setTemplates(grouped);
+        const live = (grouped[doc] || []).find((v) => v.status === "live");
+        if (live) setVersion(live.version);
+      })
+      .catch(() => { /* offline fallback: keep empty local log */ });
+    return () => { alive = false; };
+  }, [doc]);
 
   const unit = ALL_UNITS.find((u) => u.no === unitNo) || ALL_UNITS[0];
   const price = unit ? unit.price : 2327500;
@@ -1408,11 +1430,22 @@ function Documents({ dtab, setDtab, doc, setDoc }: { dtab:string; setDtab:(v:any
   const refBase = doc.split(" ").map((w) => w[0]).join("").toUpperCase() || "DOC";
   const ref = refBase + "-H21-" + String(4412 + (doc.length % 7)).padStart(6, "0");
 
+  const vers = (templates[doc] || []).length ? templates[doc]! : [
+    { version: "v3", status: "live" },
+    { version: "v2", status: "archived" },
+    { version: "v1", status: "archived" },
+  ];
+
   const download = (notify: boolean) => {
     exportDocument(doc, { no: unitNo, typ: unit?.typ || "2 Bedroom", beds: unit?.beds || 2, area, price, psf }, person, ref);
     if (notify) {
+      fetchJSON("/api/documents", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ doc_type: doc, unit_no: unitNo, buyer: person, ref, status: "sent" }),
+      }).catch(() => {});
       const when = new Date().toLocaleString("en-GB", { day: "2-digit", month: "short" });
-      setGenLog((l) => [{ ref, type: doc, when }, ...l].slice(0, 5));
+      setGenLog((l) => [{ ref, type: doc, when, buyer: person }, ...l].slice(0, 5));
       setSentLabel(ref);
       setSent(true);
       setTimeout(() => setSent(false), 4000);
@@ -1420,9 +1453,20 @@ function Documents({ dtab, setDtab, doc, setDoc }: { dtab:string; setDtab:(v:any
   };
 
   const setActive = () => {
-    setVersion("v4");
-    setNotice("v4 is now the active template for " + doc + " \u00b7 rolled out from today");
-    setTimeout(() => setNotice(""), 4000);
+    fetchJSON<{ version: string; templates: { version: string; status: string; changed_at: string }[] }>(
+      "/api/documents?doc_type=" + encodeURIComponent(doc) + "&action=activate",
+      { method: "PUT" }
+    )
+.then((d) => {
+        setVersion(d.version);
+        setTemplates((prev) => ({ ...prev, [doc]: d.templates }));
+        setNotice(d.version + " is now the active template for " + doc + " \u00b7 rolled out from today");
+        setTimeout(() => setNotice(""), 4000);
+      })
+      .catch(() => {
+        setNotice("Could not activate template \u2014 running offline");
+        setTimeout(() => setNotice(""), 4000);
+      });
   };
   const saveDraft = () => {
     setVersion("v4");
@@ -1566,7 +1610,7 @@ function Documents({ dtab, setDtab, doc, setDoc }: { dtab:string; setDtab:(v:any
                   {genLog.map((g) => (
                     <div key={g.ref + g.when + g.type} style={{display:"flex",justifyContent:"space-between",gap:10,padding:"6px 0",borderBottom:"1px solid #F6F7FA",fontSize:10.5}}>
                       <span style={{fontFamily:"'JetBrains Mono',monospace",fontWeight:600,color:"#4A5060"}}>{g.ref}</span>
-                      <span style={{color:"#9AA0AE",fontWeight:600,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{g.type} \u00b7 {person}</span>
+                      <span style={{color:"#9AA0AE",fontWeight:600,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{g.type} \u00b7 {g.buyer || person}</span>
                       <span style={{color:"#C2C6D2",fontWeight:600}}>{g.when}</span>
                     </div>
                   ))}
@@ -1606,12 +1650,15 @@ function Documents({ dtab, setDtab, doc, setDoc }: { dtab:string; setDtab:(v:any
                 </div>
                 <div style={{marginTop:18,paddingTop:14,borderTop:"1px solid #F1F2F7"}}>
                   <div style={{fontSize:11,fontWeight:700,letterSpacing:".05em",color:"#9AA0AE",textTransform:"uppercase",marginBottom:9}}>Version control</div>
-                  {[["v3 \u00b7 active","Live","#1F9D6B"],["v2 \u00b7 14 Mar 2026","Archived","#9AA0AE"],["v1 \u00b7 02 Jan 2026","Archived","#9AA0AE"]].map(([ver,status,color]) => (
-                    <div key={ver} style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:status==="Live"?undefined:"1px solid #F6F7FA"}}>
-                      <span style={{fontSize:11.5,color:"#6B7180",fontWeight:600}}>{ver}</span>
-                      <span style={{fontSize:11,fontWeight:status==="Live"?700:600,color}}>{status}</span>
-                    </div>
-                  ))}
+                  {vers.map((v) => {
+                    const live = v.status === "live";
+                    return (
+                      <div key={v.version} style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:live?undefined:"1px solid #F6F7FA"}}>
+                        <span style={{fontSize:11.5,color:"#6B7180",fontWeight:600}}>{v.version}{v.changed_at ? " \u00b7 " + new Date(v.changed_at).toLocaleDateString("en-GB", { day:"2-digit", month:"short", year:"numeric" }) : ""}</span>
+                        <span style={{fontSize:11,fontWeight:live?700:600,color:live?"#1F9D6B":"#9AA0AE"}}>{live ? "Live" : "Archived"}</span>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </div>

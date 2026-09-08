@@ -66,6 +66,18 @@ const BOOKINGS = [
   { unit: "H21-T1-3601", buyer: "Daniel Petrova", mobile: "+971 50 4140533", ref: "BKG-2026-00612", discount_pct: 2.5, discount_amt: 16000, list_price: 640000, net_price: 624000, booking_amount: 62400, expected_spa: "2026-12-15", status: "cancelled", payment_method: null, escrow_ref: "ESC-2026-4510", age_days: 61 },
 ];
 
+// document vault (T16) — generation log + template version control.
+const DOC_LOGS = [
+  { doc_type: "Sales Offer", unit_no: "H21-T1-2705", buyer: "Sunil Rathore", ref: "SOL-H21-004412", status: "sent", hours_ago: 8 },
+  { doc_type: "Invoice", unit_no: "H21-T1-2404", buyer: "Amara Okafor", ref: "INV-H21-004389", status: "generated", hours_ago: 26 },
+  { doc_type: "Sale & Purchase Agreement", unit_no: "H21-T1-3601", buyer: "Daniel Petrova", ref: "SPA-H21-004331", status: "sent", hours_ago: 72 },
+];
+const DOC_TEMPLATES = [
+  { doc_type: "Sales Offer", versions: [["v3","live"],["v2","archived"],["v1","archived"]] },
+  { doc_type: "Invoice", versions: [["v3","live"],["v2","archived"]] },
+  { doc_type: "Sale & Purchase Agreement", versions: [["v2","live"],["v1","archived"]] },
+];
+
 async function main() {
   // ensure database exists
   const dbName = new URL(url).pathname.slice(1) || "developer_inventory";
@@ -175,6 +187,24 @@ async function main() {
       `INSERT INTO broker_activity (text, meta, kind, created_at) VALUES ($1,$2,$3, now() - $4::interval)`,
       [a.text, a.meta, a.kind, a.hours_ago + " hours"]
     );
+  }
+
+  // document vault (T16) — recent generations + template version control.
+  for (const d of DOC_LOGS) {
+    await c.query(
+      `INSERT INTO documents (doc_type, unit_no, buyer, ref, status, generated_at)
+       VALUES ($1,$2,$3,$4,$5, now() - $6::interval)`,
+      [d.doc_type, d.unit_no, d.buyer, d.ref, d.status, d.hours_ago + " hours"]
+    );
+  }
+  for (const t of DOC_TEMPLATES) {
+    for (const [v, status] of t.versions) {
+      await c.query(
+        `INSERT INTO document_templates (doc_type, version, status, changed_at)
+         VALUES ($1,$2,$3, now() - interval '30 days') ON CONFLICT (doc_type, version) DO NOTHING`,
+        [t.doc_type, v, status]
+      );
+    }
   }
 
   // receipts

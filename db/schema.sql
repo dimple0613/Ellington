@@ -196,6 +196,28 @@ CREATE TABLE IF NOT EXISTS broker_activity (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS documents (
+  id SERIAL PRIMARY KEY,
+  doc_type TEXT NOT NULL,
+  unit_no TEXT,
+  buyer TEXT,
+  ref TEXT NOT NULL UNIQUE,
+  media JSONB,
+  status TEXT DEFAULT 'generated',   -- generated / sent
+  generated_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_documents_ref ON documents(ref);
+
+CREATE TABLE IF NOT EXISTS document_templates (
+  id SERIAL PRIMARY KEY,
+  doc_type TEXT NOT NULL,
+  version TEXT NOT NULL,
+  status TEXT DEFAULT 'archived',    -- live / archived
+  changed_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE (doc_type, version)
+);
+CREATE INDEX IF NOT EXISTS idx_doc_templates_live ON document_templates(doc_type) WHERE status = 'live';
+
 CREATE TABLE IF NOT EXISTS escrow_ledger (
   id SERIAL PRIMARY KEY,
   project_id INT REFERENCES projects(id),
