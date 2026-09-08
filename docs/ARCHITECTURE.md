@@ -151,7 +151,7 @@ Only parameterized SQL is used. Seeds/scripts under `db/` (`schema.sql`, `seed.t
   with `.catch(() => {})`, silent fallback to mock data; shared `lib/useApi.ts` exists
   but is unused. Fix: adopt `useApi` (or equivalent) with `loading/error/data` states
   and a shared `fetchJSON` helper; no silent fallbacks after a real fetch attempt fails.
-  **FIXED** (`a322e9a` on branch `fix/aud-007-use-api`) — the four wired screens
+  **FIXED** (`2c3fe22` on branch `fix/aud-007-use-api`) — the four wired screens
   (Payments / Inventory / Sales Leads / Users) now GET via `fetchJSON<T>` in `lib/api.ts`
   (unwraps the `{ ok, data, error }` envelope, redirects to `/login` on 401) and render a
   red "Live data unavailable — showing sample rows" banner on failure instead of failing

@@ -18,6 +18,11 @@
   (`useApi` unwraps `data`, `useSession` reads `data.user`, login reads `data.next`, Payments/Inventory/Sales/Users read `data.*`).
   lint + build green; live-verified: dashboard/inventory/receipts/leads/admins/milestones/me all `ok:true` with `data`, bad login 401.
   Merge pending operator approval.
+- **AUD-007 (#24) CLOSED/FIXED** on branch `fix/aud-007-use-api` (`2c3fe22` + docs): Payments/Inventory/Sales-Leads/Users now
+  GET through shared `fetchJSON` in `lib/api.ts` (unwraps envelope, redirects /login on 401) and render a red
+  "Live data unavailable — showing sample rows" banner on failure instead of silent `.catch(() => {})`.
+  lint + build green; live-verified all four screens show real data (258 units, leads, receipts, admin@ellington.com), no banner.
+  Merge pending operator approval.
 - Last task: merge `feat/cloudflare-hyperdrive` → `main` (Hyperdrive DB connection fix so production reads Neon, delivered 200 on `/api/auth/login` + `/api/auth/me` with admin `Dipin Ellington`/`admin@gmail.com`); pushed.
 - Admin on Neon: id 1 = `Dipin Ellington` / `admin@gmail.com` / `Admin123` (role super_admin) — verified login 200 on live worker.
 
