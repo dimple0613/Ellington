@@ -36,7 +36,7 @@ Reference UI: `Archive/UI systems design review/Ellington ERP.dc.html`.
   static-first and fall back to `lib/data.ts` mocks).
 - `lib/` — `db.ts` (pooled Hyperdrive / local `pg`), `session.ts` (JWT sign/verify, cookie helpers, `withSession`),
   `permissions.ts`/`permission-map.ts` (RBAC), `format.ts`, `screens.ts`, `nav.ts`, `pdf.ts`, `mail.ts`,
-  `auth.ts` (hashing/tokens), `data.ts` (mocks), `useApi.ts`, `useSession.ts`, `useWindowSize.ts`.
+  `auth.ts` (hashing/tokens), `data.ts` (mocks), `useSession.ts`, `useWindowSize.ts`.
 - `db/` — `schema.sql`, `seed.ts` (initial admin + RBAC rows), `reset.ts`. Scripts run with `npx tsx` (no psql/neonctl).
 - `docs/` — API_REFERENCE, AUDIT_COVERAGE, AUTH_FLOW, DATABASE, DEPLOYMENT, ROLES_AND_PERMISSIONS,
   ROUTE_INVENTORY, TESTING_STRATEGY, ARCHITECTURE. Add your finding to `ARCHITECTURE.md` when you discover one.

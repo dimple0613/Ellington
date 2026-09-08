@@ -6,6 +6,7 @@
 ## Push (current branch + what to push)
 > Branch-per-task rule (see AGENTS.md): never push directly to main. Update this section per task.
 
+- Current branch: `fix/aud-051-dead-use-api` (issue #51: dead `lib/useApi.ts` removed). To push: pages/dashboard.tsx switched from `useApi` to `fetchJSON` (same fallback/behavior), lib/useApi.ts deleted, AGENTS.md + docs/ARCHITECTURE.md refs tidied (AUD-016 recorded). lint green.
 - Current branch: `main` (`ad22adf`; `fix/aud-006-system`, `fix/aud-006-finance`, `fix/aud-015-analytics` merged; `fix/aud-015-analytics` branch deleted local+remote).
 - **AUD-015 (#37) CLOSED/MERGED** — `fix/aud-015-analytics` (`ad22adf`): cashflow forecast + report exports live via `/api/finance-analytics` + `/api/report-export`; branch deleted.
 - **DEPLOYED TO CLOUDFLARE** — `npx wrangler deploy` (`wrangler.jsonc`, account `49dcdcff…`): worker `ellington-worker` live at
