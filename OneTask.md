@@ -6,7 +6,8 @@
 ## Push (current branch + what to push)
 > Branch-per-task rule (see AGENTS.md): never push directly to main. Update this section per task.
 
-- Current branch: `fix/aud-006-handover` (`chore/standardize-project`, `fix/admin-email-consistency`, `fix/aud-009-api-envelope`, `fix/aud-007-use-api` fully merged on main)
+- Current branch: `main` (`chore/standardize-project`, `fix/admin-email-consistency`, `fix/aud-009-api-envelope`, `fix/aud-007-use-api`, `fix/aud-006-handover` fully merged)
+- **MERGED** — `fix/aud-006-handover` → `main` (`33e34b0` + `c86b7f8`: Handover module wired — pipeline_items/snag_items/deeds tables, `/api/handover`, three screens live; #22 progress comment). Pushed to `origin/main`.
 - **AUD-006 (Handover module) IN PROGRESS** on branch `fix/aud-006-handover` (`33e34b0` + docs `28827e1`): new `pipeline_items`/`snag_items`/`deeds`
   tables (idempotent in `db/schema.sql`, seed-guarded, applied to dev DB via lib/db temp script — `db/seed.ts` fails against Neon maintenance DB),
   `pages/api/handover.ts` (envelope, Handover:REA), Pipeline/Snagging/Deeds fetch live via `fetchJSON` with surfaced errors.
