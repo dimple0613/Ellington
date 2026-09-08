@@ -156,6 +156,27 @@ CREATE TABLE IF NOT EXISTS deeds (
   oa TEXT DEFAULT 'Pending'            -- Registered / Pending
 );
 
+-- System module (AUD-006): audit log + app settings.
+CREATE TABLE IF NOT EXISTS audit_log (
+  id SERIAL PRIMARY KEY,
+  ts TIMESTAMPTZ NOT NULL DEFAULT now(),
+  actor TEXT,
+  role TEXT,
+  action TEXT,
+  object TEXT,
+  field TEXT,
+  before_val TEXT,
+  after_val TEXT,
+  sensitive BOOLEAN DEFAULT false
+);
+CREATE INDEX IF NOT EXISTS idx_audit_ts ON audit_log(ts);
+
+CREATE TABLE IF NOT EXISTS app_settings (
+  id SMALLINT PRIMARY KEY,
+  company JSONB NOT NULL DEFAULT '{}',
+  brand JSONB NOT NULL DEFAULT '{}'
+);
+
 -- Seed handover data on first install (idempotent).
 DO $$
 BEGIN
@@ -191,5 +212,25 @@ BEGIN
       ('WPK-T1-0703','Elena Petrova','OQD-3350','AED 142,000','Issued','18 Aug 26','Released','Registered'),
       ('WPK-T1-0801','Fatima Al Hashimi','OQD-3362','AED 88,400','Issued','22 Aug 26','Released','Pending'),
       ('WPK-T1-0210','Vikram Shetty','OQD-3370','AED 104,200','Blocked','—','Held','Pending');
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM audit_log) THEN
+    INSERT INTO audit_log (ts, actor, role, action, object, field, before_val, after_val, sensitive) VALUES
+      (now() - interval '5 days 2 hours','Khalid Al Fahim','CEO','Approved','BLG III · Discount request','Discount %','—','5%',false),
+      (now() - interval '5 days 3 hours','Sarah Mitchell','Sales Dir','Created','BLG III · Lead','—','—','Rajesh Menon',false),
+      (now() - interval '6 days 4 hours','Ravi Kumar','Finance Mgr','Updated','H21 · Receipt RCP-H21-004789','Status','Unmatched','Matched',false),
+      (now() - interval '6 days 5 hours','Ravi Kumar','Finance Mgr','Created','DDR-0004','—','—','Structure 60%',false),
+      (now() - interval '6 days 6 hours','Khalid Al Fahim','CEO','Approved','WPK · Phase 2 release','—','—','12 units',false),
+      (now() - interval '7 days 3 hours','Sarah Mitchell','Sales Dir','Updated','BLG III · Price list','Price/psf','AED 2,140','AED 2,200',true),
+      (now() - interval '7 days 5 hours','Omar Saeed','Project Mgr','Created','BLG III · Snag SNG-0412','—','—','Paint crack',false),
+      (now() - interval '8 days 1 hour','Ravi Kumar','Finance Mgr','Exported','Finance · Statement','—','—','47 rows CSV',true),
+      (now() - interval '8 days 4 hours','Khalid Al Fahim','CEO','Updated','System · User','Status','Active','Suspended',true),
+      (now() - interval '9 days 2 hours','Sarah Mitchell','Sales Dir','Created','BLG III · Booking BK-9042','—','—','Unit 0402',false),
+      (now() - interval '10 days 3 hours','Ravi Kumar','Finance Mgr','Updated','Escrow · Reconciliation','Variance','AED 14,200','AED 0',false),
+      (now() - interval '11 days 2 hours','Omar Saeed','Project Mgr','Updated','WPK · Milestone','Status','Pending','Certified',false);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM app_settings) THEN
+    INSERT INTO app_settings (id, company, brand) VALUES (1,
+      '{"Legal name":"Ellington Properties Development LLC","Trade licence":"CN-2847192","ORN":"21281","RERA":"1884","VAT TRN":"100234567800003"}'::jsonb,
+      '{"Primary color":"#4F46F5","Currency":"AED","Date format":"DD MMM YYYY","Timezone":"Asia/Dubai (GMT+4)","Fiscal year":"Jan – Dec"}'::jsonb);
   END IF;
 END $$;

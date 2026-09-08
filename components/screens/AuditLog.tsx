@@ -1,5 +1,16 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AC } from "../../lib/format";
+import { fetchJSON } from "../../lib/api";
+
+const fmtTs = (iso: string): string => {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return iso || "";
+  const mon = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const dd = String(d.getDate()).padStart(2, "0");
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
+  return dd + " " + mon[d.getMonth()] + ", " + hh + ":" + mm;
+};
 
 type Row = { ts: string; actor: string; role: string; action: string; object: string; field: string; before: string; after: string; sens?: boolean };
 const ROWS: Row[] = [
@@ -34,8 +45,34 @@ export default function AuditLogScreen() {
   const [project, setProject] = useState("All");
   const [sensOnly, setSensOnly] = useState(false);
   const [notice, setNotice] = useState("");
+  const [rows, setRows] = useState<Row[]>(ROWS);
+  const [apiError, setApiError] = useState("");
 
-  const filtered = ROWS.filter((r) => {
+  useEffect(() => {
+    let active = true;
+    fetchJSON<{ audit: { ts: string; actor: string; role: string; action: string; object: string; field: string; before_val: string; after_val: string; sensitive: boolean }[] }>("/api/system")
+      .then((j) => {
+        if (!active || !Array.isArray(j.audit)) return;
+        const mapped: Row[] = j.audit.map((a) => ({
+          ts: fmtTs(a.ts),
+          actor: a.actor || "",
+          role: a.role || "",
+          action: a.action || "",
+          object: a.object || "",
+          field: a.field || "—",
+          before: a.before_val || "—",
+          after: a.after_val || "—",
+          sens: !!a.sensitive,
+        }));
+        if (mapped.length) setRows(mapped);
+      })
+      .catch((e) => {
+        if (active) setApiError(e?.message || "Failed to load audit log");
+      });
+    return () => { active = false; };
+  }, []);
+
+  const filtered = rows.filter((r) => {
     if ((r.actor + r.action + r.object + r.field + r.before + r.after).toLowerCase().includes(search.toLowerCase()) === false) return false;
     if (project !== "All" && PROJECT(r.object) !== project) return false;
     if (sensOnly && !r.sens) return false;
@@ -63,6 +100,11 @@ export default function AuditLogScreen() {
 
   return (
     <div>
+      {apiError && (
+        <div style={{ background: "#FDECEC", color: "#E5484D", borderRadius: 12, padding: "11px 16px", fontSize: 12, fontWeight: 700, marginBottom: 16 }}>
+          Live data unavailable ({apiError}) — showing sample rows
+        </div>
+      )}
       {notice && <div style={{ background: "#E9F8F1", color: "#1F9D6B", borderRadius: 12, padding: "11px 16px", fontSize: 12, fontWeight: 700, marginBottom: 16 }}>{notice}</div>}
       <div style={{ display: "flex", alignItems: "flex-end", gap: 16, marginBottom: 18 }}>
         <div style={{ flex: 1 }}>

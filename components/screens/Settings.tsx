@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AC } from "../../lib/format";
+import { fetchJSON } from "../../lib/api";
 
 type Tab = "company" | "numbering" | "notif" | "integr" | "other";
 const TABS: [Tab, string][] = [["company", "Company"], ["numbering", "Numbering"], ["notif", "Notifications"], ["integr", "Integrations"], ["other", "Other"]];
@@ -43,10 +44,33 @@ export default function SettingsScreen() {
     "Timezone": "Asia/Dubai (GMT+4)",
     "Fiscal year": "Jan \u2013 Dec",
   });
+  const [apiError, setApiError] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    fetchJSON<{ settings: { company: Record<string, string>; brand: Record<string, string> } }>("/api/system")
+      .then((j) => {
+        if (!active || !j?.settings) return;
+        if (j.settings.company && Object.keys(j.settings.company).length) setCompany(j.settings.company);
+        if (j.settings.brand && Object.keys(j.settings.brand).length) setBrand(j.settings.brand);
+      })
+      .catch((e) => {
+        if (active) setApiError(e?.message || "Failed to load settings");
+      });
+    return () => { active = false; };
+  }, []);
 
   const banner = (m: string) => { setNotice(m); setTimeout(() => setNotice(""), 3000); };
 
-  const save = () => { banner("Changes saved \u00b7 will take effect immediately"); };
+  const save = () => {
+    fetchJSON<{ settings: { company: Record<string, string>; brand: Record<string, string> } }>("/api/system", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ company, brand }),
+    })
+      .then(() => banner("Changes saved \u00b7 will take effect immediately"))
+      .catch((e) => banner("Save failed \u00b7 " + (e?.message || "try again")));
+  };
 
   const flipNotif = (rowIdx: number, colIdx: number) => {
     setNotif((prev) => prev.map((row, ri) => ri !== rowIdx ? row : [row[0], colIdx === 0 ? !row[1] : row[1], colIdx === 1 ? !row[2] : row[2], colIdx === 2 ? !row[3] : row[3]] as [string, boolean, boolean, boolean]));
@@ -75,6 +99,11 @@ export default function SettingsScreen() {
 
   return (
     <div>
+      {apiError && (
+        <div style={{ background: "#FDECEC", color: "#E5484D", borderRadius: 12, padding: "11px 16px", fontSize: 12, fontWeight: 700, marginBottom: 16 }}>
+          Live data unavailable ({apiError}) — showing defaults
+        </div>
+      )}
       {notice && <div style={{ background: "#E9F8F1", color: "#1F9D6B", borderRadius: 12, padding: "11px 16px", fontSize: 12, fontWeight: 700, marginBottom: 16 }}>{notice}</div>}
       <div style={{ display: "flex", alignItems: "flex-end", gap: 16, marginBottom: 18 }}>
         <div style={{ flex: 1 }}>
