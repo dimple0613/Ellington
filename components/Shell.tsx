@@ -42,7 +42,7 @@ const NAV: Record<GroupId, { label: string; items: NavItem[] }> = {
     ],
   },
   project: {
-    label: "Project Â· BLG",
+    label: "Project · BLG",
     items: [
       { screen: "inventory", label: "Inventory", count: String(UNITS.filter((u) => u.status === "Available").length) },
       { screen: "pricing", label: "Pricing & availability" },
@@ -129,8 +129,8 @@ const NOTIFS = [
   { id: "n1", who: "R. Menon", what: "requested a 7.5% discount on T2-0806", time: "2 min ago", unread: true },
   { id: "n2", who: "Oqood", what: "3 registrations pending >14 days", time: "18 min ago", unread: true },
   { id: "n3", who: "Escrow", what: "AED 340,000 variance unmatched", time: "41 min ago", unread: true },
-  { id: "n4", who: "Collections", what: "4 units overdue >90 days â€” AED 8.2M", time: "1 hr ago", unread: true },
-  { id: "n5", who: "Handover", what: "Wilton Park â€” 12 SPAs unsigned beyond 21 days", time: "2 hr ago", unread: false },
+  { id: "n4", who: "Collections", what: "4 units overdue >90 days — AED 8.2M", time: "1 hr ago", unread: true },
+  { id: "n5", who: "Handover", what: "Wilton Park — 12 SPAs unsigned beyond 21 days", time: "2 hr ago", unread: false },
   { id: "n6", who: "Compliance", what: "6 buyer passports expiring within 60 days", time: "Yesterday", unread: false },
 ];
 
@@ -321,7 +321,7 @@ export default function Shell({
     ...PROJECTS.map((p) => ({ code: p.code, name: p.name, pct: Math.round((p.sold / p.units) * 100), units: p.units })),
   ];
   const proj = PROJECTS.find((p) => p.code === scopeCode);
-  const groupLabel = group === "project" ? "Project Â· " + (proj ? proj.code : scopeCode || "ALL") : NAV[group].label;
+  const groupLabel = group === "project" ? "Project · " + (proj ? proj.code : scopeCode || "ALL") : NAV[group].label;
 
   const hitUnits = UNITS.filter(
     (u) => !q || u.id.toLowerCase().includes(q.toLowerCase()) || u.typ.toLowerCase().includes(q.toLowerCase())
@@ -513,15 +513,15 @@ export default function Shell({
                 ref={inputRef}
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
-                placeholder="Search units, buyers, receiptsâ€¦"
+                placeholder="Search units, buyers, receipts…"
                 style={{ flex: 1, border: 0, outline: "none", fontFamily: "inherit", fontSize: 13.5, color: "#14161F", background: "transparent" }}
               />
               <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10, fontWeight: 600, background: "#F5F6FA", border: "1px solid #E4E6EE", borderRadius: 6, padding: "2px 6px", color: "#6B7180" }}>Esc</span>
             </div>
             <div style={{ maxHeight: 360, overflow: "auto", padding: "8px" }}>
-              {hitUnits.length > 0 && <Group label="Units" items={hitUnits.map((u) => ({ key: u.id, title: u.id, sub: u.typ + " Â· L" + u.f + " Â· " + u.area + " sq.ft", trail: money(u.price), icon: "âŒ—", bg: ST[u.status][1], fg: ST[u.status][0], onClick: () => { closeCmdk(); navigate("unit", "project", { unit: u.id }); } }))} />}
-              {hitBuyers.length > 0 && <Group label="Buyers" items={hitBuyers.map((b, i) => ({ key: b, title: b, sub: "H21-B-00" + (147 + i) + " Â· 2 units", trail: "AED " + (1.9 - i * 0.4).toFixed(1) + "M out", icon: b[0], bg: "#E7E9F0", fg: "#4A5060", onClick: () => { closeCmdk(); navigate("buyer", "sales", { name: b }); } }))} />}
-              {hitActions.length > 0 && <Group label="Actions" items={hitActions.map((a) => ({ key: a.title, title: a.title, sub: "Action", trail: "â†µ", icon: "â€º", bg: "#EDECFE", fg: AC, onClick: () => { closeCmdk(); navigate(a.screen, a.group); } }))} />}
+              {hitUnits.length > 0 && <Group label="Units" items={hitUnits.map((u) => ({ key: u.id, title: u.id, sub: u.typ + " · L" + u.f + " · " + u.area + " sq.ft", trail: money(u.price), icon: "⌗", bg: ST[u.status][1], fg: ST[u.status][0], onClick: () => { closeCmdk(); navigate("unit", "project", { unit: u.id }); } }))} />}
+              {hitBuyers.length > 0 && <Group label="Buyers" items={hitBuyers.map((b, i) => ({ key: b, title: b, sub: "H21-B-00" + (147 + i) + " · 2 units", trail: "AED " + (1.9 - i * 0.4).toFixed(1) + "M out", icon: b[0], bg: "#E7E9F0", fg: "#4A5060", onClick: () => { closeCmdk(); navigate("buyer", "sales", { name: b }); } }))} />}
+              {hitActions.length > 0 && <Group label="Actions" items={hitActions.map((a) => ({ key: a.title, title: a.title, sub: "Action", trail: "↵", icon: "›", bg: "#EDECFE", fg: AC, onClick: () => { closeCmdk(); navigate(a.screen, a.group); } }))} />}
             </div>
           </div>
         </div>
@@ -532,7 +532,7 @@ export default function Shell({
           onClose={() => setNewProj(false)}
           onCreate={(name, code) => {
             setNewProj(false);
-            showToast("Project " + code + " Â· " + name + " created");
+            showToast("Project " + code + " · " + name + " created");
           }}
         />
       )}
@@ -601,7 +601,7 @@ function Rail({ groups, group, gi, locked, onGo, onSignOut }: { groups: RailDef[
             <button
               key={g.id}
               onClick={() => onGo(g.id)}
-              title={isLocked ? "Select a project to access â€” " + g.label : g.label}
+              title={isLocked ? "Select a project to access — " + g.label : g.label}
               style={{ ...railBtn(group === g.id, isLocked ? "#C7CBD6" : "#9AA0AE"), opacity: isLocked && group !== g.id ? 0.5 : 1, cursor: isLocked && group !== g.id ? "not-allowed" : "pointer" } as CSSProperties}
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d={g.d} /></svg>
@@ -776,10 +776,10 @@ function TopbarFloating({
             <span style={{ display: "inline-block", marginTop: 6, fontSize: 10, fontWeight: 700, background: "#EDECFE", color: AC, borderRadius: 7, padding: "2px 7px" }}>{roleLabel}</span>
           </div>
           <div style={{ borderTop: "1px solid #EDEEF3", margin: "6px 8px" }} />
-          <MenuRow icon="â—Ž" label="My profile" sub="Identity & credentials" onClick={() => { onCloseProfile(); onProfile(); }} />
-          <MenuRow icon="âš™" label="Preferences" sub="Notifications & quiet hours" onClick={() => { onCloseProfile(); onToast("Preferences opened"); }} />
-          <MenuRow icon="âŸ³" label="Offline cache" sub="Last synced 09:39" onClick={() => { onCloseProfile(); onToast("Offline cache synced"); }} />
-          <MenuRow icon="â‡„" label={rtl ? "Direction: RTL" : "Direction: LTR"} sub="Mirror the shell" onClick={() => { onToggleRtl(); onCloseProfile(); }} />
+          <MenuRow icon="◎" label="My profile" sub="Identity & credentials" onClick={() => { onCloseProfile(); onProfile(); }} />
+          <MenuRow icon="⚙" label="Preferences" sub="Notifications & quiet hours" onClick={() => { onCloseProfile(); onToast("Preferences opened"); }} />
+          <MenuRow icon="⟳" label="Offline cache" sub="Last synced 09:39" onClick={() => { onCloseProfile(); onToast("Offline cache synced"); }} />
+          <MenuRow icon="⇄" label={rtl ? "Direction: RTL" : "Direction: LTR"} sub="Mirror the shell" onClick={() => { onToggleRtl(); onCloseProfile(); }} />
           <div style={{ borderTop: "1px solid #EDEEF3", margin: "6px 8px" }} />
           <button onClick={() => { onCloseProfile(); onSignOut(); }} style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 10px", border: 0, background: "transparent", borderRadius: 10, cursor: "pointer", fontFamily: "inherit", color: "#E5484D", fontSize: 12, fontWeight: 700, textAlign: "left", width: "100%" }}>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" /></svg>
@@ -795,7 +795,7 @@ function TopbarFloating({
               {unread > 0 && (
                 <button onClick={onMarkAll} style={{ border: 0, background: "transparent", color: AC, fontSize: 11.5, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", padding: 0 }}>Mark all read</button>
               )}
-              <button onClick={onClose} style={{ border: 0, background: "#F1F2F7", color: "#4A5060", width: 24, height: 24, borderRadius: 8, cursor: "pointer", fontFamily: "inherit", fontWeight: 700, fontSize: 12, lineHeight: 1 }}>Ã—</button>
+              <button onClick={onClose} style={{ border: 0, background: "#F1F2F7", color: "#4A5060", width: 24, height: 24, borderRadius: 8, cursor: "pointer", fontFamily: "inherit", fontWeight: 700, fontSize: 12, lineHeight: 1 }}>×</button>
             </div>
           </div>
           <div style={{ maxHeight: 380, overflow: "auto" }}>
@@ -807,9 +807,9 @@ function TopbarFloating({
                   <div style={{ fontSize: 12, fontWeight: 600, lineHeight: 1.45 }}>
                     <span style={{ fontWeight: 800 }}>{n.who}</span> {n.what}
                   </div>
-                  <div style={{ fontSize: 10.5, color: "#9AA0AE", fontWeight: 500, marginTop: 2 }}>{n.time}{n.unread ? " Â· unread" : ""}</div>
+                  <div style={{ fontSize: 10.5, color: "#9AA0AE", fontWeight: 500, marginTop: 2 }}>{n.time}{n.unread ? " · unread" : ""}</div>
                 </div>
-                <button onClick={() => onDismiss(n.id)} title="Dismiss" style={{ border: 0, background: "transparent", color: "#C7CBD6", cursor: "pointer", fontSize: 13, fontFamily: "inherit", alignSelf: "flex-start" }}>Ã—</button>
+                <button onClick={() => onDismiss(n.id)} title="Dismiss" style={{ border: 0, background: "transparent", color: "#C7CBD6", cursor: "pointer", fontSize: 13, fontFamily: "inherit", alignSelf: "flex-start" }}>×</button>
               </div>
             ))}
           </div>
@@ -823,7 +823,7 @@ function TopbarFloating({
             <span style={{ fontSize: 12, fontWeight: 600 }}>Documentation & guides</span>
           </button>
           <button onClick={onCloseHelp} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 10px", border: 0, background: "transparent", borderRadius: 10, cursor: "pointer", fontFamily: "inherit", textAlign: "left", width: "100%" }}>
-            <span style={{ width: 26, height: 24, flex: "none", borderRadius: 8, background: "#F1F2F7", color: "#4A5060", display: "grid", placeItems: "center", fontSize: 12 }}>âŒ˜K</span>
+            <span style={{ width: 26, height: 24, flex: "none", borderRadius: 8, background: "#F1F2F7", color: "#4A5060", display: "grid", placeItems: "center", fontSize: 12 }}>⌘K</span>
             <span style={{ fontSize: 12, fontWeight: 600 }}>Keyboard shortcuts</span>
           </button>
           <button onClick={onCloseHelp} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 10px", border: 0, background: "transparent", borderRadius: 10, cursor: "pointer", fontFamily: "inherit", textAlign: "left", width: "100%" }}>
