@@ -13,6 +13,11 @@
   (GraphQL create-project.json already prepared).
 - Deferred (needs visual/contract change, no-visual-change rule): AUD-007 error states (#24), AUD-009 API envelope (#26).
   AUD-005 (Jest/RTL/Playwright) requires operator approval to add dev deps. AUD-006 (role→permission-map rewiring) not started.
+  **AUD-009 (#26) CLOSED/FIXED** on branch `fix/aud-009-api-envelope` (`421594a`): all 13 routes now return `{ ok, data, error }`
+  via `lib/api.ts` (`ok`/`fail`/`methodNotAllowed`/`notFound` + `validEmail`/`missingFields`); consumers updated
+  (`useApi` unwraps `data`, `useSession` reads `data.user`, login reads `data.next`, Payments/Inventory/Sales/Users read `data.*`).
+  lint + build green; live-verified: dashboard/inventory/receipts/leads/admins/milestones/me all `ok:true` with `data`, bad login 401.
+  Merge pending operator approval.
 - Last task: merge `feat/cloudflare-hyperdrive` → `main` (Hyperdrive DB connection fix so production reads Neon, delivered 200 on `/api/auth/login` + `/api/auth/me` with admin `Dipin Ellington`/`admin@gmail.com`); pushed.
 - Admin on Neon: id 1 = `Dipin Ellington` / `admin@gmail.com` / `Admin123` (role super_admin) — verified login 200 on live worker.
 

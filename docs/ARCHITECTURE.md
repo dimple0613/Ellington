@@ -157,7 +157,10 @@ Only parameterized SQL is used. Seeds/scripts under `db/` (`schema.sql`, `seed.t
 - **AUD-009 — API validation/response inconsistency.** Routes hand-roll validation and
   return heterogeneous shapes (`{users}`, `{units}`, `{leads}`, `{error}`, `{ok}`).
   Fix: shared `{ ok, data, error }` envelope + small validation helpers reused across
-  the 13 routes.
+  the 13 routes. **FIXED** (`421594a` on branch `fix/aud-009-api-envelope`) — `lib/api.ts`
+  adds the envelope (`ok`/`fail`/`methodNotAllowed`/`notFound`) + `validEmail`/`missingFields`
+  helpers; all 13 routes return `{ ok, data, error }`; `useApi`/`useSession`/login + the
+  wired screens parse `data`; error messages and status codes unchanged.
 
 ### Low
 
