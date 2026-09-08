@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { AC } from "../../lib/format";
 import { fetchJSON } from "../../lib/api";
+import { KpiSkeleton, PanelSkeleton } from "../Loading";
 
 type ReceiptRow = {
   id?: number | string | null;
@@ -70,6 +71,7 @@ export default function PaymentsScreen({ buyer }: { buyer?: string }) {
   const [dbRows, setDbRows] = useState<ReceiptRow[]>([]);
   const [stmtRows, setStmtRows] = useState<StmtRow[]>([]);
   const [apiError, setApiError] = useState("");
+  const [loaded, setLoaded] = useState(false);
 
   const loadReceipts = () =>
     fetchJSON<{ receipts: ApiReceipt[] }>("/api/receipts")
@@ -103,8 +105,7 @@ export default function PaymentsScreen({ buyer }: { buyer?: string }) {
 
   useEffect(() => {
     let active = true;
-    loadReceipts().finally(() => { if (!active) return; });
-    loadStmts().finally(() => { if (!active) return; });
+    Promise.all([loadReceipts(), loadStmts()]).then(() => { if (active) setLoaded(true); }).catch(() => { if (active) setLoaded(true); });
     return () => { active = false; };
   }, []);
 
@@ -236,6 +237,17 @@ export default function PaymentsScreen({ buyer }: { buyer?: string }) {
       body: JSON.stringify({ action }),
     }).then((resp) => (resp.ok ? loadStmts() : null)).catch(() => {});
   };
+
+  if (!loaded) {
+    return (
+      <div>
+        <KpiSkeleton count={5} />
+        <div style={{ marginTop: 16 }}>
+          <PanelSkeleton headerW={180} rows={10} cols={7} />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>

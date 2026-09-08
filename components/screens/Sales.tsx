@@ -4,6 +4,7 @@ import { AC, money } from "../../lib/format";
 import { ALL_UNITS } from "../../lib/data";
 import { exportBuyerStatement, exportDocument } from "../../lib/pdf";
 import { fetchJSON } from "../../lib/api";
+import { KpiSkeleton, PanelSkeleton } from "../Loading";
 
 const BUYERS = ["Rajesh Menon","Aisha Al Marri","Hassan Al Rayes","Chen Liu","Daniel Whitfield","Elena Petrova","Marcus Lindqvist","Wei Chen","Priya Nair","Nadia Khoury","Sunil Rathore","Grace Okonkwo","Omar Al Suwaidi","Fatima Al Hashimi"];
 const pill = (s: string, ok: boolean) =>
@@ -239,6 +240,7 @@ function Leads({ onNewBooking, onBookLead }: { onNewBooking: () => void; onBookL
   const [dbCols, setDbCols] = useState<Col[] | null>(null);
   const [liveLeads, setLiveLeads] = useState<ApiLead[] | null>(null);
   const [apiError, setApiError] = useState("");
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -246,6 +248,7 @@ function Leads({ onNewBooking, onBookLead }: { onNewBooking: () => void; onBookL
       .then((j) => {
         const leads = j.leads;
         if (!active || !Array.isArray(leads)) return;
+        setLoaded(true);
         const order = ["new", "contacted", "qualified", "viewing", "negotiation", "eoi", "booked", "lost"];
         const byStage: Record<string, Card[]> = { new: [], contacted: [], qualified: [], viewing: [], negotiation: [], eoi: [], booked: [], lost: [] };
         (leads as ApiLead[]).forEach((l) => {
@@ -281,7 +284,7 @@ function Leads({ onNewBooking, onBookLead }: { onNewBooking: () => void; onBookL
         setLiveLeads(leads);
       })
       .catch((e) => {
-        if (active) setApiError(e?.message || "Failed to load leads");
+        if (active) { setLoaded(true); setApiError(e?.message || "Failed to load leads"); }
       });
     return () => { active = false; };
   }, []);
@@ -341,6 +344,14 @@ function Leads({ onNewBooking, onBookLead }: { onNewBooking: () => void; onBookL
       })
       .sort((a, b) => b.value - a.value);
   })();
+
+  if (!loaded) {
+    return (
+      <div>
+        <PanelSkeleton headerW={120} rows={6} cols={6} />
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -630,12 +641,13 @@ function Booking({ step, setStep, onBack, lead, blank }: { step:number; setStep:
 function BuyersDirectory({ onOpen }: { onOpen: (id: number) => void }) {
   const [rows, setRows] = useState<BuyerRow[] | null>(null);
   const [error, setError] = useState("");
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     let active = true;
     fetchJSON<{ buyers: BuyerRow[] }>("/api/buyers")
-      .then((j) => { if (active) setRows(Array.isArray(j.buyers) ? j.buyers : []); })
-      .catch(() => { if (active) setError("Live data unavailable \u2014 showing sample rows"); });
+      .then((j) => { if (active) { setLoaded(true); setRows(Array.isArray(j.buyers) ? j.buyers : []); } })
+      .catch(() => { if (active) { setLoaded(true); setError("Live data unavailable \u2014 showing sample rows"); } });
     return () => { active = false; };
   }, []);
 
@@ -649,6 +661,17 @@ function BuyersDirectory({ onOpen }: { onOpen: (id: number) => void }) {
     if (avail) onOpen(r.id);
     else setError("Directory is in read-only sample mode \u2014 reload to view live records");
   };
+
+  if (!loaded) {
+    return (
+      <div>
+        <KpiSkeleton count={4} />
+        <div style={{ marginTop: 16 }}>
+          <PanelSkeleton headerW={180} rows={8} cols={5} />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -711,6 +734,7 @@ function Buyer360({ btab, setBtab, goUnit }: { btab:string; setBtab:(v:any)=>voi
   const router = useRouter();
   const [sent, setSent] = useState(false);
   const [live, setLive] = useState<BuyerDetail | null>(null);
+  const [loaded, setLoaded] = useState(false);
   const idRaw = router.query.id;
   const bid = typeof idRaw === "string" ? Number(idRaw) : NaN;
 
@@ -718,8 +742,8 @@ function Buyer360({ btab, setBtab, goUnit }: { btab:string; setBtab:(v:any)=>voi
     if (!Number.isInteger(bid) || bid <= 0) return;
     let active = true;
     fetchJSON<{ buyer: BuyerDetail }>("/api/buyers?id=" + bid)
-      .then((j) => { if (active) setLive(j.buyer); })
-      .catch(() => {});
+      .then((j) => { if (active) { setLoaded(true); setLive(j.buyer); } })
+      .catch((e) => { if (active) setLoaded(true); });
     return () => { active = false; };
   }, [bid]);
 
@@ -806,6 +830,14 @@ function Buyer360({ btab, setBtab, goUnit }: { btab:string; setBtab:(v:any)=>voi
   const contactLine = live
     ? [live.phone, live.email, "Risk rating: Low"].filter(Boolean).join(" \u00b7 ")
     : "+971 50 442 1187 \u00b7 r.menon@arvexcapital.ae \u00b7 Dubai Marina, Dubai \u00b7 Risk rating: Low";
+
+  if (!loaded) {
+    return (
+      <div>
+        <PanelSkeleton headerW={160} rows={6} cols={6} />
+      </div>
+    );
+  }
 
   return (
     <div>

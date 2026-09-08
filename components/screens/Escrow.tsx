@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { AC } from "../../lib/format";
 import { fetchJSON } from "../../lib/api";
+import { KpiSkeleton, PanelSkeleton } from "../Loading";
 
 type QueueRow = { id: number; date: string; desc: string; amount: string; side: string };
 type Obligation = { label: string; value: string; flag: boolean };
@@ -18,6 +19,7 @@ export default function EscrowScreen() {
   const [ddrOpen, setDdrOpen] = useState(false);
   const [apiError, setApiError] = useState("");
   const [reconciling, setReconciling] = useState<number | null>(null);
+  const [loaded, setLoaded] = useState(false);
 
   const fallbackQueue = (): QueueRow[] => [
     { id: 0, date: "22 Aug 26", desc: "Inbound transfer \u00b7 ref MENON RM 3302", amount: "367,875", side: "Bank only" },
@@ -32,6 +34,7 @@ export default function EscrowScreen() {
     let active = true;
     fetchJSON<{ escrow: { queue: any[]; drawdowns: any[] } }>("/api/finance")
       .then((j) => {
+        if (active) setLoaded(true);
         if (!active || !j?.escrow) return;
         if (j.escrow.queue.length) {
           setQueue(j.escrow.queue.map((q) => ({
@@ -55,7 +58,7 @@ export default function EscrowScreen() {
           })));
         }
       })
-      .catch((e) => { if (active) { setApiError(e?.message || "Failed to load escrow"); setQueue(fallbackQueue); } });
+      .catch((e) => { if (active) { setLoaded(true); setApiError(e?.message || "Failed to load escrow"); setQueue(fallbackQueue); } });
     return () => { active = false; };
   }, []);
   const [ddrMilestone, setDdrMilestone] = useState("Structure 40%");
@@ -159,6 +162,17 @@ export default function EscrowScreen() {
     else { bg = v === "Released" ? "#F1F2F6" : "#EDECFE"; col = v === "Released" ? "#6B7180" : AC; }
     return { display: "inline-block", fontSize: 10.5, fontWeight: 700, borderRadius: 7, padding: "3px 8px", background: bg, color: col, whiteSpace: "nowrap" as const };
   };
+
+  if (!loaded) {
+    return (
+      <div>
+        <KpiSkeleton count={4} />
+        <div style={{ marginTop: 16 }}>
+          <PanelSkeleton headerW={220} rows={6} cols={5} />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>

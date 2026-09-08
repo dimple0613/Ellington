@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { AC } from "../../lib/format";
 import { exportInvoicesLedger } from "../../lib/pdf";
 import { fetchJSON } from "../../lib/api";
+import { KpiSkeleton, PanelSkeleton } from "../Loading";
 
 type InvRow = { id: number; no: string; buyer: string; unit: string; inst: string; issued: string; due: string; amount: string; paid: string; status: string; viewed: string };
 
@@ -38,6 +39,7 @@ const pillCol = (s: string) => s === "Paid" ? "#1F9D6B" : s === "Overdue" ? "#E5
 export default function InvoicesScreen() {
   const [notice, setNotice] = useState("");
   const [apiError, setApiError] = useState("");
+  const [loaded, setLoaded] = useState(false);
   const [rows, setRows] = useState<InvRow[]>([]);
   const [voidTarget, setVoidTarget] = useState<{ id: number; no: string } | null>(null);
   const [voidReason, setVoidReason] = useState("");
@@ -82,8 +84,8 @@ export default function InvoicesScreen() {
   const load = () => {
     let active = true;
     fetchJSON<{ invoices: any[] }>("/api/finance")
-      .then((j) => { if (active && j?.invoices?.length) setRows(mapRows(j.invoices)); else if (active) setRows([]); })
-      .catch((e) => { if (active) { setApiError(e?.message || "Failed to load invoices"); setRows(INV_ROWS); } });
+      .then((j) => { if (active) { setLoaded(true); if (j?.invoices?.length) setRows(mapRows(j.invoices)); else setRows([]); } })
+      .catch((e) => { if (active) { setLoaded(true); setApiError(e?.message || "Failed to load invoices"); setRows(INV_ROWS); } });
     return () => { active = false; };
   };
 
@@ -120,6 +122,17 @@ export default function InvoicesScreen() {
   };
 
   const producePdf = () => { show("Statement PDF produced \u00b7 emailed + published to buyer portal"); };
+
+  if (!loaded) {
+    return (
+      <div>
+        <KpiSkeleton count={5} />
+        <div style={{ marginTop: 16 }}>
+          <PanelSkeleton headerW={220} rows={8} cols={7} />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import { AC } from "../../lib/format";
 import { fetchJSON } from "../../lib/api";
+import { PanelSkeleton } from "../Loading";
 
 type PipeCard = { no: string; buyer: string; meta: string };
 type PipeCol = { label: string; count: number; color: string; cards: PipeCard[] };
@@ -64,6 +65,7 @@ export default function PipelineScreen() {
   const [overview, setOverview] = useState<{ total: number; ready: number; blocked: number }>({ total: 140, ready: 0, blocked: 4 });
   const [readyInfo, setReadyInfo] = useState<Record<string, ReadinessRow>>({});
   const [apiError, setApiError] = useState("");
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -74,6 +76,7 @@ export default function PipelineScreen() {
     }>("/api/handover")
       .then((j) => {
         if (!active) return;
+        setLoaded(true);
         if (Array.isArray(j.pipeline)) {
           const byStage: Record<string, PipeCard[]> = {};
           for (const p of j.pipeline) {
@@ -108,7 +111,7 @@ export default function PipelineScreen() {
         if (j.overview) setOverview(j.overview);
       })
       .catch((e) => {
-        if (active) setApiError(e?.message || "Failed to load pipeline");
+        if (active) { setLoaded(true); setApiError(e?.message || "Failed to load pipeline"); }
       });
     return () => { active = false; };
   }, []);
@@ -123,6 +126,14 @@ export default function PipelineScreen() {
     setNotice("Handover scheduled for " + unit + " on " + date + " \u00b7 added to Payment cleared");
     setTimeout(() => setNotice(""), 3800);
   };
+
+  if (!loaded) {
+    return (
+      <div>
+        <PanelSkeleton headerW={160} rows={6} cols={6} />
+      </div>
+    );
+  }
 
   return (
     <div>

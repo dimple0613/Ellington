@@ -3,6 +3,7 @@ import { useRouter } from "next/router";
 import { AC } from "../../lib/format";
 import { exportCollectionNotice } from "../../lib/pdf";
 import { fetchJSON } from "../../lib/api";
+import { KpiSkeleton, PanelSkeleton } from "../Loading";
 
 type CollRow = { id: number; buyer: string; unit: string; amount: string; days: number; stage: string; action: string; promised?: string };type StageMap = Record<string, { bg: string; color: string }>;
 
@@ -47,6 +48,7 @@ export default function CollectionsScreen() {
 
   const [liveRows, setLiveRows] = useState<CollRow[]>([]);
   const [apiError, setApiError] = useState("");
+  const [loaded, setLoaded] = useState(false);
   const [calc, setCalc] = useState<any>(null);
   const [calcErr, setCalcErr] = useState("");
   const [calcUnit, setCalcUnit] = useState("H21-T1-2705");
@@ -56,6 +58,7 @@ export default function CollectionsScreen() {
     fetchJSON<{ collections: any[]; defaultCalc: any }>("/api/finance")
       .then((j) => {
         if (!active) return;
+        setLoaded(true);
         if (j?.collections) {
           setLiveRows(j.collections.map((c) => ({
             id: Number(c.id),
@@ -70,7 +73,7 @@ export default function CollectionsScreen() {
         }
         if (j?.defaultCalc) setCalc(j.defaultCalc);
       })
-      .catch((e) => { if (active) setApiError(e?.message || "Failed to load collections"); });
+      .catch((e) => { if (active) { setLoaded(true); setApiError(e?.message || "Failed to load collections"); } });
     return () => { active = false; };
   }, []);
 
@@ -145,6 +148,24 @@ export default function CollectionsScreen() {
     const s = STAGE_PILL[stage] || { bg: "#F1F2F6", color: "#6B7180" };
     return { display: "inline-block", fontSize: 10.5, fontWeight: 700, borderRadius: 7, padding: "3px 8px", background: s.bg, color: s.color, whiteSpace: "nowrap" as const };
   };
+
+  if (!loaded) {
+    return (
+      <div>
+        <div style={{ display: "grid", gridTemplateColumns: "1.55fr 1fr", gap: 16, alignItems: "start" }}>
+          <div>
+            <KpiSkeleton count={5} />
+            <div style={{ marginTop: 16 }}>
+              <PanelSkeleton headerW={200} rows={8} cols={6} />
+            </div>
+          </div>
+          <div>
+            <KpiSkeleton count={2} />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>
