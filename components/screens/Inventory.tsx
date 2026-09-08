@@ -1,6 +1,36 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AC, compact, money } from "../../lib/format";
 import { ST, UnitStatus, UNITS, Unit } from "../../lib/data";
+
+function toUnitShape(row: any, idx: number): Unit {
+  const price = Number(row.price) || 0;
+  const area = Number(row.area) || 0;
+  const f = Math.floor(idx / 6) + 1;
+  const st = (row.status || "available").toLowerCase();
+  const statusMap: Record<string, UnitStatus> = {
+    available: "Available",
+    booked: "Booked",
+    reserved: "Reserved",
+    held: "Held",
+    blocked: "Blocked",
+    sold: "Sold",
+  };
+  return {
+    f,
+    pos: (idx % 6) + 1,
+    no: row.no || String(idx + 1).padStart(3, "0"),
+    id: "" + row.id,
+    typ: row.type || "2BR",
+    beds: Number(row.beds) || 2,
+    area,
+    view: row.view || "Park",
+    psf: area > 0 ? Math.round(price / area) : 0,
+    price,
+    status: statusMap[st] || "Available",
+    base: 1450,
+    buyer: row.buyer || "—",
+  };
+}
 
 type View = "stack" | "plate" | "list" | "cards";
 
@@ -55,26 +85,41 @@ export default function InventoryScreen({
   const [view, setView] = useState<View>("stack");
   const [filter, setFilter] = useState<string>("all");
   const [heat, setHeat] = useState(false);
+  const [dbUnits, setDbUnits] = useState<Unit[]>([]);
+
+  useEffect(() => {
+    let active = true;
+    fetch("/api/inventory" + (scope && scope !== "ALL" ? "?project=" + encodeURIComponent(scope) : ""))
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => {
+        if (!active || !j || !Array.isArray(j.units)) return;
+        setDbUnits(j.units.map(toUnitShape));
+      })
+      .catch(() => {});
+    return () => { active = false; };
+  }, [scope]);
+
+  const source = dbUnits.length ? dbUnits : UNITS;
 
   const units = useMemo(() => {
-    const list = filter === "all" ? UNITS : UNITS.filter((u) => u.status === filter);
+    const list = filter === "all" ? source : source.filter((u) => u.status === filter);
     return list.slice(0, 120);
-  }, [filter]);
+  }, [filter, source]);
 
   const counts = useMemo(() => {
     const c: Record<string, { n: number; v: number }> = {};
-    UNITS.forEach((u) => {
+    source.forEach((u) => {
       c[u.status] = c[u.status] || { n: 0, v: 0 };
       c[u.status].n += 1;
       c[u.status].v += u.price;
     });
-    c.all = { n: UNITS.length, v: UNITS.reduce((a, u) => a + u.price, 0) };
+    c.all = { n: source.length, v: source.reduce((a, u) => a + u.price, 0) };
     return c;
-  }, []);
+  }, [source]);
 
   const floors = useMemo(() => {
     const map: Record<number, Unit[]> = {};
-    UNITS.forEach((u) => {
+    source.forEach((u) => {
       (map[u.f] = map[u.f] || []).push(u);
     });
     return Object.keys(map)
@@ -85,7 +130,7 @@ export default function InventoryScreen({
         const sold = cells.filter((c) => c.status === "Sold" || c.status === "Booked").length;
         return { f, cells, sold };
       });
-  }, []);
+  }, [source]);
 
   const scopeName = "Tower 1";
 

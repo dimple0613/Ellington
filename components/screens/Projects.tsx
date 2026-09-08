@@ -87,6 +87,11 @@ export default function ProjectsScreen({
     setOpen(false);
     setForm({ name: "", loc: "", units: "0", gdv: "0", price: "0" });
     setErr("");
+    fetch("/api/projects", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code, name, location: loc, units_total: units, gdv: gdv * 1000000 }),
+    }).catch(() => {});
   };
 
   const field = (key: keyof typeof form, label: string, type = "text", ph = "") => (

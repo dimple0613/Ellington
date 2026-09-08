@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AC } from "../../lib/format";
 
 type UserRow = { name: string; email: string; role: string; projects: string; lastActive: string; tfa: string; status: string };
@@ -66,8 +66,31 @@ export default function UsersScreen() {
     for (const r of ROLES) init[r] = ROLE_PERMS.map((row) => ({ ...row, perm: { ...row.perm } }));
     return init;
   });
+  const [dbUsers, setDbUsers] = useState<UserRow[] | null>(null);
 
-  const user = users[sel];
+  useEffect(() => {
+    let active = true;
+    fetch("/api/admins")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => {
+        if (!active || !j || !Array.isArray(j.users)) return;
+        const rows: UserRow[] = j.users.map((u: any) => ({
+          name: u.name || u.email,
+          email: u.email,
+          role: u.role === "super_admin" ? "CEO" : u.role || "viewer",
+          projects: "All",
+          lastActive: "—",
+          tfa: "Disabled",
+          status: "Active",
+        }));
+        if (rows.length) setDbUsers(rows);
+      })
+      .catch(() => {});
+    return () => { active = false; };
+  }, []);
+
+  const effectiveUsers = dbUsers || users;
+  const user = effectiveUsers[sel];
   const matrix = permByRole[role] || ROLE_PERMS;
 
   const toggle = (module: string, perm: string) => {
@@ -83,10 +106,16 @@ export default function UsersScreen() {
     if (!iName.trim() || !iEmail.trim()) { setErr("Enter both name and work email"); return; }
     const row: UserRow = { name: iName.trim(), email: iEmail.trim().toLowerCase(), role: iRole, projects: iProj, lastActive: "Just now", tfa: "Disabled", status: "Active" };
     setUsers((u) => [row, ...u]);
+    setDbUsers((d) => d ? [row, ...d] : d);
     setInviteOpen(false);
     setIName(""); setIEmail(""); setErr("");
     setNotice("Invite sent \u00b7 " + row.email + " \u00b7 " + iRole);
     setTimeout(() => setNotice(""), 3000);
+    fetch("/api/admins", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: iName.trim(), email: iEmail.trim().toLowerCase(), role: iRole.toLowerCase().replace(" ", "_") }),
+    }).catch(() => {});
   };
 
   return (
@@ -105,7 +134,7 @@ export default function UsersScreen() {
           <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1.4fr 96px 1.1fr 82px 72px 72px", gap: 8, padding: "13px 20px", fontSize: 9.5, fontWeight: 700, letterSpacing: ".07em", color: "#9AA0AE", textTransform: "uppercase", background: "#FAFBFD", borderBottom: "1px solid #EDEEF3" }}>
             <span>Name</span><span>Email</span><span>Role</span><span>Projects</span><span>Last active</span><span>2FA</span><span>Status</span>
           </div>
-          {users.map((u, i) => (
+          {effectiveUsers.map((u, i) => (
             <div key={i} onClick={() => { setSel(i); setRole(u.role); }} style={{ display: "grid", gridTemplateColumns: "1.2fr 1.4fr 96px 1.1fr 82px 72px 72px", gap: 8, alignItems: "center", padding: "0 20px", height: 46, borderBottom: "1px solid #F6F7FA", cursor: "pointer", background: i === sel ? "#F0EFFE" : undefined }}>
               <span style={{ fontSize: 12, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{u.name}</span>
               <span style={{ fontSize: 11, color: "#6B7180", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{u.email}</span>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import { AC, money } from "../../lib/format";
 import { ALL_UNITS } from "../../lib/data";
@@ -164,6 +164,48 @@ export default function Sales({ scope }: { scope: string }) {
    LEADS
    ═══════════════════════════════════════════════════════════════════ */
 function Leads({ onNewBooking, onBookLead }: { onNewBooking: () => void; onBookLead: (card: Card) => void }) {
+  const [dbCols, setDbCols] = useState<Col[] | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    fetch("/api/leads")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => {
+        if (!active || !j || !Array.isArray(j.leads)) return;
+        const order = ["new", "contacted", "qualified", "viewing", "negotiation", "eoi", "booked", "lost"];
+        const byStage: Record<string, Card[]> = { new: [], contacted: [], qualified: [], viewing: [], negotiation: [], eoi: [], booked: [], lost: [] };
+        (j.leads as any[]).forEach((l) => {
+          const st = (l.stage || "new").toLowerCase();
+          const key = byStage[st] ? st : "new";
+          const budget = l.budgetMin || l.budgetMax
+            ? "AED " + (l.budgetMin || l.budgetMax).toLocaleString("en-US")
+            : "AED -";
+          byStage[key].push({
+            name: l.name,
+            flag: "AE",
+            src: l.source || "Referral",
+            budget,
+            chips: [],
+            agent: (l.agent || "AD").split(/\s+/).map((w: string) => w[0]).slice(0, 2).join("").toUpperCase() || "AD",
+            age: "live",
+            live: l.live !== false,
+          });
+        });
+        const cols = order.map((st) => {
+          const cards = byStage[st];
+          const val = "AED " + (cards.reduce((a, c) => a + (parseFloat(String(c.budget).replace(/[^\d.]/g, "")) || 0), 0) / (cards.length || 1)).toLocaleString("en-US", { maximumFractionDigits: 0 }) + " avg";
+          const colors: Record<string, string> = { new: "#8B7CF6", contacted: "#8B7CF6", qualified: AC, viewing: AC, negotiation: "#E2A33C", eoi: "#34C08A", booked: "#34C08A", lost: "#8A94A6" };
+          const labels: Record<string, string> = { new: "New", contacted: "Contacted", qualified: "Qualified", viewing: "Viewing", negotiation: "Negotiation", eoi: "EOI signed", booked: "Booked", lost: "Lost" };
+          return { label: labels[st], count: cards.length, val, color: colors[st], cards };
+        });
+        setDbCols(cols);
+      })
+      .catch(() => {});
+    return () => { active = false; };
+  }, []);
+
+  const cols = dbCols && dbCols.some((c) => c.cards.length > 0) ? dbCols : LEADS_COLS;
+
   return (
     <div>
       <div style={{display:"flex",alignItems:"flex-end",gap:16,marginBottom:18}}>
@@ -193,7 +235,7 @@ function Leads({ onNewBooking, onBookLead }: { onNewBooking: () => void; onBookL
 
       {/* kanban */}
       <div style={{display:"flex",gap:12,overflowX:"auto",paddingBottom:8,alignItems:"flex-start"}}>
-        {LEADS_COLS.map(col => (
+        {cols.map(col => (
           <div key={col.label} style={{width:240,flex:"none",background:"#EFF0F5",borderRadius:18,padding:12}}>
             <div style={{display:"flex",alignItems:"center",gap:8,padding:"2px 6px 12px"}}>
               <span style={{width:8,height:8,borderRadius:4,background:col.color}} />

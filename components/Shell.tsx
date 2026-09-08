@@ -396,10 +396,10 @@ export default function Shell({
       </div>
       <div style={{ flex: 1, minHeight: 24 }} />
       <div style={{ borderTop: "1px solid #EDEEF3", paddingTop: 12, display: "flex", alignItems: "center", gap: 10 }}>
-        <div style={{ width: 32, height: 32, flex: "none", borderRadius: 11, background: "#E7E9F0", display: "grid", placeItems: "center", fontSize: 11, fontWeight: 700, color: "#4A5060" }}>RM</div>
+        <div style={{ width: 32, height: 32, flex: "none", borderRadius: 11, background: "#E7E9F0", display: "grid", placeItems: "center", fontSize: 11, fontWeight: 700, color: "#4A5060" }}>{(() => { const n = (user?.full_name || "").trim(); const l = (user?.email || "").split("@")[0] || ""; return (n.split(/\s+/).map((w: string) => w[0]).filter(Boolean).slice(0, 2).join("").toUpperCase() || l.slice(0, 2) || "AD").toUpperCase(); })()}</div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>Rania Mansour</div>
-          <div style={{ fontSize: 10, color: "#6B7180", fontWeight: 600 }}>Super Admin</div>
+          <div style={{ fontSize: 12, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{user?.full_name || "Administrator"}</div>
+          <div style={{ fontSize: 10, color: "#6B7180", fontWeight: 600 }}>{user?.role === "super_admin" ? "Super Admin" : user?.role === "editor" ? "Editor" : user?.role ? user.role : "Admin"}</div>
         </div>
         <button onClick={() => { closeMenus(); setProfileMenu((p) => !p); }} title="Account menu" style={{ width: 30, height: 30, border: 0, background: "#F5F6FA", borderRadius: 10, display: "grid", placeItems: "center", cursor: "pointer", color: "#4A5060" }}>
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /><circle cx="5" cy="12" r="1" /></svg>
