@@ -40,6 +40,23 @@ function csvFor(name: string) {
   return head + "\n" + body;
 }
 
+async function liveCsv(name: string) {
+  try {
+    const r = await fetch("/api/report-export?report=" + encodeURIComponent(name), {
+      credentials: "same-origin",
+      headers: { "Accept": "text/csv" },
+    });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    const text = await r.text();
+    const j = text.startsWith("{");
+    if (j) throw new Error("report unavailable");
+    return text;
+  } catch (e) {
+    console.error("report-export failed", e);
+    return csvFor(name);
+  }
+}
+
 function xlsFor(name: string) {
   return "Report\tGenerated\tScope\n" + name + "\t" + new Date().toLocaleDateString("en-GB") + "\tAll projects\n";
 }
@@ -76,13 +93,19 @@ export default function ReportsScreen() {
     []
   );
 
-  const runCsv = (name: string) => download(new Blob([csvFor(name)], { type: "text/csv;charset=utf-8;" }), "ellington-" + bullet(name) + ".csv");
+  const runCsv = async (name: string) => {
+    const text = await liveCsv(name);
+    download(new Blob([text], { type: "text/csv;charset=utf-8;" }), "ellington-" + bullet(name) + ".csv");
+  };
 
-  const generate = () => {
+  const generate = async () => {
     if (!report) { setErr("Choose a report."); return; }
     if (format === "PDF") pdfFor(report, "Custom report", "Generated 25 Aug 2026 · All projects");
     else if (format === "XLSX") download(new Blob([xlsFor(report)], { type: "application/vnd.ms-excel" }), "ellington-" + bullet(report) + ".xls");
-    else download(new Blob([csvFor(report)], { type: "text/csv;charset=utf-8;" }), "ellington-" + bullet(report) + ".csv");
+    else {
+      const text = await liveCsv(report);
+      download(new Blob([text], { type: "text/csv;charset=utf-8;" }), "ellington-" + bullet(report) + ".csv");
+    }
     setOpen(false);
     setErr("");
   };

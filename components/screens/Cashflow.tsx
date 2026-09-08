@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AC } from "../../lib/format";
+import { fetchJSON } from "../../lib/api";
 
 const FC: Record<string, [string, number][]> = {
   "7": [["Mon", 8.4], ["Tue", 12.1], ["Wed", 6.2], ["Thu", 14.8], ["Fri", 3.1], ["Sat", 1.2], ["Sun", 0.6]],
@@ -34,12 +35,36 @@ const CF_ROWS: [string, string, string, string, string][] = [
 
 export default function CashflowScreen() {
   const [fc, setFc] = useState("30");
-  const bars = FC[fc];
-  const mx = Math.max(...bars.map((b) => b[1]));
+  const [live, setLive] = useState<{ buckets: Record<string, [string, number][]>; window: { d30: number; d180: number }; ladder: [string, number, number][]; split: [string, number, string][]; rows: [string, number, number, number, number][] } | null>(null);
+  const [apiError, setApiError] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    fetchJSON<{ cashflow: any }>("/api/finance-analytics")
+      .then((j) => { if (active && j?.cashflow) setLive(j.cashflow); })
+      .catch((e) => { if (active) setApiError(e?.message || "Failed to load cashflow"); });
+    return () => { active = false; };
+  }, []);
+
+  const LADDER = live ? live.ladder : CF_LADDER;
+  const SPLIT: [string, number, string][] = live ? live.split.filter((s) => s[1] > 0.5) : CF_SPLIT;
+  const MONTHLY: { [k: number]: string }[] = (live ? live.rows : CF_ROWS) as unknown as { [k: number]: string }[];
+  const mfmt = (n: number | string) => typeof n === "string" ? n : "AED " + n.toFixed(1) + "M";
+  const barRow = (x: { [k: number]: string }) => {
+    return { m: x[0], inflow: mfmt(x[1]), draw: mfmt(x[2]), net: mfmt(x[3]), close: mfmt(x[4]) };
+  };
+
+  const bars = live ? (live.buckets[fc] || []) : FC[fc];
+  const mx = Math.max(1, ...bars.map((b) => b[1]));
   const total = bars.reduce((a, b) => a + b[1], 0);
 
   return (
     <div>
+      {apiError && (
+        <div style={{ background: "#FDECEC", color: "#E5484D", borderRadius: 12, padding: "11px 16px", fontSize: 12, fontWeight: 700, marginBottom: 16 }}>
+          Live data unavailable ({apiError}) — showing sample forecast
+        </div>
+      )}
       <div style={{ display: "flex", alignItems: "flex-end", gap: 16, marginBottom: 18 }}>
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: "-.03em", lineHeight: 1.15 }}>Cashflow forecast</div>
@@ -77,9 +102,9 @@ export default function CashflowScreen() {
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 14, marginTop: 20, borderTop: "1px solid #F1F2F7", paddingTop: 18 }}>
             {[
-              { label: "Expected", value: "AED " + total.toFixed(1) + "M", note: "Scheduled instalments in window", red: false },
-              { label: "Confidence-adjusted", value: "AED " + (total * 0.914).toFixed(1) + "M", note: "At 91.4% historical collection rate", red: false },
-              { label: "At risk", value: "AED " + (total * 0.086).toFixed(1) + "M", note: "Broken promises and dunning ladder", red: true },
+              { label: "Expected", value: mfmt(total), note: "Scheduled instalments in window", red: false },
+              { label: "Confidence-adjusted", value: mfmt(total * 0.914), note: "At 91.4% historical collection rate", red: false },
+              { label: "At risk", value: mfmt(total * 0.086), note: "Broken promises and dunning ladder", red: true },
             ].map((x) => (
               <div key={x.label}>
                 <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: ".07em", color: "#9AA0AE", textTransform: "uppercase" }}>{x.label}</div>
@@ -92,24 +117,24 @@ export default function CashflowScreen() {
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <div style={{ background: "#fff", borderRadius: 20, padding: "22px 24px", boxShadow: "0 1px 3px rgba(20,22,31,.04)" }}>
             <div style={{ fontSize: 15, fontWeight: 700, letterSpacing: "-.015em", marginBottom: 14 }}>Balance ladder · next 30 days</div>
-            {CF_LADDER.map((l, i, a) => (
+            {LADDER.map((l, i, a) => (
               <div key={l[0]} style={{ display: "flex", justifyContent: "space-between", gap: 14, padding: "12px 0", borderBottom: "1px solid " + (i === a.length - 2 ? "#DDE0E8" : "#F6F7FA") }}>
                 <span style={{ fontSize: 12, color: "#6B7180", fontWeight: 600 }}>{l[0]}</span>
-                <span style={{ fontSize: 13, fontWeight: l[2] === 0 ? 800 : 700, color: l[2] === 1 ? "#1F9D6B" : l[2] === 2 ? "#E5484D" : "#14161F", whiteSpace: "nowrap" }}>{l[1]}</span>
+                <span style={{ fontSize: 13, fontWeight: l[2] === 0 ? 800 : 700, color: l[2] === 1 ? "#1F9D6B" : l[2] === 2 ? "#E5484D" : "#14161F", whiteSpace: "nowrap" }}>{mfmt(l[1])}</span>
               </div>
             ))}
           </div>
           <div style={{ background: "#fff", borderRadius: 20, padding: "22px 24px", boxShadow: "0 1px 3px rgba(20,22,31,.04)" }}>
             <div style={{ fontSize: 15, fontWeight: 700, letterSpacing: "-.015em", marginBottom: 6 }}>By trigger type</div>
-            {CF_SPLIT.map((c) => (
+            {SPLIT.map((c) => (
               <div key={c[0]} style={{ padding: "9px 0" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
                   <span style={{ width: 9, height: 9, borderRadius: 4, background: c[2], flex: "none" }}></span>
                   <span style={{ flex: 1, fontSize: 11.5, fontWeight: 600, color: "#6B7180" }}>{c[0]}</span>
-                  <span style={{ fontSize: 12, fontWeight: 800 }}>{c[1] + "%"}</span>
+                  <span style={{ fontSize: 12, fontWeight: 800 }}>{Math.round(c[1]) + "%"}</span>
                 </div>
                 <div style={{ height: 7, borderRadius: 5, background: "#F1F2F7", marginTop: 7, overflow: "hidden" }}>
-                  <span style={{ display: "block", height: "100%", width: c[1] + "%", background: c[2] }}></span>
+                  <span style={{ display: "block", height: "100%", width: Math.round(c[1]) + "%", background: c[2] }}></span>
                 </div>
               </div>
             ))}
@@ -120,15 +145,18 @@ export default function CashflowScreen() {
         <div style={{ display: "grid", gridTemplateColumns: "100px 1fr 1fr 1fr 1fr", gap: 12, padding: "14px 24px", fontSize: 9.5, fontWeight: 700, letterSpacing: ".07em", color: "#9AA0AE", textTransform: "uppercase", borderBottom: "1px solid #EDEEF3", background: "#FAFBFD" }}>
           <span>Month</span><span style={{ textAlign: "right" }}>Inflow</span><span style={{ textAlign: "right" }}>Drawdowns</span><span style={{ textAlign: "right" }}>Net</span><span style={{ textAlign: "right" }}>Closing balance</span>
         </div>
-        {CF_ROWS.map((r) => (
-          <div key={r[0]} style={{ display: "grid", gridTemplateColumns: "100px 1fr 1fr 1fr 1fr", gap: 12, alignItems: "center", padding: "0 24px", height: 44, borderBottom: "1px solid #F6F7FA" }}>
-            <span style={{ fontSize: 12, fontWeight: 700 }}>{r[0]}</span>
-            <span style={{ textAlign: "right", fontSize: 11.5, fontWeight: 600, color: "#1F9D6B" }}>{r[1]}</span>
-            <span style={{ textAlign: "right", fontSize: 11.5, fontWeight: 600, color: "#E5484D" }}>{r[2]}</span>
-            <span style={{ textAlign: "right", fontSize: 11.5, fontWeight: 700 }}>{r[3]}</span>
-            <span style={{ textAlign: "right", fontSize: 12, fontWeight: 800 }}>{r[4]}</span>
-          </div>
-        ))}
+        {MONTHLY.map((r) => {
+            const x = barRow(r);
+            return (
+              <div key={x.m} style={{ display: "grid", gridTemplateColumns: "100px 1fr 1fr 1fr 1fr", gap: 12, alignItems: "center", padding: "0 24px", height: 44, borderBottom: "1px solid #F6F7FA" }}>
+                <span style={{ fontSize: 12, fontWeight: 700 }}>{x.m}</span>
+                <span style={{ textAlign: "right", fontSize: 11.5, fontWeight: 600, color: "#1F9D6B" }}>{x.inflow}</span>
+                <span style={{ textAlign: "right", fontSize: 11.5, fontWeight: 600, color: "#E5484D" }}>{x.draw}</span>
+                <span style={{ textAlign: "right", fontSize: 11.5, fontWeight: 700 }}>{x.net}</span>
+                <span style={{ textAlign: "right", fontSize: 12, fontWeight: 800 }}>{x.close}</span>
+              </div>
+            );
+          })}
       </div>
     </div>
   );
