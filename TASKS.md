@@ -46,7 +46,7 @@
 ## Phase 8 — Build & regression
 - [x] `npm run lint` (tsc) green
 - [x] `npm run build` green
-- [ ] Round-trip retest: browser smoke across groups after fixes — SKIPPED per operator (resume later). Note found: local `next start` login 401s on `admin@gmail.com`/`Admin123` — local DB admin email likely drifted again (known OneTask issue); investigate before resuming tests.
+- [x] Round-trip retest: browser smoke — PASSED (2026-09-08). Login with `admin@ellington.com`/`Admin123` → `/dashboard` renders real data, `/api/auth/me` → 200 (super_admin). Root cause of prior 401: local DB admin email had drifted to `kartik1111gohil@gmail.com`; fixed in place to `admin@ellington.com` and `db/seed.ts` fallback + login/forgot-password placeholders updated (`2ea46bf`).
 
 ## Phase 9 — TASKS.md
 - [x] This runbook
