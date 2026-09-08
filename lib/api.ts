@@ -2,11 +2,18 @@ import type { NextApiResponse } from "next";
 
 export type ApiEnvelope<T = unknown> = { ok: boolean; data: T; error: string | null };
 
+function noCache(res: NextApiResponse) {
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+  res.setHeader("Pragma", "no-cache");
+}
+
 export function ok<T>(res: NextApiResponse, data: T, status = 200) {
+  noCache(res);
   res.status(status).json({ ok: true, data, error: null });
 }
 
 export function fail(res: NextApiResponse, message: string, status = 400) {
+  noCache(res);
   res.status(status).json({ ok: false, data: null, error: message });
 }
 
