@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { AC } from "../../lib/format";
 import { fetchJSON } from "../../lib/api";
 
-type QueueRow = { date: string; desc: string; amount: string; side: string };
+type QueueRow = { id: number; date: string; desc: string; amount: string; side: string };
 type Obligation = { label: string; value: string; flag: boolean };
 type Drawdown = { id: string; milestone: string; amount: string; cert: string; rera: string; status: string };
 
@@ -12,23 +12,21 @@ const SIDE_PILL: Record<string, { bg: string; color: string }> = {
 };
 
 export default function EscrowScreen() {
-  const [queue, setQueue] = useState<QueueRow[]>([
-    { date: "22 Aug 26", desc: "Inbound transfer \u00b7 ref MENON RM 3302", amount: "367,875", side: "Bank only" },
-    { date: "21 Aug 26", desc: "RCP-H21-004706 \u00b7 M. Lindqvist", amount: "640,000", side: "System only" },
-    { date: "19 Aug 26", desc: "Inbound transfer \u00b7 no reference quoted", amount: "112,400", side: "Bank only" },
-    { date: "18 Aug 26", desc: "RCP-H21-004689 \u00b7 E. Petrova", amount: "1,204,000", side: "System only" },
-    { date: "15 Aug 26", desc: "Inbound transfer \u00b7 ref BLG-1602", amount: "84,600", side: "Bank only" },
-    { date: "12 Aug 26", desc: "Cheque return \u00b7 CHQ-883964", amount: "268,000", side: "Bank only" },
-  ]);
+  const [queue, setQueue] = useState<QueueRow[]>([]);
   const [notice, setNotice] = useState("");
-  const [drawdowns, setDrawdowns] = useState<Drawdown[]>([
-    { id: "DDR-0004", milestone: "Structure 40%", amount: "62,400,000", cert: "WSP \u00b7 A. Faruqi \u00b7 04 Aug 26", rera: "Submitted", status: "Awaiting trustee" },
-    { id: "DDR-0003", milestone: "Substructure complete", amount: "48,200,000", cert: "WSP \u00b7 A. Faruqi \u00b7 12 May 26", rera: "Approved", status: "Released" },
-    { id: "DDR-0002", milestone: "Enabling works", amount: "21,600,000", cert: "WSP \u00b7 A. Faruqi \u00b7 03 Feb 26", rera: "Approved", status: "Released" },
-    { id: "DDR-0001", milestone: "Mobilisation", amount: "14,800,000", cert: "WSP \u00b7 A. Faruqi \u00b7 18 Nov 25", rera: "Approved", status: "Released" },
-  ]);
+  const [drawdowns, setDrawdowns] = useState<Drawdown[]>([]);
   const [ddrOpen, setDdrOpen] = useState(false);
   const [apiError, setApiError] = useState("");
+  const [reconciling, setReconciling] = useState<number | null>(null);
+
+  const fallbackQueue = (): QueueRow[] => [
+    { id: 0, date: "22 Aug 26", desc: "Inbound transfer \u00b7 ref MENON RM 3302", amount: "367,875", side: "Bank only" },
+    { id: 0, date: "21 Aug 26", desc: "RCP-H21-004706 \u00b7 M. Lindqvist", amount: "640,000", side: "System only" },
+    { id: 0, date: "19 Aug 26", desc: "Inbound transfer \u00b7 no reference quoted", amount: "112,400", side: "Bank only" },
+    { id: 0, date: "18 Aug 26", desc: "RCP-H21-004689 \u00b7 E. Petrova", amount: "1,204,000", side: "System only" },
+    { id: 0, date: "15 Aug 26", desc: "Inbound transfer \u00b7 ref BLG-1602", amount: "84,600", side: "Bank only" },
+    { id: 0, date: "12 Aug 26", desc: "Cheque return \u00b7 CHQ-883964", amount: "268,000", side: "Bank only" },
+  ];
 
   useEffect(() => {
     let active = true;
@@ -37,11 +35,14 @@ export default function EscrowScreen() {
         if (!active || !j?.escrow) return;
         if (j.escrow.queue.length) {
           setQueue(j.escrow.queue.map((q) => ({
+            id: Number(q.id),
             date: new Date(q.received_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "2-digit" }),
             desc: q.reference,
             amount: Number(q.amount).toLocaleString("en-US"),
             side: q.bank && !q.system_side ? "Bank only" : q.system_side && !q.bank ? "System only" : "Bank only",
           })));
+        } else {
+          if (active) setQueue([]);
         }
         if (j.escrow.drawdowns.length) {
           setDrawdowns(j.escrow.drawdowns.map((d) => ({
@@ -54,7 +55,7 @@ export default function EscrowScreen() {
           })));
         }
       })
-      .catch((e) => { if (active) setApiError(e?.message || "Failed to load escrow"); });
+      .catch((e) => { if (active) { setApiError(e?.message || "Failed to load escrow"); setQueue(fallbackQueue); } });
     return () => { active = false; };
   }, []);
   const [ddrMilestone, setDdrMilestone] = useState("Structure 40%");
@@ -92,25 +93,53 @@ export default function EscrowScreen() {
     { label: "5% retention held", value: "5.0%", flag: false },
   ];
 
-  const matchRow = (idx: number) => { setQueue((q) => q.filter((_, i) => i !== idx)); setNotice("Row matched and reconciled \u00b7 escrow variance reduced"); setTimeout(() => setNotice(""), 3000); };
+  const matchRow = async (idx: number) => {
+    const row = queue[idx];
+    if (!row || reconciling !== null) return;
+    setReconciling(row.id);
+    setNotice("");
+    try {
+      await fetchJSON<{ id: number; matched: boolean }>("/api/finance", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "reconcile", id: row.id }),
+      });
+      setQueue((q) => q.filter((_, i) => i !== idx));
+      setNotice("Row matched and reconciled \u00b7 escrow variance reduced");
+    } catch (e: any) {
+      setNotice("");
+      setApiError("Failed to match row: " + (e?.message || "request failed"));
+    } finally {
+      setReconciling(null);
+    }
+    setTimeout(() => setNotice(""), 3000);
+  };
 
-  const submitDdr = () => {
+  const submitDdr = async () => {
     const amt = ddrAmount.replace(/[^0-9]/g, "");
     if (!amt || Number(amt) <= 0) { setDdrErr("Enter a valid drawdown amount"); return; }
-    const next = (Number(drawdowns[0]?.id.replace("DDR-", "") || "0004") + 1).toString().padStart(4, "0");
-    const newRow: Drawdown = {
-      id: "DDR-" + next,
-      milestone: ddrMilestone,
-      amount: Number(amt).toLocaleString("en-US"),
-      cert: "WSP \u00b7 A. Faruqi \u00b7 " + new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "2-digit" }),
-      rera: ddrRera,
-      status: "Awaiting trustee",
-    };
-    setDrawdowns((d) => [newRow, ...d]);
-    setDdrOpen(false);
-    setDdrErr("");
-    setDdrAmount("");
-    setNotice("Drawdown request " + newRow.id + " created \u00b7 " + ddrMilestone + " \u00b7 AED " + newRow.amount + " submitted to trustee");
+    try {
+      const d = await fetchJSON<any>("/api/finance", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "drawdown", milestone: ddrMilestone, amount: amt, rera: ddrRera }),
+      });
+      const newRow: Drawdown = {
+        id: d.ref,
+        milestone: d.milestone,
+        amount: Number(d.amount).toLocaleString("en-US"),
+        cert: d.cert,
+        rera: d.rera,
+        status: d.status,
+      };
+      setDrawdowns((x) => [newRow, ...x]);
+      setDdrOpen(false);
+      setDdrErr("");
+      setDdrAmount("");
+      setNotice("Drawdown request " + newRow.id + " created \u00b7 " + d.milestone + " \u00b7 AED " + newRow.amount + " submitted to trustee");
+    } catch (e: any) {
+      setDdrErr(e?.message || "Failed to create drawdown");
+    }
     setTimeout(() => setNotice(""), 4000);
   };
 
@@ -198,7 +227,7 @@ export default function EscrowScreen() {
               <span style={{ textAlign: "right", fontSize: 11.5, fontWeight: 700 }}>AED {r.amount}</span>
               <span style={pill(r.side, "side")}>{r.side}</span>
               <div style={{ display: "flex", justifyContent: "flex-end", gap: 6 }}>
-                <button onClick={() => matchRow(i)} style={{ height: 28, borderRadius: 8, border: 0, background: "#F0EFFE", padding: "0 10px", fontFamily: "inherit", fontSize: 10, fontWeight: 700, color: AC, cursor: "pointer" }}>Match to&hellip;</button>
+                <button onClick={() => matchRow(i)} disabled={reconciling !== null} style={{ height: 28, borderRadius: 8, border: 0, background: "#F0EFFE", padding: "0 10px", fontFamily: "inherit", fontSize: 10, fontWeight: 700, color: AC, cursor: reconciling !== null ? "wait" : "pointer", opacity: reconciling !== null && reconciling !== r.id ? 0.5 : 1 }}>Match to&hellip;</button>
                 <button style={{ height: 28, borderRadius: 8, border: "1px solid #EDEEF3", background: "#fff", padding: "0 10px", fontFamily: "inherit", fontSize: 10, fontWeight: 700, color: "#4A5060", cursor: "pointer" }}>Flag</button>
               </div>
             </div>
