@@ -42,8 +42,15 @@ function safeNext(raw: string | null): string {
 export async function middleware(req: NextRequest, _event: NextFetchEvent) {
   const { pathname } = req.nextUrl;
 
-  if (pathname.startsWith("/api") || pathname.startsWith("/_next")) {
+  if (pathname.startsWith("/_next")) {
     return NextResponse.next();
+  }
+
+  if (pathname.startsWith("/api")) {
+    const res = NextResponse.next();
+    res.headers.set("Cache-Control", "no-store, no-cache, must-revalidate");
+    res.headers.set("Pragma", "no-cache");
+    return res;
   }
 
   const session = await verifyFromCookieHeader(req.headers.get("cookie"));
