@@ -339,7 +339,7 @@ export default function Dashboard() {
       ) : screen === "projects" ? (
         <ProjectsScreen projects={projects} onSelect={openProject} />
       ) : screen === "financials" ? (
-        <FinancialsScreen />
+        <FinancialsScreen projects={projects} />
       ) : screen === "cashflow" ? (
         <CashflowScreen />
       ) : screen === "reports" ? (
