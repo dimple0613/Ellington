@@ -181,10 +181,11 @@ function Leads({ onNewBooking, onBookLead }: { onNewBooking: () => void; onBookL
     fetch("/api/leads")
       .then((r) => (r.ok ? r.json() : null))
       .then((j) => {
-        if (!active || !j || !Array.isArray(j.leads)) return;
+        const leads = j?.data?.leads;
+        if (!active || !Array.isArray(leads)) return;
         const order = ["new", "contacted", "qualified", "viewing", "negotiation", "eoi", "booked", "lost"];
         const byStage: Record<string, Card[]> = { new: [], contacted: [], qualified: [], viewing: [], negotiation: [], eoi: [], booked: [], lost: [] };
-        (j.leads as ApiLead[]).forEach((l) => {
+        (leads as ApiLead[]).forEach((l) => {
           const st = (l.stage || "new").toLowerCase();
           const key = byStage[st] ? st : "new";
           const budgetMin = l.budgetMin || 0;

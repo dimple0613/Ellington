@@ -21,7 +21,7 @@ export function useSession() {
           if (alive) setUser(null);
         } else if (res.ok) {
           const json = await res.json();
-          if (alive) setUser(json.user as SessionUser);
+          if (alive) setUser((json?.data?.user ?? json?.user) as SessionUser);
         } else {
           if (alive) setUser(null);
         }

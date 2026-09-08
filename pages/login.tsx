@@ -141,7 +141,7 @@ export default function Login() {
         setBusy(false);
         return;
       }
-      router.push(json.next || next);
+      router.push(json?.data?.next || next);
     } catch {
       setServerError("Unable to reach the server. Please check your connection and try again.");
       setBusy(false);

@@ -104,8 +104,9 @@ export default function InventoryScreen({
     fetch("/api/inventory" + (scope && scope !== "ALL" ? "?project=" + encodeURIComponent(scope) : ""))
       .then((r) => (r.ok ? r.json() : null))
       .then((j) => {
-        if (!active || !j || !Array.isArray(j.units)) return;
-        setDbUnits(j.units.map(toUnitShape));
+        const units = j?.data?.units;
+        if (!active || !Array.isArray(units)) return;
+        setDbUnits(units.map(toUnitShape));
       })
       .catch(() => {});
     return () => { active = false; };

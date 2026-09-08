@@ -79,8 +79,9 @@ export default function UsersScreen() {
     fetch("/api/admins")
       .then((r) => (r.ok ? r.json() : null))
       .then((j) => {
-        if (!active || !j || !Array.isArray(j.users)) return;
-        const rows: UserRow[] = (j.users as AdminRow[]).map((u) => ({
+        const users = j?.data?.users;
+        if (!active || !Array.isArray(users)) return;
+        const rows: UserRow[] = users.map((u: AdminRow) => ({
           name: u.name || u.email,
           email: u.email,
           role: u.role === "super_admin" ? "CEO" : u.role || "viewer",

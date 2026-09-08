@@ -48,11 +48,12 @@ export default function PaymentsScreen({ buyer }: { buyer?: string }) {
     fetch("/api/receipts")
       .then((r) => (r.ok ? r.json() : null))
       .then((j) => {
-        if (!active || !j || !Array.isArray(j.receipts)) return;
+        const receipts = j?.data?.receipts;
+        if (!active || !Array.isArray(receipts)) return;
         setDbRows(
-          j.receipts.slice(0, 20).map((x: ApiReceipt) => ({
+          receipts.slice(0, 20).map((x: ApiReceipt) => ({
             rcp: "RCP-" + String(x.id).padStart(6, "0"),
-            date: x.date,
+            date: x.date || "",
             buyer: x.buyer || "",
             unit: x.unit || "",
             amount: (x.amount || 0).toLocaleString("en-US"),

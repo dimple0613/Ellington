@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { withPerm } from "../../lib/permissions";
 import { query } from "../../lib/db";
+import { ok, methodNotAllowed } from "../../lib/api";
 
 export default withPerm("Finance", "REA", async function (req: NextApiRequest, res: NextApiResponse) {
   if (req.method === "GET") {
@@ -32,8 +33,8 @@ export default withPerm("Finance", "REA", async function (req: NextApiRequest, r
       amount: Number(m.amount) || 0,
       status: m.status || "scheduled",
     }));
-    return res.status(200).json({ milestones: data });
+    return ok(res, { milestones: data });
   }
 
-  return res.status(405).json({ error: "Method not allowed" });
+  return methodNotAllowed(res);
 });

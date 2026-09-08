@@ -2,15 +2,16 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { verifyPassword } from "../../../lib/auth";
 import { query } from "../../../lib/db";
 import { serializeCookie, sign } from "../../../lib/session";
+import { ok, fail, methodNotAllowed } from "../../../lib/api";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     if (req.method !== "POST") {
-      return res.status(405).json({ error: "Method not allowed" });
+      return methodNotAllowed(res);
     }
     const { email, password } = req.body || {};
     if (!email || !password) {
-      return res.status(400).json({ error: "Email and password required" });
+      return fail(res, "Email and password required");
     }
 
     const r = await query<{ id: number; email: string; password_hash: string; role: string; full_name: string }>(
@@ -18,11 +19,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       [email]
     );
     if (r.rows.length === 0) {
-      return res.status(401).json({ error: "Invalid credentials" });
+      return fail(res, "Invalid credentials", 401);
     }
     const admin = r.rows[0];
     if (!(await verifyPassword(password, admin.password_hash))) {
-      return res.status(401).json({ error: "Invalid credentials" });
+      return fail(res, "Invalid credentials", 401);
     }
 
     const token = await sign({
@@ -46,9 +47,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         secure,
       })
     );
-    return res.status(200).json({ ok: true });
+    return ok(res, {});
   } catch (e: any) {
     console.error("LOGIN_ERROR", e?.message || e);
-    return res.status(500).json({ error: "An unexpected error occurred. Please try again." });
+    return fail(res, "An unexpected error occurred. Please try again.", 500);
   }
 }

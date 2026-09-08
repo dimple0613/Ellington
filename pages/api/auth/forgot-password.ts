@@ -2,22 +2,23 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { generateResetToken, hashToken } from "../../../lib/auth";
 import { query } from "../../../lib/db";
 import { sendPasswordReset } from "../../../lib/mail";
+import { ok, fail, methodNotAllowed, validEmail, notFound } from "../../../lib/api";
 
 const RESET_TTL_MS = 30 * 60 * 1000;
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     if (req.method !== "POST") {
-      return res.status(405).json({ error: "Method not allowed" });
+      return methodNotAllowed(res);
     }
     const email = String(req.body?.email || "").trim().toLowerCase();
-    if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
-      return res.status(400).json({ error: "Please enter a valid email address." });
+    if (!email || !validEmail(email)) {
+      return fail(res, "Please enter a valid email address.");
     }
 
     const found = await query<{ id: number }>("SELECT id FROM admins WHERE email = $1 LIMIT 1", [email]);
     if (found.rows.length === 0) {
-      return res.status(404).json({ error: "No account found with that email address." });
+      return notFound(res, "No account found with that email address.");
     }
 
     const token = generateResetToken();
@@ -31,12 +32,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     );
     await sendPasswordReset(email, token);
 
-    return res.status(200).json({
-      ok: true,
-      message: "A password reset link has been sent to your email.",
-    });
+    return ok(res, { message: "A password reset link has been sent to your email." });
   } catch (e: any) {
     console.error("FORGOT_PASSWORD_ERROR", e);
-    return res.status(500).json({ error: "Password reset is temporarily unavailable. Please try again later." });
+    return fail(res, "Password reset is temporarily unavailable. Please try again later.", 500);
   }
 }

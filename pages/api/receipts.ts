@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { withPerm } from "../../lib/permissions";
 import { query } from "../../lib/db";
+import { ok, fail, methodNotAllowed } from "../../lib/api";
 
 export default withPerm("Finance", "REA", async function (req: NextApiRequest, res: NextApiResponse) {
   if (req.method === "GET") {
@@ -35,18 +36,18 @@ export default withPerm("Finance", "REA", async function (req: NextApiRequest, r
       buyer: r.buyer_name || "",
       unit: r.unit_no || "",
     }));
-    return res.status(200).json({ receipts: data });
+    return ok(res, { receipts: data });
   }
 
   if (req.method === "POST") {
     const { project_code, buyer_name, unit_no, amount, method, reference } = req.body || {};
     const amt = Number(amount);
     if (!project_code || !(amt > 0)) {
-      return res.status(400).json({ error: "project_code and amount are required" });
+      return fail(res, "project_code and amount are required");
     }
 
     const pr = await query<any>("SELECT id FROM projects WHERE code = upper($1)", [project_code]);
-    if (!pr.rows.length) return res.status(400).json({ error: "Unknown project" });
+    if (!pr.rows.length) return fail(res, "Unknown project");
     const projectId = pr.rows[0].id;
 
     let buyerId: number | null = null;
@@ -84,8 +85,8 @@ export default withPerm("Finance", "REA", async function (req: NextApiRequest, r
       "UPDATE projects SET collected = collected + $2 WHERE id = $1",
       [projectId, amt]
     );
-    return res.status(201).json({ id: ins.rows[0].id });
+    return ok(res, { id: ins.rows[0].id }, 201);
   }
 
-  return res.status(405).json({ error: "Method not allowed" });
+  return methodNotAllowed(res);
 });

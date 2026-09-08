@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { withPerm } from "../../lib/permissions";
 import { query } from "../../lib/db";
+import { ok } from "../../lib/api";
 
 export default withPerm("Dashboard", "REA", async function (_req: NextApiRequest, res: NextApiResponse) {
   const projects = await query<any>(
@@ -43,5 +44,5 @@ export default withPerm("Dashboard", "REA", async function (_req: NextApiRequest
     };
   });
 
-  res.status(200).json({ projects: data });
+  ok(res, { projects: data });
 });

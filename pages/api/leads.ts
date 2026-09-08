@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { withPerm } from "../../lib/permissions";
 import { query } from "../../lib/db";
+import { ok, fail, methodNotAllowed, missingFields } from "../../lib/api";
 
 export function stageLabel(stage: string): string {
   const map: Record<string, string> = {
@@ -46,13 +47,14 @@ export default withPerm("Sales", "REA", async function (req: NextApiRequest, res
       projectCode: l.project_code || "",
       live: stageIndex(l.stage) < 6,
     }));
-    return res.status(200).json({ leads: data });
+    return ok(res, { leads: data });
   }
 
   if (req.method === "POST") {
-    const { name, source, phone, stage, budget_min, budget_max, agent, project_code } =
-      req.body || {};
-    if (!name) return res.status(400).json({ error: "name is required" });
+    const body = (req.body || {}) as Record<string, unknown>;
+    const { name, source, phone, stage, budget_min, budget_max, agent, project_code } = body;
+    const miss = missingFields(body, ["name"]);
+    if (miss) return fail(res, miss);
 
     let projectId: number | null = null;
     if (project_code) {
@@ -75,8 +77,8 @@ export default withPerm("Sales", "REA", async function (req: NextApiRequest, res
         agent || null,
       ]
     );
-    return res.status(201).json({ id: ins.rows[0].id });
+    return ok(res, { id: ins.rows[0].id }, 201);
   }
 
-  return res.status(405).json({ error: "Method not allowed" });
+  return methodNotAllowed(res);
 });
