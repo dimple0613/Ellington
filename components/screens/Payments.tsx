@@ -1,5 +1,6 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { AC } from "../../lib/format";
+import { fetchJSON } from "../../lib/api";
 
 type ReceiptRow = {
   rcp: string;
@@ -22,6 +23,17 @@ type PdcRow = {
   status: string;
 };
 
+type ApiReceipt = {
+  id?: number | string | null;
+  amount?: number | string | null;
+  method?: string | null;
+  reference?: string | null;
+  matched?: boolean;
+  date?: string | null;
+  buyer?: string | null;
+  unit?: string | null;
+};
+
 export default function PaymentsScreen({ buyer }: { buyer?: string }) {
   const [tab, setTab] = useState<"receipts" | "pdc">("receipts");
   const [showForm, setShowForm] = useState(false);
@@ -30,6 +42,32 @@ export default function PaymentsScreen({ buyer }: { buyer?: string }) {
   const [formMethod, setFormMethod] = useState("Bank transfer");
   const [saved, setSaved] = useState(false);
   const [extraRows, setExtraRows] = useState<ReceiptRow[]>([]);
+  const [dbRows, setDbRows] = useState<ReceiptRow[]>([]);
+  const [apiError, setApiError] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    fetchJSON<{ receipts: ApiReceipt[] }>("/api/receipts")
+      .then((j) => {
+        if (!active || !Array.isArray(j.receipts)) return;
+        setDbRows(
+          j.receipts.slice(0, 20).map((x: ApiReceipt) => ({
+            rcp: "RCP-" + String(x.id).padStart(6, "0"),
+            date: x.date || "",
+            buyer: x.buyer || "",
+            unit: x.unit || "",
+            amount: (x.amount || 0).toLocaleString("en-US"),
+            method: (x.method || "bank_transfer").replace("_", " "),
+            esc: x.reference || "—",
+            recon: x.matched ? "Matched" : "Unmatched",
+          }))
+        );
+      })
+      .catch((e) => {
+        if (active) setApiError(e?.message || "Failed to load receipts");
+      });
+    return () => { active = false; };
+  }, []);
 
   const kpis: { label: string; value: string; note: string; bad?: boolean }[] = [
     { label: "Collected today", value: "AED 4.24M", note: "9 receipts issued" },
@@ -72,14 +110,14 @@ export default function PaymentsScreen({ buyer }: { buyer?: string }) {
   };
 
   const record = () => {
-    const amt = (parseFloat(formAmount) || 0).toLocaleString("en-US");
+    const amt = parseFloat(formAmount) || 0;
     if (!formBuyer || !amt) return;
     const row: ReceiptRow = {
       rcp: "RCP-H21-" + String(4790 + extraRows.length).padStart(6, "0"),
       date: new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "2-digit" }).replace(/ /g, " "),
       buyer: formBuyer,
       unit: "H21-T1-1204",
-      amount: amt,
+      amount: amt.toLocaleString("en-US"),
       method: formMethod,
       esc: "ESC-2026-" + (9014 + extraRows.length),
       recon: "Matched",
@@ -88,10 +126,25 @@ export default function PaymentsScreen({ buyer }: { buyer?: string }) {
     setSaved(true);
     setShowForm(false);
     setTimeout(() => setSaved(false), 4000);
+    fetch("/api/receipts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        project_code: (row.unit || "BLG").split("-")[0] || "BLG",
+        buyer_name: formBuyer,
+        amount: amt,
+        method: formMethod.toLowerCase().replace(" ", "_"),
+      }),
+    }).catch(() => {});
   };
 
   return (
     <div>
+      {apiError && (
+        <div style={{ background: "#FDECEC", color: "#E5484D", borderRadius: 12, padding: "11px 16px", fontSize: 12, fontWeight: 700, marginBottom: 16 }}>
+          Live data unavailable ({apiError}) — showing sample rows
+        </div>
+      )}
       {buyer && (
         <div style={{ background: "#F0EFFE", color: AC, borderRadius: 12, padding: "11px 16px", fontSize: 12, fontWeight: 700, marginBottom: 16 }}>
           Recording payment for <span style={{ fontWeight: 800 }}>{buyer}</span> \u00b7 sourced from Buyer 360 \u00b7 escrow deposit required
@@ -130,7 +183,7 @@ export default function PaymentsScreen({ buyer }: { buyer?: string }) {
         <div style={{ display: "grid", gridTemplateColumns: "118px 86px 1.1fr 92px 96px 96px 104px 88px", gap: 8, padding: "14px 22px", fontSize: 9.5, fontWeight: 700, letterSpacing: ".07em", color: "#9AA0AE", textTransform: "uppercase", background: "#FAFBFD", borderBottom: "1px solid #EDEEF3" }}>
           <span>Receipt</span><span>Date</span><span>Buyer</span><span>Unit</span><span style={{ textAlign: "right" }}>Amount</span><span>Method</span><span>Escrow ref</span><span>Recon</span>
         </div>
-        {tab === "receipts" ? [...extraRows, ...payRows].map((r, i) => (
+        {tab === "receipts" ? [...dbRows, ...extraRows, ...payRows].map((r, i) => (
           <div key={i} style={{ display: "grid", gridTemplateColumns: "118px 86px 1.1fr 92px 96px 96px 104px 88px", gap: 8, alignItems: "center", padding: "0 22px", height: 40, borderBottom: "1px solid #F6F7FA" }}>
             <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, fontWeight: 600 }}>{r.rcp}</span>
             <span style={{ fontSize: 11.5, color: "#6B7180", fontWeight: 600 }}>{r.date}</span>

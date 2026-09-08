@@ -119,3 +119,77 @@ CREATE TABLE IF NOT EXISTS escrow_ledger (
 CREATE INDEX IF NOT EXISTS idx_units_project ON units(project_id);
 CREATE INDEX IF NOT EXISTS idx_units_status ON units(status);
 CREATE INDEX IF NOT EXISTS idx_receipts_project ON receipts(project_id);
+
+-- Handover module (AUD-006): pipeline stages, snag items, title deeds.
+CREATE TABLE IF NOT EXISTS pipeline_items (
+  id SERIAL PRIMARY KEY,
+  unit_no TEXT,
+  buyer TEXT,
+  stage TEXT NOT NULL,                 -- payment_cleared / snagging_scheduled / snagging_done / de_snagging / utilities / documents_ready / title_deed_issued / keys_handed / oa_onboarded
+  meta TEXT,
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_pipeline_stage ON pipeline_items(stage);
+
+CREATE TABLE IF NOT EXISTS snag_items (
+  id SERIAL PRIMARY KEY,
+  unit_no TEXT,
+  loc TEXT,
+  trade TEXT,
+  description TEXT,
+  sev TEXT DEFAULT 'Major',            -- Critical / Major / Minor
+  contractor TEXT,
+  status TEXT DEFAULT 'Open',          -- Open / In progress / Closed / Re-inspect
+  reinspect TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_snags_unit ON snag_items(unit_no);
+
+CREATE TABLE IF NOT EXISTS deeds (
+  id SERIAL PRIMARY KEY,
+  unit_no TEXT,
+  buyer TEXT,
+  oqood TEXT,
+  dld TEXT,
+  deed TEXT DEFAULT 'Applied',         -- Issued / Applied / Blocked
+  issued TEXT,
+  keys TEXT DEFAULT 'Held',            -- Released / Held
+  oa TEXT DEFAULT 'Pending'            -- Registered / Pending
+);
+
+-- Seed handover data on first install (idempotent).
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pipeline_items) THEN
+    INSERT INTO pipeline_items (unit_no, buyer, stage, meta) VALUES
+      ('WPK-T1-0402','N. Khoury','payment_cleared','Cleared 04 Aug'),
+      ('WPK-T1-0405','M. Haddad','payment_cleared','Cleared 06 Aug'),
+      ('WPK-T1-0311','S. Rathore','snagging_scheduled','Inspection 28 Aug'),
+      ('WPK-T1-0208','G. Okonkwo','snagging_done','11 snags raised'),
+      ('WPK-T1-0104','W. Chen','de_snagging','4 snags open · ALEC'),
+      ('WPK-T1-0512','P. Nair','utilities','DEWA pending'),
+      ('WPK-T1-0607','O. Al Suwaidi','documents_ready','Title deed applied'),
+      ('WPK-T1-0703','E. Petrova','title_deed_issued','Deed 4417-2026'),
+      ('WPK-T1-0801','F. Al Hashimi','keys_handed','Keys 22 Aug'),
+      ('WPK-T1-0902','M. Lindqvist','oa_onboarded','Mollak registered');
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM snag_items) THEN
+    INSERT INTO snag_items (unit_no, loc, trade, description, sev, contractor, status, reinspect) VALUES
+      ('WPK-T1-0114','Master bedroom','Joinery','Wardrobe door misaligned, does not close flush','Major','ALEC · Joinery','Open','28 Aug'),
+      ('WPK-T1-0114','Guest bathroom','MEP','Low water pressure at basin mixer','Critical','ALEC · MEP','In progress','27 Aug'),
+      ('WPK-T1-0208','Living room','Finishes','Paint blemish on north wall, 300mm','Minor','ALEC · Finishes','Closed','—'),
+      ('WPK-T1-0208','Balcony','Waterproofing','Ponding at drain outlet after test','Critical','ALEC · Civil','Open','29 Aug'),
+      ('WPK-T1-0311','Kitchen','Appliances','Oven fan intermittent','Major','Siemens · warranty','In progress','30 Aug'),
+      ('WPK-T1-0104','Entrance','Smart home','Door sensor not pairing with panel','Major','Loxone','Open','02 Sep'),
+      ('WPK-T1-0104','Powder room','Finishes','Grout discolouration','Minor','ALEC · Finishes','Closed','—'),
+      ('WPK-T1-0512','Terrace','Glazing','Scratch to glass panel, 120mm','Minor','Alumco','Re-inspect','28 Aug');
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM deeds) THEN
+    INSERT INTO deeds (unit_no, buyer, oqood, dld, deed, issued, keys, oa) VALUES
+      ('WPK-T1-0402','Nadia Khoury','OQD-3312','AED 118,000','Issued','04 Aug 26','Released','Registered'),
+      ('WPK-T1-0405','Mariam Haddad','OQD-3318','AED 124,400','Issued','08 Aug 26','Released','Registered'),
+      ('WPK-T1-0607','Omar Al Suwaidi','OQD-3341','AED 96,800','Applied','—','Held','Pending'),
+      ('WPK-T1-0703','Elena Petrova','OQD-3350','AED 142,000','Issued','18 Aug 26','Released','Registered'),
+      ('WPK-T1-0801','Fatima Al Hashimi','OQD-3362','AED 88,400','Issued','22 Aug 26','Released','Pending'),
+      ('WPK-T1-0210','Vikram Shetty','OQD-3370','AED 104,200','Blocked','—','Held','Pending');
+  END IF;
+END $$;

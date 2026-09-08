@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AC } from "../../lib/format";
 import { exportOaData, exportHandoverCert } from "../../lib/pdf";
+import { fetchJSON } from "../../lib/api";
 
 type DeedRow = { unit: string; buyer: string; oqood: string; dld: string; deed: string; issued: string; keys: string; oa: string };
 
@@ -35,16 +36,41 @@ export default function DeedsScreen() {
   const [notice, setNotice] = useState("");
   const [certOpen, setCertOpen] = useState(false);
   const [certUnit, setCertUnit] = useState("WPK-T1-0402");
+  const [rows, setRows] = useState<DeedRow[]>(ROWS);
+  const [apiError, setApiError] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    fetchJSON<{ deeds: { unit_no: string; buyer: string; oqood: string; dld: string; deed: string; issued: string; keys: string; oa: string }[] }>("/api/handover")
+      .then((j) => {
+        if (!active || !Array.isArray(j.deeds)) return;
+        const mapped: DeedRow[] = j.deeds.map((d) => ({
+          unit: d.unit_no || "",
+          buyer: d.buyer || "",
+          oqood: d.oqood || "—",
+          dld: d.dld || "—",
+          deed: d.deed || "Applied",
+          issued: d.issued || "—",
+          keys: d.keys || "Held",
+          oa: d.oa || "Pending",
+        }));
+        if (mapped.length) setRows(mapped);
+      })
+      .catch((e) => {
+        if (active) setApiError(e?.message || "Failed to load deeds");
+      });
+    return () => { active = false; };
+  }, []);
 
   const banner = (m: string) => { setNotice(m); setTimeout(() => setNotice(""), 3000); };
 
   const doExport = () => {
-    exportOaData(ROWS);
-    banner("OA data exported \u00b7 6 rows \u00b7 CSV");
+    exportOaData(rows);
+    banner("OA data exported \u00b7 " + rows.length + " rows \u00b7 CSV");
   };
 
   const doIssue = () => {
-    const row = ROWS.find((r) => r.unit === certUnit) || ROWS[0];
+    const row = rows.find((r) => r.unit === certUnit) || rows[0];
     exportHandoverCert(row.unit, row.buyer, row.oqood, row.dld);
     setCertOpen(false);
     banner("Certificate issued \u00b7 " + row.unit + " \u00b7 " + row.buyer);
@@ -52,6 +78,11 @@ export default function DeedsScreen() {
 
   return (
     <div>
+      {apiError && (
+        <div style={{ background: "#FDECEC", color: "#E5484D", borderRadius: 12, padding: "11px 16px", fontSize: 12, fontWeight: 700, marginBottom: 16 }}>
+          Live data unavailable ({apiError}) — showing sample rows
+        </div>
+      )}
       {notice && <div style={{ background: "#E9F8F1", color: "#1F9D6B", borderRadius: 12, padding: "11px 16px", fontSize: 12, fontWeight: 700, marginBottom: 16 }}>{notice}</div>}
       <div style={{ display: "flex", alignItems: "flex-end", gap: 16, marginBottom: 18 }}>
         <div style={{ flex: 1 }}>
@@ -67,7 +98,7 @@ export default function DeedsScreen() {
           <div style={{ display: "grid", gridTemplateColumns: "110px 1.2fr 96px 104px 88px 92px 88px 96px", gap: 8, padding: "13px 20px", fontSize: 9.5, fontWeight: 700, letterSpacing: ".07em", color: "#9AA0AE", textTransform: "uppercase", background: "#FAFBFD", borderBottom: "1px solid #EDEEF3" }}>
             <span>Unit</span><span>Owner</span><span>Oqood</span><span style={{ textAlign: "right" }}>DLD 4%</span><span>Deed</span><span>Issued</span><span>Keys</span><span>Mollak</span>
           </div>
-          {ROWS.map((r) => (
+          {rows.map((r) => (
             <div key={r.unit} style={{ display: "grid", gridTemplateColumns: "110px 1.2fr 96px 104px 88px 92px 88px 96px", gap: 8, alignItems: "center", padding: "0 20px", height: 48, borderBottom: "1px solid #F6F7FA" }}>
               <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, fontWeight: 600 }}>{r.unit}</span>
               <span style={{ fontSize: 11.5, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.buyer}</span>
@@ -111,13 +142,13 @@ export default function DeedsScreen() {
               <div>
                 <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".05em", color: "#9AA0AE", textTransform: "uppercase", marginBottom: 6 }}>Unit</div>
                 <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                  {ROWS.map((r) => (
+                  {rows.map((r) => (
                     <span key={r.unit} onClick={() => setCertUnit(r.unit)} style={{ fontSize: 11.5, fontWeight: 700, padding: "7px 12px", borderRadius: 10, cursor: "pointer", fontFamily: "monospace", background: certUnit === r.unit ? AC : "#F1F2F6", color: certUnit === r.unit ? "#fff" : "#4A5060" }}>{r.unit}</span>
                   ))}
                 </div>
               </div>
               <div style={{ background: "#FAFBFD", borderRadius: 12, padding: "12px 14px", fontSize: 11.5, color: "#4A5060", fontWeight: 600, lineHeight: 1.6 }}>
-                {(ROWS.find((r) => r.unit === certUnit) || ROWS[0]).buyer}
+                {(rows.find((r) => r.unit === certUnit) || rows[0]).buyer}
               </div>
             </div>
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 22 }}>

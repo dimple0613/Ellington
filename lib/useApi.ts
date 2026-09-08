@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import type { ApiEnvelope } from "./api";
 
 export function useApi<T = any>(path: string, opts: { initial?: T } = {}) {
   const [data, setData] = useState<T | undefined>(opts.initial);
@@ -14,7 +15,13 @@ export function useApi<T = any>(path: string, opts: { initial?: T } = {}) {
         return;
       }
       if (!res.ok) throw new Error("Failed");
-      setData(await res.json());
+      const json = (await res.json().catch(() => null)) as ApiEnvelope<T> | T | null;
+      if (json && typeof json === "object" && "ok" in json) {
+        if (!(json as ApiEnvelope<T>).ok) throw new Error((json as { error: string | null }).error || "Failed");
+        setData((json as ApiEnvelope<T>).data ?? opts.initial);
+      } else {
+        setData(json as T);
+      }
       setError(null);
     } catch (e: any) {
       setError(e.message);

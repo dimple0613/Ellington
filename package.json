@@ -6,6 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "build:cf": "opennextjs-cloudflare build",
+    "pages:build": "opennextjs-cloudflare build && node scripts/build-pages.mjs",
+    "pages:deploy": "wrangler pages deploy .vercel/output/static --project-name ellington",
     "start": "next start",
     "lint": "tsc --noEmit",
     "db:setup": "tsx db/seed.ts",
@@ -18,16 +20,13 @@
   "dependencies": {
     "@neondatabase/serverless": "1.1.0",
     "@opennextjs/cloudflare": "1.20.6",
-    "date-fns": "4.4.0",
-    "formik": "2.4.9",
     "jspdf": "4.2.1",
     "jspdf-autotable": "5.0.8",
     "next": "15.5.25",
     "nodemailer": "^10.0.0",
     "pg": "8.23.0",
     "react": "19.2.8",
-    "react-dom": "19.2.8",
-    "yup": "1.7.1"
+    "react-dom": "19.2.8"
   },
   "devDependencies": {
     "@types/node": "22.20.1",

@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { withPerm } from "../../lib/permissions";
 import { query } from "../../lib/db";
+import { ok } from "../../lib/api";
 
 export default withPerm("Inventory", "REA", async function (req: NextApiRequest, res: NextApiResponse) {
   const project = (req.query.project as string) || "all";
@@ -44,5 +45,5 @@ export default withPerm("Inventory", "REA", async function (req: NextApiRequest,
     `SELECT code, name FROM projects ORDER BY code`
   );
 
-  res.status(200).json({ units: units.rows, summary: summary.rows, projects: projects.rows });
+  ok(res, { units: units.rows, summary: summary.rows, projects: projects.rows });
 });

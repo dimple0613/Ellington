@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import { AC, money } from "../../lib/format";
 import { ALL_UNITS } from "../../lib/data";
 import { exportBuyerStatement, exportDocument } from "../../lib/pdf";
+import { fetchJSON } from "../../lib/api";
 
 const BUYERS = ["Rajesh Menon","Aisha Al Marri","Hassan Al Rayes","Chen Liu","Daniel Whitfield","Elena Petrova","Marcus Lindqvist","Wei Chen","Priya Nair","Nadia Khoury","Sunil Rathore","Grace Okonkwo","Omar Al Suwaidi","Fatima Al Hashimi"];
 const pill = (s: string, ok: boolean) =>
@@ -17,6 +18,16 @@ const CONV = ["","52%","65%","60%","71%"];
 /* ── kanban columns ─────────────────────────────────────────────── */
 type Card = { name:string; flag:string; src:string; budget:string; chips:string[]; agent:string; age:string; live:boolean };
 type Col = { label:string; count:number; val:string; color:string; cards:Card[] };
+
+type ApiLead = {
+  name: string;
+  source?: string;
+  stage?: string;
+  budgetMin?: number;
+  budgetMax?: number;
+  agent?: string;
+  live?: boolean;
+};
 const LEADS_COLS: Col[] = [
   { label:"New",count:8,val:"AED 14.2M",color:"#8B7CF6",cards:[
     {name:"Hassan Al Rayes",flag:"UAE",src:"Property Finder",budget:"AED 2.0-2.6M",chips:["2BR","1204"],agent:"HA",age:"2 days",live:true},
@@ -164,8 +175,60 @@ export default function Sales({ scope }: { scope: string }) {
    LEADS
    ═══════════════════════════════════════════════════════════════════ */
 function Leads({ onNewBooking, onBookLead }: { onNewBooking: () => void; onBookLead: (card: Card) => void }) {
+  const [dbCols, setDbCols] = useState<Col[] | null>(null);
+  const [apiError, setApiError] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    fetchJSON<{ leads: ApiLead[] }>("/api/leads")
+      .then((j) => {
+        const leads = j.leads;
+        if (!active || !Array.isArray(leads)) return;
+        const order = ["new", "contacted", "qualified", "viewing", "negotiation", "eoi", "booked", "lost"];
+        const byStage: Record<string, Card[]> = { new: [], contacted: [], qualified: [], viewing: [], negotiation: [], eoi: [], booked: [], lost: [] };
+        (leads as ApiLead[]).forEach((l) => {
+          const st = (l.stage || "new").toLowerCase();
+          const key = byStage[st] ? st : "new";
+          const budgetMin = l.budgetMin || 0;
+          const budgetMax = l.budgetMax || 0;
+          const budget = budgetMin || budgetMax
+            ? "AED " + (budgetMin || budgetMax).toLocaleString("en-US")
+            : "AED -";
+          byStage[key].push({
+            name: l.name,
+            flag: "AE",
+            src: l.source || "Referral",
+            budget,
+            chips: [],
+            agent: (l.agent || "AD").split(/\s+/).map((w: string) => w[0]).slice(0, 2).join("").toUpperCase() || "AD",
+            age: "live",
+            live: l.live !== false,
+          });
+        });
+        const cols = order.map((st) => {
+          const cards = byStage[st];
+          const val = "AED " + (cards.reduce((a, c) => a + (parseFloat(String(c.budget).replace(/[^\d.]/g, "")) || 0), 0) / (cards.length || 1)).toLocaleString("en-US", { maximumFractionDigits: 0 }) + " avg";
+          const colors: Record<string, string> = { new: "#8B7CF6", contacted: "#8B7CF6", qualified: AC, viewing: AC, negotiation: "#E2A33C", eoi: "#34C08A", booked: "#34C08A", lost: "#8A94A6" };
+          const labels: Record<string, string> = { new: "New", contacted: "Contacted", qualified: "Qualified", viewing: "Viewing", negotiation: "Negotiation", eoi: "EOI signed", booked: "Booked", lost: "Lost" };
+          return { label: labels[st], count: cards.length, val, color: colors[st], cards };
+        });
+        setDbCols(cols);
+      })
+      .catch((e) => {
+        if (active) setApiError(e?.message || "Failed to load leads");
+      });
+    return () => { active = false; };
+  }, []);
+
+  const cols = dbCols && dbCols.some((c) => c.cards.length > 0) ? dbCols : LEADS_COLS;
+
   return (
     <div>
+      {apiError && (
+        <div style={{ background: "#FDECEC", color: "#E5484D", borderRadius: 12, padding: "11px 16px", fontSize: 12, fontWeight: 700, marginBottom: 16 }}>
+          Live data unavailable ({apiError}) — showing sample columns
+        </div>
+      )}
       <div style={{display:"flex",alignItems:"flex-end",gap:16,marginBottom:18}}>
         <div style={{flex:1}}>
           <div style={{fontSize:26,fontWeight:800,letterSpacing:"-.03em",lineHeight:1.15}}>Leads</div>
@@ -193,7 +256,7 @@ function Leads({ onNewBooking, onBookLead }: { onNewBooking: () => void; onBookL
 
       {/* kanban */}
       <div style={{display:"flex",gap:12,overflowX:"auto",paddingBottom:8,alignItems:"flex-start"}}>
-        {LEADS_COLS.map(col => (
+        {cols.map(col => (
           <div key={col.label} style={{width:240,flex:"none",background:"#EFF0F5",borderRadius:18,padding:12}}>
             <div style={{display:"flex",alignItems:"center",gap:8,padding:"2px 6px 12px"}}>
               <span style={{width:8,height:8,borderRadius:4,background:col.color}} />

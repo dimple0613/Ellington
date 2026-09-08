@@ -1,6 +1,49 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AC, compact, money } from "../../lib/format";
 import { ST, UnitStatus, UNITS, Unit } from "../../lib/data";
+import { fetchJSON } from "../../lib/api";
+
+type UnitRow = {
+  id?: string | number | null;
+  no?: string | number | null;
+  type?: string | null;
+  beds?: string | number | null;
+  area?: string | number | null;
+  view?: string | null;
+  status?: string | null;
+  price?: string | number | null;
+  buyer?: string | null;
+};
+
+function toUnitShape(row: UnitRow, idx: number): Unit {
+  const price = Number(row.price) || 0;
+  const area = Number(row.area) || 0;
+  const f = Math.floor(idx / 6) + 1;
+  const st = (row.status || "available").toLowerCase();
+  const statusMap: Record<string, UnitStatus> = {
+    available: "Available",
+    booked: "Booked",
+    reserved: "Reserved",
+    held: "Held",
+    blocked: "Blocked",
+    sold: "Sold",
+  };
+  return {
+    f,
+    pos: (idx % 6) + 1,
+    no: row.no ? String(row.no) : String(idx + 1).padStart(3, "0"),
+    id: "" + row.id,
+    typ: row.type || "2BR",
+    beds: Number(row.beds) || 2,
+    area,
+    view: row.view || "Park",
+    psf: area > 0 ? Math.round(price / area) : 0,
+    price,
+    status: statusMap[st] || "Available",
+    base: 1450,
+    buyer: row.buyer ? String(row.buyer) : "—",
+  };
+}
 
 type View = "stack" | "plate" | "list" | "cards";
 
@@ -55,26 +98,43 @@ export default function InventoryScreen({
   const [view, setView] = useState<View>("stack");
   const [filter, setFilter] = useState<string>("all");
   const [heat, setHeat] = useState(false);
+  const [dbUnits, setDbUnits] = useState<Unit[]>([]);
+  const [apiError, setApiError] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    fetchJSON<{ units: UnitRow[] }>("/api/inventory" + (scope && scope !== "ALL" ? "?project=" + encodeURIComponent(scope) : ""))
+      .then((j) => {
+        if (!active || !Array.isArray(j.units)) return;
+        setDbUnits(j.units.map(toUnitShape));
+      })
+      .catch((e) => {
+        if (active) setApiError(e?.message || "Failed to load units");
+      });
+    return () => { active = false; };
+  }, [scope]);
+
+  const source = dbUnits.length ? dbUnits : UNITS;
 
   const units = useMemo(() => {
-    const list = filter === "all" ? UNITS : UNITS.filter((u) => u.status === filter);
+    const list = filter === "all" ? source : source.filter((u) => u.status === filter);
     return list.slice(0, 120);
-  }, [filter]);
+  }, [filter, source]);
 
   const counts = useMemo(() => {
     const c: Record<string, { n: number; v: number }> = {};
-    UNITS.forEach((u) => {
+    source.forEach((u) => {
       c[u.status] = c[u.status] || { n: 0, v: 0 };
       c[u.status].n += 1;
       c[u.status].v += u.price;
     });
-    c.all = { n: UNITS.length, v: UNITS.reduce((a, u) => a + u.price, 0) };
+    c.all = { n: source.length, v: source.reduce((a, u) => a + u.price, 0) };
     return c;
-  }, []);
+  }, [source]);
 
   const floors = useMemo(() => {
     const map: Record<number, Unit[]> = {};
-    UNITS.forEach((u) => {
+    source.forEach((u) => {
       (map[u.f] = map[u.f] || []).push(u);
     });
     return Object.keys(map)
@@ -85,7 +145,7 @@ export default function InventoryScreen({
         const sold = cells.filter((c) => c.status === "Sold" || c.status === "Booked").length;
         return { f, cells, sold };
       });
-  }, []);
+  }, [source]);
 
   const scopeName = "Tower 1";
 
@@ -137,6 +197,11 @@ export default function InventoryScreen({
 
   return (
     <div>
+      {apiError && (
+        <div style={{ background: "#FDECEC", color: "#E5484D", borderRadius: 12, padding: "11px 16px", fontSize: 12, fontWeight: 700, marginBottom: 16 }}>
+          Live data unavailable ({apiError}) — showing sample units
+        </div>
+      )}
       <div style={{ display: "flex", alignItems: "flex-end", gap: 16, marginBottom: 18 }}>
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: "-.03em", lineHeight: 1.15 }}>Inventory</div>

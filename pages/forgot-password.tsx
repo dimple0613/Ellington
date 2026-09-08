@@ -108,11 +108,8 @@ export default function ForgotPassword() {
                   type="email"
                   autoComplete="email"
                   value={email}
-                  onChange={(e) => {
-                    setEmail(e.target.value);
-                    if (error) setError("");
-                  }}
-                  placeholder="admin@gmail.com"
+onChange={(e) => setEmail(e.target.value)}
+                  placeholder="admin@ellington.com"
                   aria-invalid={!!error}
                   style={{
                     width: "100%",

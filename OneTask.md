@@ -6,17 +6,30 @@
 ## Push (current branch + what to push)
 > Branch-per-task rule (see AGENTS.md): never push directly to main. Update this section per task.
 
-- Current branch: `kartik-gohil`
-- Pending code to push: none (all work merged to `main` and pushed; `main` now includes RBAC, favicon, build fix, `wrangler.toml` removal)
-- Last task: `feat(rbac)` — **Issue #19 (no server-side RBAC) fixed + verified** (pushed). Added `role_permissions` table (seeded `super_admin`/`ops`/`finance`/`viewer`, 6 modules × CRE/REA/UPD/DEL/APR/EXP) in `db/schema.sql`; `lib/permission-map.ts` (dependency-free matrix) + `lib/permissions.ts` (`getRolePerms` DB source-of-truth, `withPerm` API guard); `middleware.ts` maps route→module→REA and redirects lack-of-access → new `/403` page; `components/Shell.tsx` filters rail/nav by role; APIs `/api/dashboard` (Dashboard·REA) + `/api/inventory` (Inventory·REA) now use `withPerm` → 403. Verified: RBAC runtime **18/18** (super_admin all 200; viewer `/system`→307 `/403`; ops `/finance`+`/system`→`/403`; finance `/system`→`/403`; APIs 200/403 as seeded), API baseline **20/20**, browser smoke **8/8** (0 console/HTTP errors; rail shows all groups for super_admin). Build + lint green, middleware bundle back to 34.7 kB (pg out of edge).
-- Not yet merged to `main` (awaits operator approval)
-- Pending code to push: none (all current work already pushed to `kartik-gohil`)
-- Push command: `git add <files>; git commit -m "<msg>"; git push origin <branch>`
-- NOTE: `kartik-gohil/auth_issue_login` deleted (`gh auth refresh -s delete_repo` complete)
-- Not yet merged to `main` (awaits operator approval)
-- Pending code to push: none (all current work already pushed to `kartik-gohil`)
-- Push command: `git add <files>; git commit -m "<msg>"; git push origin <branch>`
-- NOTE: `kartik-gohil/auth_issue_login` deleted (`gh auth refresh -s delete_repo` complete)
+- Current branch: `main` (`chore/standardize-project`, `fix/admin-email-consistency`, `fix/aud-009-api-envelope`, `fix/aud-007-use-api`, `fix/aud-006-handover` fully merged)
+- **MERGED** — `fix/aud-006-handover` → `main` (`33e34b0` + `c86b7f8`: Handover module wired — pipeline_items/snag_items/deeds tables, `/api/handover`, three screens live; #22 progress comment). Pushed to `origin/main`.
+- **AUD-006 (Handover module) IN PROGRESS** on branch `fix/aud-006-handover` (`33e34b0` + docs `28827e1`): new `pipeline_items`/`snag_items`/`deeds`
+  tables (idempotent in `db/schema.sql`, seed-guarded, applied to dev DB via lib/db temp script — `db/seed.ts` fails against Neon maintenance DB),
+  `pages/api/handover.ts` (envelope, Handover:REA), Pipeline/Snagging/Deeds fetch live via `fetchJSON` with surfaced errors.
+  lint + build green; verified in operator Chrome at localhost:3100. Push section below; no-hidden-browser policy — verification in operator Chrome only.
+- **MERGED** — `chore/standardize-project` → `main` via **PR #35** (`1ed35b3`, includes `b427dda` ARCHITECTURE + `c2a0ba2` AUD safe fixes) plus doc commits `286c0a3` (AGENTS.md/TASKS.md/`.opencode/`) + `300a3da` (phase-8 status). **MERGED** — `fix/admin-email-consistency` → `main` (`2ea46bf`: default admin email now `admin@ellington.com` in seed fallback + login/forgot-password placeholders). **MERGED** — `fix/aud-009-api-envelope` → `main` (`421594a` + `8058952`: 13 routes on `{ ok, data, error }` envelope; #26 closed). **MERGED** — `fix/aud-007-use-api` → `main` (`2c3fe22` + `0a83826`: fetchJSON + surfaced errors; #24 closed). All pushed to `origin/main`. Nothing pending to push.
+- Full audit tracked on GitHub: issues #20–#34 (AUD-001…AUD-014, severity labels). Board (project) still blocked:
+  local `gh` token lacks `project` scope — operator must run `gh auth refresh -s project`, then board can be created
+  (GraphQL create-project.json already prepared).
+- Deferred (needs visual/contract change, no-visual-change rule): AUD-007 error states (#24), AUD-009 API envelope (#26).
+  AUD-005 (Jest/RTL/Playwright) requires operator approval to add dev deps. AUD-006 (role→permission-map rewiring) not started.
+  **AUD-009 (#26) CLOSED/FIXED** on branch `fix/aud-009-api-envelope` (`421594a`): all 13 routes now return `{ ok, data, error }`
+  via `lib/api.ts` (`ok`/`fail`/`methodNotAllowed`/`notFound` + `validEmail`/`missingFields`); consumers updated
+  (`useApi` unwraps `data`, `useSession` reads `data.user`, login reads `data.next`, Payments/Inventory/Sales/Users read `data.*`).
+  lint + build green; live-verified: dashboard/inventory/receipts/leads/admins/milestones/me all `ok:true` with `data`, bad login 401.
+  Merge pending operator approval.
+- **AUD-007 (#24) CLOSED/FIXED** on branch `fix/aud-007-use-api` (`2c3fe22` + docs): Payments/Inventory/Sales-Leads/Users now
+  GET through shared `fetchJSON` in `lib/api.ts` (unwraps envelope, redirects /login on 401) and render a red
+  "Live data unavailable — showing sample rows" banner on failure instead of silent `.catch(() => {})`.
+  lint + build green; live-verified all four screens show real data (258 units, leads, receipts, admin@ellington.com), no banner.
+  Merge pending operator approval.
+- Last task: merge `feat/cloudflare-hyperdrive` → `main` (Hyperdrive DB connection fix so production reads Neon, delivered 200 on `/api/auth/login` + `/api/auth/me` with admin `Dipin Ellington`/`admin@gmail.com`); pushed.
+- Admin on Neon: id 1 = `Dipin Ellington` / `admin@gmail.com` / `Admin123` (role super_admin) — verified login 200 on live worker.
 
 ## Today's Focus
 - [x] Task 1 — Scaffold project (complete md set)
@@ -49,6 +62,8 @@
 - [x] **Issue #18 (favicon) fixed + closed** (`4c35ac0`, pushed) — added `public/favicon.svg` + head link in `_app.tsx`; verified clean + regression. NOTE: local DB admin email had drifted again to `kartik1111gohil@gmail.com` (were `admin@gmail.com`); re-seeded to `admin@gmail.com`/`Admin123`. Root cause of drift not yet pinned — monitor.
 - [x] **Issue #19 (server-side RBAC) fixed + verified** — `role_permissions` table + seeds; `lib/permission-map.ts` (edge-safe) + `lib/permissions.ts`/`withPerm` (DB source-of-truth API 403s); `middleware.ts` route→module gate → `/403`; Shell nav filtered client-side. **18/18** RBAC + **20/20** API + **8/8** browser regression.
 - [x] **Deploy prep started for production** — removed erroneous `wrangler.toml` (its `pages_build_output_dir = ".vercel/output/static"` points to a non-existent dir and caused the broken-worker misdiagnosis); confirmed correct config is `wrangler.jsonc` (Worker `ellington-worker`, `main: .open-next/worker.js`, assets `binding: ASSETS`); `npm run build:cf` with Node 22 emits valid `.open-next/worker.js` + `.open-next/assets` (incl. favicon). **Merged `kartik-gohil` → `main`** (18 commits: RBAC, favicon, build fix, config cleanup) and pushed to `origin/main` (`d1e3999..322bcd0`). Production APIs still **all 500/404** and do NOT show new code (no favicon after 5 min) — the `main` push did **NOT** trigger a Cloudflare auto-deploy. **HARD BLOCKER: production deploy cannot be run from this machine** — no Cloudflare auth anywhere (`CLOUDFLARE_API_TOKEN`/`ACCOUNT_ID` absent, no `wrangler` config, no git hooks, no GH Actions, no Pages auto-build). Only the Cloudflare account owner (`dimple0613`) can deploy via `wrangler login`/API token + `wrangler deploy` (Worker `ellington-worker`), then re-seed Neon admin/roles.
+
+- [x] **Project standardization pass** (`chore/standardize-project`, merged via **PR #35** (`1ed35b3`) + docs commits) — Phase 1+2 audit → `docs/ARCHITECTURE.md`; 15 AUD issues filed (#20–#34) + severity labels; Phase 6+7 safe fixes applied (login error leak, JWT secret fail-closed, mail link leak, admins validation, permissions dedupe, dead deps, Stub dedupe, `any` mappers, cookie Secure/`__Host-`, `.env.example` generic, `.gitignore` backups). Phases 3/4/5/9 done (AGENTS.md, TASKS.md, `.opencode/` auditor, folder-structure doc). Phase 10 summary posted as issue **#36**. lint + prod build green. **Phase 8 round-trip browser retest PASSED** — login with `admin@ellington.com`/`Admin123` → `/dashboard` renders real data, `/api/auth/me` → 200 (super_admin). Local DB admin drifted (was `kartik1111gohil@gmail.com`) → **fixed to `admin@ellington.com`**; `db/seed.ts` fallback + login/forgot-password placeholders updated to match (`2ea46bf`). Board creation still blocked (needs `gh auth refresh -s project`).
 
 ## Backlog (pending)
 - [ ] Issue #1 — Task 3: CEO-Review baseline (feature spec from Ellington reference)

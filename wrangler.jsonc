@@ -7,5 +7,12 @@
   "assets": {
     "directory": ".open-next/assets",
     "binding": "ASSETS"
-  }
+  },
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      "id": "b9057aad7125418589f900050b753284",
+      "localConnectionString": "postgresql://postgres@localhost:5432/developer_inventory"
+    }
+  ]
 }

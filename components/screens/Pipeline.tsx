@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import { AC } from "../../lib/format";
+import { fetchJSON } from "../../lib/api";
 
 type PipeCard = { no: string; buyer: string; meta: string };
 type PipeCol = { label: string; count: number; color: string; cards: PipeCard[] };
@@ -34,6 +35,8 @@ const STAGE_DAYS = [
   { label: "Keys", days: 4 },
 ];
 
+const STAGE_SLUGS = ["payment_cleared", "snagging_scheduled", "snagging_done", "de_snagging", "utilities", "documents_ready", "title_deed_issued", "keys_handed", "oa_onboarded"];
+
 const FORECAST = [8, 12, 15, 11, 18, 14, 9, 6];
 const maxF = Math.max(...FORECAST);
 
@@ -54,6 +57,34 @@ export default function PipelineScreen() {
     PIPE.forEach((c, i) => { m[i] = c.count; });
     return m;
   });
+  const [apiError, setApiError] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    fetchJSON<{ pipeline: { unit_no: string; buyer: string; stage: string; meta: string }[] }>("/api/handover")
+      .then((j) => {
+        if (!active || !Array.isArray(j.pipeline)) return;
+        const byStage: Record<string, PipeCard[]> = {};
+        for (const p of j.pipeline) {
+          const slug = STAGE_SLUGS.includes(p.stage) ? p.stage : "payment_cleared";
+          (byStage[slug] = byStage[slug] || []).push({ no: p.unit_no || "", buyer: p.buyer || "", meta: p.meta || "" });
+        }
+        setCards((c) => {
+          const next = { ...c };
+          STAGE_SLUGS.forEach((slug, i) => { if (byStage[slug]) next[i] = byStage[slug]; });
+          return next;
+        });
+        setCounts((c) => {
+          const next = { ...c };
+          STAGE_SLUGS.forEach((slug, i) => { if (byStage[slug]) next[i] = byStage[slug].length; });
+          return next;
+        });
+      })
+      .catch((e) => {
+        if (active) setApiError(e?.message || "Failed to load pipeline");
+      });
+    return () => { active = false; };
+  }, []);
 
   const goSnag = () => router.push({ pathname: "/handover", query: { s: "snagging" } }, undefined, { shallow: true });
 
@@ -68,6 +99,11 @@ export default function PipelineScreen() {
 
   return (
     <div>
+      {apiError && (
+        <div style={{ background: "#FDECEC", color: "#E5484D", borderRadius: 12, padding: "11px 16px", fontSize: 12, fontWeight: 700, marginBottom: 16 }}>
+          Live data unavailable ({apiError}) — showing sample columns
+        </div>
+      )}
       {notice && <div style={{ background: "#E9F8F1", color: "#1F9D6B", borderRadius: 12, padding: "11px 16px", fontSize: 12, fontWeight: 700, marginBottom: 16 }}>{notice}</div>}
       <div style={{ display: "flex", alignItems: "flex-end", gap: 16, marginBottom: 18 }}>
         <div style={{ flex: 1 }}>
