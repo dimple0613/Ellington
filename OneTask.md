@@ -6,7 +6,14 @@
 ## Push (current branch + what to push)
 > Branch-per-task rule (see AGENTS.md): never push directly to main. Update this section per task.
 
-- Current branch: `fix/aud-006-finance` (`main` = `3f04e16`; pending-approval branches: `fix/aud-006-system`, `fix/aud-006-finance`).
+- Current branch: `main` (`ad22adf`; `fix/aud-006-system`, `fix/aud-006-finance`, `fix/aud-015-analytics` merged; `fix/aud-015-analytics` branch deleted local+remote).
+- **AUD-015 (#37) CLOSED/MERGED** — `fix/aud-015-analytics` (`ad22adf`): cashflow forecast + report exports live via `/api/finance-analytics` + `/api/report-export`; branch deleted.
+- **DEPLOYED TO CLOUDFLARE** — `npx wrangler deploy` (`wrangler.jsonc`, account `49dcdcff…`): worker `ellington-worker` live at
+  **https://ellington-worker.dimple-49d.workers.dev** (VERSION 989ea1f1). Verified from this machine: login 200 (+session cookie),
+  `/api/auth/me` → `Dipin Ellington` super_admin, `/api/dashboard` ok with `projects`, home page 200. All prod secrets present
+  (ADMIN_EMAIL, ADMIN_PASSWORD, CRON_SECRET, DATABASE_URL, DIGEST_TO, JWT_SECRET, SMTP_*). Build path: `npm run build:cf`
+  (OpenNext → `.open-next/worker.js`) then `wrangler deploy`.
+- Prior merged AUD modules (branches still present locally+remote: `fix/aud-006-system`, `fix/aud-006-finance` — safe to delete on request): all on `main`.
 - **PENDING APPROVAL — `fix/aud-006-system`** → `main` (`7a2b0b4` + docs `2af5c3b..95b807c`: System module wired — `audit_log`/`app_settings` tables, `/api/system` GET+PUT, AuditLog/Settings live via fetchJSON; lint+build green, GET live-verified audit=12/settings keys; #22 comment). **PENDING APPROVAL — `fix/aud-006-finance`** → `main` (`916a1f5` + docs `3e1cf05..ab66bb8`: finance ledgers wired — `collections`/`drawdowns`/`invoices` tables + `escrow_ledger.received_at`, `/api/finance` envelope, Collections/Escrow/Invoices live with error banners; lint+build green, GET live-verified 8/6/4/6 rows; Cashflow/Reports stay static analytics; #22 comment). Both pushed. Awaiting operator Chrome review (localhost:3100) + merge approval.
 - **AUD-006 scope essentially complete** — Handover (merged), System (pending), Finance ledgers (pending). Mobile.tsx is an intentional static iPhone design prototype (no data fetches, no swallowed errors) — excluded. Remaining to wire before closing #22: none blocking.
 - **MERGED** — `fix/aud-006-handover` → `main` (`33e34b0` + `c86b7f8`: Handover module wired — pipeline_items/snag_items/deeds tables, `/api/handover`, three screens live; #22 progress comment). Pushed to `origin/main`.

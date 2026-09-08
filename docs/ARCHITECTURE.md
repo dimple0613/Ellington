@@ -159,10 +159,12 @@ Only parameterized SQL is used. Seeds/scripts under `db/` (`schema.sql`, `seed.t
   `fix/aud-006-finance`): new `collections`, `drawdowns`, `invoices` tables (+ `received_at`
   on `escrow_ledger`) seeded idempotently, new `pages/api/finance.ts` (envelope returning
   `{collections, escrow:{queue,drawdowns}, invoices}` behind `Finance:REA`), Collections /
-  Escrow / Invoices screens fetch live rows via `fetchJSON` with error banners. Cashflow and
-  Reports remain static analytics (`FC`/ladder dashboards) — noted as ANALYTIC MOCK in
-  DATA.md; remaining static screens to
-  wire: Exec mobile — tracked in #22.
+  Escrow / Invoices screens fetch live rows via `fetchJSON` with error banners. **AUD-015
+  (`ad22adf`)**: cashflow forecast (`/api/finance-analytics` — bars, balance ladder, trigger
+  split, monthly table from live payment_milestones/escrow_ledger/drawdowns) and real CSV
+  report exports (`/api/report-export?report=`, whitelisted names) wired; Cashflow + Reports
+  screens now render/export live data with error banners. Exec mobile remains an intentional
+  static design prototype (no fetches).
 - **AUD-007 — Fetch error handling swallowed.** Screens use local `let active` blocks
   with `.catch(() => {})`, silent fallback to mock data; shared `lib/useApi.ts` exists
   but is unused. Fix: adopt `useApi` (or equivalent) with `loading/error/data` states
