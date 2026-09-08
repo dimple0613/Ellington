@@ -6,7 +6,9 @@
 ## Push (current branch + what to push)
 > Branch-per-task rule (see AGENTS.md): never push directly to main. Update this section per task.
 
-- Current branch: `main` (`chore/standardize-project`, `fix/admin-email-consistency`, `fix/aud-009-api-envelope`, `fix/aud-007-use-api`, `fix/aud-006-handover` fully merged)
+- Current branch: `fix/aud-006-finance` (`main` = `3f04e16`; pending-approval branches: `fix/aud-006-system`, `fix/aud-006-finance`).
+- **PENDING APPROVAL — `fix/aud-006-system`** → `main` (`7a2b0b4` + docs `2af5c3b..95b807c`: System module wired — `audit_log`/`app_settings` tables, `/api/system` GET+PUT, AuditLog/Settings live via fetchJSON; lint+build green, GET live-verified audit=12/settings keys; #22 comment). **PENDING APPROVAL — `fix/aud-006-finance`** → `main` (`916a1f5` + docs `3e1cf05..ab66bb8`: finance ledgers wired — `collections`/`drawdowns`/`invoices` tables + `escrow_ledger.received_at`, `/api/finance` envelope, Collections/Escrow/Invoices live with error banners; lint+build green, GET live-verified 8/6/4/6 rows; Cashflow/Reports stay static analytics; #22 comment). Both pushed. Awaiting operator Chrome review (localhost:3100) + merge approval.
+- **AUD-006 scope essentially complete** — Handover (merged), System (pending), Finance ledgers (pending). Mobile.tsx is an intentional static iPhone design prototype (no data fetches, no swallowed errors) — excluded. Remaining to wire before closing #22: none blocking.
 - **MERGED** — `fix/aud-006-handover` → `main` (`33e34b0` + `c86b7f8`: Handover module wired — pipeline_items/snag_items/deeds tables, `/api/handover`, three screens live; #22 progress comment). Pushed to `origin/main`.
 - **AUD-006 (Handover module) IN PROGRESS** on branch `fix/aud-006-handover` (`33e34b0` + docs `28827e1`): new `pipeline_items`/`snag_items`/`deeds`
   tables (idempotent in `db/schema.sql`, seed-guarded, applied to dev DB via lib/db temp script — `db/seed.ts` fails against Neon maintenance DB),
