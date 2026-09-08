@@ -91,6 +91,7 @@ export default function Profile() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showNew, setShowNew] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
   const [serverError, setServerError] = useState("");
@@ -336,18 +337,75 @@ export default function Profile() {
                     </div>
                   )}
                 </div>
-                <Field
-                  id="confirm_password"
-                  label="Confirm new password"
-                  type="password"
-                  value={confirmPassword}
-                  autoComplete="new-password"
-                  onChange={(v) => {
-                    setConfirmPassword(v);
-                    clearField("confirmPassword");
-                  }}
-                  error={errors.confirmPassword}
-                />
+                <div style={{ position: "relative" }}>
+                  <label htmlFor="confirm_password" style={{ display: "block", fontSize: 11.5, fontWeight: 700, color: "#6B7180", marginBottom: 7 }}>Confirm new password</label>
+                  <input
+                    id="confirm_password"
+                    name="confirm_password"
+                    type={showConfirm ? "text" : "password"}
+                    value={confirmPassword}
+                    autoComplete="new-password"
+                    onChange={(e) => {
+                      setConfirmPassword(e.target.value);
+                      clearField("confirmPassword");
+                    }}
+                    placeholder=""
+                    aria-invalid={!!errors.confirmPassword}
+                    aria-describedby={errors.confirmPassword ? "confirm_password-error" : undefined}
+                    style={{
+                      width: "100%",
+                      height: 42,
+                      padding: "0 42px 0 13px",
+                      border: `1px solid ${errors.confirmPassword ? "#E5484D" : "#E4E6EE"}`,
+                      borderRadius: 11,
+                      fontSize: 13,
+                      fontFamily: "inherit",
+                      background: "#fff",
+                      color: "#14161F",
+                      outline: "none",
+                      transition: "border-color 150ms ease, box-shadow 150ms ease",
+                    }}
+                    onFocus={(e) => {
+                      e.currentTarget.style.borderColor = ACCENT;
+                      e.currentTarget.style.boxShadow = `0 0 0 3px rgba(79,70,245,.10)`;
+                    }}
+                    onBlur={(e) => {
+                      e.currentTarget.style.borderColor = errors.confirmPassword ? "#E5484D" : "#E4E6EE";
+                      e.currentTarget.style.boxShadow = "none";
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirm((s) => !s)}
+                    title={showConfirm ? "Hide password" : "Show password"}
+                    aria-label={showConfirm ? "Hide password" : "Show password"}
+                    style={{
+                      position: "absolute",
+                      right: 6,
+                      top: 29,
+                      width: 34,
+                      height: 34,
+                      border: 0,
+                      background: "transparent",
+                      borderRadius: 10,
+                      display: "grid",
+                      placeItems: "center",
+                      cursor: "pointer",
+                      color: "#9AA0AE",
+                    }}
+                  >
+                    {showConfirm ? (
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M3 3l18 18M10.5 10.7a2.5 2.5 0 0 0 3.5 3.5M9.9 5.2A9.4 9.4 0 0 1 12 5c5 0 8.5 4 9.5 6.5-.7 1.8-2.7 4.8-6 6.1M6.3 7.5C3.7 9 1.8 11.6 1.5 12c1 2.5 4.5 6.5 9.5 6.5a9.3 9.3 0 0 0 4.2-1" /></svg>
+                    ) : (
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12Z" /><circle cx="12" cy="12" r="2.6" /></svg>
+                    )}
+                  </button>
+                  {errors.confirmPassword && (
+                    <div id="confirm_password-error" role="alert" style={{ fontSize: 11.5, color: "#E5484D", fontWeight: 600, marginTop: 6 }}>
+                      {errors.confirmPassword}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
