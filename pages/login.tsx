@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import Link from "next/link";
+import AuthBrandPanel from "../components/AuthBrandPanel";
+import AuthToast from "../components/AuthToast";
 
 const ACCENT = "#4F46F5";
 
@@ -148,8 +150,6 @@ export default function Login() {
     }
   }
 
-  const brandCols = ["#4F46F5", "#1F9D6B", "#E2A33C", "#0B8A8A"];
-
   return (
     <div
       dir="ltr"
@@ -161,61 +161,11 @@ export default function Login() {
         fontFamily: "'Plus Jakarta Sans',system-ui,-apple-system,sans-serif",
       }}
     >
-      <div
-        style={{
-          display: "none",
-          flex: 1.1,
-          background: "linear-gradient(160deg,#14161F 0%,#252a3d 58%,#2b2570 100%)",
-          color: "#fff",
-          padding: "54px 60px",
-          position: "relative",
-          overflow: "hidden",
-        }}
-        className="auth-brand-panel"
-      >
-        <div style={{ position: "absolute", inset: 0, opacity: 0.16, backgroundImage: "radial-gradient(circle at 20% 20%, rgba(255,255,255,.5), transparent 24%), radial-gradient(circle at 80% 30%, rgba(255,255,255,.35), transparent 22%), radial-gradient(circle at 55% 85%, rgba(79,70,245,.8), transparent 30%)" }} />
-        <div style={{ position: "relative", zIndex: 1, display: "flex", flexDirection: "column", height: "100%" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <div style={{ width: 42, height: 42, borderRadius: 14, background: "#fff", color: ACCENT, display: "grid", placeItems: "center", fontWeight: 800, fontSize: 15, letterSpacing: "-.02em" }}>EH</div>
-            <div style={{ fontSize: 20, fontWeight: 800, letterSpacing: "-.02em" }}>Ellington</div>
-          </div>
-          <div style={{ marginTop: "auto", maxWidth: 430 }}>
-            <div style={{ fontSize: 40, lineHeight: 1.08, fontWeight: 800, letterSpacing: "-.04em" }}>Own every unit,<br />chasing every dirham.</div>
-            <div style={{ fontSize: 14, color: "rgba(255,255,255,.72)", fontWeight: 500, marginTop: 18, lineHeight: 1.6 }}>
-              The developer sales console for ORN 21281 — portfolio position, sales, finance, handover and compliance in one secure workspace.
-            </div>
-            <div style={{ display: "flex", gap: 10, marginTop: 28, flexWrap: "wrap" }}>
-              {["Sales console", "Escrow reconciliation", "Handover pipeline"].map((t) => (
-                <span key={t} style={{ fontSize: 11.5, fontWeight: 700, borderRadius: 999, padding: "7px 13px", background: "rgba(255,255,255,.12)", border: "1px solid rgba(255,255,255,.16)", color: "#fff" }}>{t}</span>
-              ))}
-            </div>
-          </div>
-          <div style={{ display: "flex", gap: 40, marginTop: 48, paddingTop: 26, borderTop: "1px solid rgba(255,255,255,.14)" }}>
-            {[
-              { v: "AED 1.94B", l: "Portfolio GDV" },
-              { v: "850", l: "Units tracked" },
-              { v: "89 / 89", l: "Screens verified" },
-            ].map((s) => (
-              <div key={s.l}>
-                <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: "-.03em", color: brandCols[0] }}>
-                  <span style={{ color: "#fff" }}>{s.v}</span>
-                </div>
-                <div style={{ fontSize: 11, color: "rgba(255,255,255,.6)", fontWeight: 600, marginTop: 2 }}>{s.l}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
+      <AuthBrandPanel />
 
       <div style={{ flex: 1, display: "grid", placeItems: "center", padding: "28px 22px", minWidth: 0 }}>
         <div style={{ width: "100%", maxWidth: 392 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 30 }}>
-            <div style={{ width: 38, height: 38, borderRadius: 13, background: "#14161F", color: "#fff", display: "grid", placeItems: "center", fontWeight: 800, fontSize: 13, letterSpacing: "-.02em" }}>EH</div>
-            <div style={{ fontSize: 16, fontWeight: 800, letterSpacing: "-.02em" }}>Ellington</div>
-          </div>
-
-          <div style={{ background: "#fff", border: "1px solid #EDEEF3", borderRadius: 22, padding: "30px 30px 26px", boxShadow: "0 1px 3px rgba(20,22,31,.05)" }}>
-            <h1 style={{ fontSize: 22, fontWeight: 800, letterSpacing: "-.03em", margin: "0 0 5px", color: "#14161F" }}>Welcome back</h1>
+          <h1 style={{ fontSize: 22, fontWeight: 800, letterSpacing: "-.03em", margin: "0 0 5px", color: "#14161F" }}>Welcome back</h1>
             <p style={{ fontSize: 12.5, color: "#6B7180", fontWeight: 500, margin: "0 0 24px" }}>
               Sign in to your developer sales console.
             </p>
@@ -362,13 +312,9 @@ export default function Login() {
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#1F9D6B" strokeWidth="2"><rect x="4" y="11" width="16" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg>
               Encrypted session · HTTP-only cookie · Server-side auth
             </div>
-          </div>
-
-          <div style={{ textAlign: "center", marginTop: 18, fontSize: 12, color: "#9AA0AE", fontWeight: 500 }}>
-            Need help signing in? <Link href="/forgot-password" style={{ color: ACCENT, fontWeight: 700, textDecoration: "none" }}>Reset your password</Link>
-          </div>
         </div>
       </div>
+      <AuthToast />
     </div>
   );
 }
