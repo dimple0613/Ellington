@@ -6,17 +6,10 @@
 ## Push (current branch + what to push)
 > Branch-per-task rule (see AGENTS.md): never push directly to main. Update this section per task.
 
-- Current branch: `kartik-gohil`
-- Pending code to push: none (all work merged to `main` and pushed; `main` now includes RBAC, favicon, build fix, `wrangler.toml` removal)
-- Last task: `feat(rbac)` — **Issue #19 (no server-side RBAC) fixed + verified** (pushed). Added `role_permissions` table (seeded `super_admin`/`ops`/`finance`/`viewer`, 6 modules × CRE/REA/UPD/DEL/APR/EXP) in `db/schema.sql`; `lib/permission-map.ts` (dependency-free matrix) + `lib/permissions.ts` (`getRolePerms` DB source-of-truth, `withPerm` API guard); `middleware.ts` maps route→module→REA and redirects lack-of-access → new `/403` page; `components/Shell.tsx` filters rail/nav by role; APIs `/api/dashboard` (Dashboard·REA) + `/api/inventory` (Inventory·REA) now use `withPerm` → 403. Verified: RBAC runtime **18/18** (super_admin all 200; viewer `/system`→307 `/403`; ops `/finance`+`/system`→`/403`; finance `/system`→`/403`; APIs 200/403 as seeded), API baseline **20/20**, browser smoke **8/8** (0 console/HTTP errors; rail shows all groups for super_admin). Build + lint green, middleware bundle back to 34.7 kB (pg out of edge).
-- Not yet merged to `main` (awaits operator approval)
-- Pending code to push: none (all current work already pushed to `kartik-gohil`)
-- Push command: `git add <files>; git commit -m "<msg>"; git push origin <branch>`
-- NOTE: `kartik-gohil/auth_issue_login` deleted (`gh auth refresh -s delete_repo` complete)
-- Not yet merged to `main` (awaits operator approval)
-- Pending code to push: none (all current work already pushed to `kartik-gohil`)
-- Push command: `git add <files>; git commit -m "<msg>"; git push origin <branch>`
-- NOTE: `kartik-gohil/auth_issue_login` deleted (`gh auth refresh -s delete_repo` complete)
+- Current branch: `feat/wire-db-screens` (created off `main` after Cloudflare deploy work merged)
+- Pending code to push: DB-implementation work (wire screens from static `lib/data` to the 10 Neon tables via API routes)
+- Last task: merge `feat/cloudflare-hyperdrive` → `main` (Hyperdrive DB connection fix so production reads Neon, delivered 200 on `/api/auth/login` + `/api/auth/me` with admin `Dipin Ellington`/`admin@gmail.com`); pushed.
+- Admin on Neon: id 1 = `Dipin Ellington` / `admin@gmail.com` / `Admin123` (role super_admin) — verified login 200 on live worker.
 
 ## Today's Focus
 - [x] Task 1 — Scaffold project (complete md set)
