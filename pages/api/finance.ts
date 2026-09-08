@@ -21,7 +21,7 @@ export default withPerm("Finance", "REA", async function (req: NextApiRequest, r
          FROM drawdowns ORDER BY id DESC`
       ),
       query<any>(
-        `SELECT no, buyer, unit_no, milestone, due, amount, paid
+        `SELECT id, no, buyer, unit_no, milestone, due, amount, paid, issued_at, voided_at, void_reason
          FROM invoices ORDER BY due DESC`
       ),
     ]);

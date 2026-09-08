@@ -6,7 +6,7 @@
 ## Push (current branch + what to push)
 > Branch-per-task rule (see AGENTS.md): never push directly to main. Update this section per task.
 
-- Current branch: `fix/plinth-parity` (PLINTH Parity Program). Pushed: `81d9b7b` (T1), `8e405db` (T2), `a518b68` (T3), `20d764d` (T4), `91adcb5` (T5), `3fbec64` (T6), `b0ed1df` (T7). In progress: T8 (`/api/finance` PUT — reconcile match flips `escrow_ledger.matched`, drawdown submit inserts `drawdowns` with auto `DDR-NNNN` ref + RERA validation; queue/drawdowns wired to PUT; live-verified reconcile 6→5, drawdown 201 DDR-0005, bad id 404, bad action 400; test artifacts reverted, test admin removed; lint green). Note: local Postgres died mid-T6 (0xC0000142 at backend spawn) and was restarted by the operator; keep an eye on it — if it dies again: retry start; if irretrievable, commit on lint-only and mark re-verify pending. Operator out of office — running T7→T18 standalone, no merges to main. Merge to main only after operator approval.
+- Current branch: `fix/plinth-parity` (PLINTH Parity Program). Pushed: `81d9b7b` (T1), `8e405db` (T2), `a518b68` (T3), `20d764d` (T4), `91adcb5` (T5), `3fbec64` (T6), `b0ed1df` (T7), `234e74c` (T8). In progress: T9 (new `/api/invoices` POST/PUT — issue sets `issued_at`, void sets `voided_at`+`void_reason` w/ reason-required + paid-block, bulk-issue stamps all drafts; `invoices` gained `issued_at`/`voided_at`/`void_reason` columns; Invoices wired: status Draft/Sent/Overdue/Paid/Void, per-row Issue/Void + reason modal, Bulk issue button; live-verified issue 200, void 200, bulk 200→2, void-paid 400, void-no-reason 400, bogus 400; artifacts reverted, temp admin removed; lint green). Note: git push to origin hangs on GCM credential prompt — workaround `git push "https://oauth2:<gh-token>@github.com/..."`; local Postgres died mid-T6 (0xC0000142) and was restarted by the operator — if it dies again retry start, else commit on lint-only + re-verify pending. Operator out of office — running T7→T18 standalone, no merges to main. Merge to main only after operator approval.
 - Closed on GitHub (no merge): issue #51 (dead `lib/useApi.ts` removed) on `fix/aud-051-dead-use-api` (`f8cbbd0` + `7a0bd8b`); issue #52 (any-type cleanups) on `fix/aud-052-any-types` (`164047b`).
 - Current branch: `main` (`ad22adf`; `fix/aud-006-system`, `fix/aud-006-finance`, `fix/aud-015-analytics` merged; `fix/aud-015-analytics` branch deleted local+remote).
 - **AUD-015 (#37) CLOSED/MERGED** — `fix/aud-015-analytics` (`ad22adf`): cashflow forecast + report exports live via `/api/finance-analytics` + `/api/report-export`; branch deleted.
@@ -57,7 +57,7 @@
 > - [x] **T6** `Buyers` directory + Buyer 360 → new `/api/buyers` (GET) + wire Sales buyer subscreens
 > - [x] **T7** `Leads` → PUT stage to `/api/leads` (drag-persist) + agent leaderboard (live aggregate by agent)
 > - [x] **T8** `Escrow` → add `/api/finance` PUT (reconcile match / drawdown submit) + wire actions
-> - [ ] **T9** `Invoices` → add `/api/invoices` POST/PUT (issue / void / bulk-issue) + wire actions
+> - [x] **T9** `Invoices` → add `/api/invoices` POST/PUT (issue / void / bulk-issue) + wire actions
 > - [ ] **T10** `Collections` → dunning action PUT (remind/log/promise) + live default calculator (construction %)
 > - [ ] **T11** `Payments` → bank-statement import (CSV) + PDC register live from receipts
 > - [ ] **T12** `Handover` → payment-clear hard block from collections + readiness dashboard computed

@@ -3,17 +3,17 @@ import { AC } from "../../lib/format";
 import { exportInvoicesLedger } from "../../lib/pdf";
 import { fetchJSON } from "../../lib/api";
 
-type InvRow = { no: string; buyer: string; unit: string; inst: string; issued: string; due: string; amount: string; paid: string; status: string; viewed: string };
+type InvRow = { id: number; no: string; buyer: string; unit: string; inst: string; issued: string; due: string; amount: string; paid: string; status: string; viewed: string };
 
 const INV_ROWS: InvRow[] = [
-  { no: "INV-H21-003318", buyer: "Rajesh Menon", unit: "H21-T1-1204", inst: "04  \u00b7  Structure 40%", issued: "31 Aug 26", due: "14 Sep 26", amount: "465,500", paid: "0", status: "Sent", viewed: "Viewed" },
-  { no: "INV-H21-003317", buyer: "Aisha Al Marri", unit: "H21-T1-2801", inst: "03  \u00b7  Excavation 20%", issued: "31 Aug 26", due: "14 Sep 26", amount: "512,000", paid: "512,000", status: "Paid", viewed: "Viewed" },
-  { no: "INV-H21-003316", buyer: "Sunil Rathore", unit: "H21-T1-2705", inst: "04  \u00b7  Structure 40%", issued: "02 Jun 26", due: "16 Jun 26", amount: "824,000", paid: "0", status: "Overdue", viewed: "Viewed" },
-  { no: "INV-H21-003315", buyer: "Elena Petrova", unit: "H21-T1-4102", inst: "03  \u00b7  Excavation 20%", issued: "18 May 26", due: "01 Jun 26", amount: "1,204,000", paid: "0", status: "Overdue", viewed: "Not viewed" },
-  { no: "INV-H21-003314", buyer: "Daniel Whitfield", unit: "H21-T1-1905", inst: "04  \u00b7  Structure 40%", issued: "31 Aug 26", due: "14 Sep 26", amount: "842,500", paid: "842,500", status: "Paid", viewed: "Viewed" },
-  { no: "INV-H21-003313", buyer: "Grace Okonkwo", unit: "H21-T1-1103", inst: "02  \u00b7  SPA execution", issued: "12 Aug 26", due: "26 Aug 26", amount: "186,250", paid: "186,250", status: "Paid", viewed: "Viewed" },
-  { no: "INV-H21-003312", buyer: "Wei Chen", unit: "H21-T1-1602", inst: "04  \u00b7  Structure 40%", issued: "24 May 26", due: "07 Jun 26", amount: "722,000", paid: "268,000", status: "Part paid", viewed: "Viewed" },
-  { no: "INV-H21-003311", buyer: "Priya Nair", unit: "H21-T1-0904", inst: "03  \u00b7  Excavation 20%", issued: "31 Aug 26", due: "14 Sep 26", amount: "234,500", paid: "0", status: "Sent", viewed: "Not viewed" },
+  { id: 1, no: "INV-H21-003318", buyer: "Rajesh Menon", unit: "H21-T1-1204", inst: "04  \u00b7  Structure 40%", issued: "31 Aug 26", due: "14 Sep 26", amount: "465,500", paid: "0", status: "Sent", viewed: "Viewed" },
+  { id: 2, no: "INV-H21-003317", buyer: "Aisha Al Marri", unit: "H21-T1-2801", inst: "03  \u00b7  Excavation 20%", issued: "31 Aug 26", due: "14 Sep 26", amount: "512,000", paid: "512,000", status: "Paid", viewed: "Viewed" },
+  { id: 3, no: "INV-H21-003316", buyer: "Sunil Rathore", unit: "H21-T1-2705", inst: "04  \u00b7  Structure 40%", issued: "02 Jun 26", due: "16 Jun 26", amount: "824,000", paid: "0", status: "Overdue", viewed: "Viewed" },
+  { id: 4, no: "INV-H21-003315", buyer: "Elena Petrova", unit: "H21-T1-4102", inst: "03  \u00b7  Excavation 20%", issued: "18 May 26", due: "01 Jun 26", amount: "1,204,000", paid: "0", status: "Overdue", viewed: "Not viewed" },
+  { id: 5, no: "INV-H21-003314", buyer: "Daniel Whitfield", unit: "H21-T1-1905", inst: "04  \u00b7  Structure 40%", issued: "31 Aug 26", due: "14 Sep 26", amount: "842,500", paid: "842,500", status: "Paid", viewed: "Viewed" },
+  { id: 6, no: "INV-H21-003313", buyer: "Grace Okonkwo", unit: "H21-T1-1103", inst: "02  \u00b7  SPA execution", issued: "12 Aug 26", due: "26 Aug 26", amount: "186,250", paid: "186,250", status: "Paid", viewed: "Viewed" },
+  { id: 7, no: "INV-H21-003312", buyer: "Wei Chen", unit: "H21-T1-1602", inst: "04  \u00b7  Structure 40%", issued: "24 May 26", due: "07 Jun 26", amount: "722,000", paid: "268,000", status: "Part paid", viewed: "Viewed" },
+  { id: 8, no: "INV-H21-003311", buyer: "Priya Nair", unit: "H21-T1-0904", inst: "03  \u00b7  Excavation 20%", issued: "31 Aug 26", due: "14 Sep 26", amount: "234,500", paid: "0", status: "Sent", viewed: "Not viewed" },
 ];
 
 const INV_KPIS: [string, string, string, boolean?][] = [
@@ -38,36 +38,12 @@ const pillCol = (s: string) => s === "Paid" ? "#1F9D6B" : s === "Overdue" ? "#E5
 export default function InvoicesScreen() {
   const [notice, setNotice] = useState("");
   const [apiError, setApiError] = useState("");
-  const [rows, setRows] = useState<InvRow[]>(INV_ROWS);
+  const [rows, setRows] = useState<InvRow[]>([]);
+  const [voidTarget, setVoidTarget] = useState<{ id: number; no: string } | null>(null);
+  const [voidReason, setVoidReason] = useState("");
+  const [voidErr, setVoidErr] = useState("");
+  const [voidBusy, setVoidBusy] = useState(false);
   const show = (msg: string) => { setNotice(msg); setTimeout(() => setNotice(""), 3000); };
-
-  useEffect(() => {
-    let active = true;
-    fetchJSON<{ invoices: any[] }>("/api/finance")
-      .then((j) => {
-        if (!active || !j?.invoices?.length) return;
-        setRows(j.invoices.map((r) => {
-          const due = new Date(r.due);
-          const issued = new Date(due.getTime() - 14 * 86400000);
-          const paidAmt = Number(r.paid ? r.amount : 0);
-          const status = r.paid ? "Paid" : due.getTime() < Date.now() ? "Overdue" : "Sent";
-          return {
-            no: "INV-H21-00" + String(r.no).replace("INV-", "").padStart(4, "0"),
-            buyer: r.buyer,
-            unit: r.unit_no,
-            inst: "Milestone · " + r.milestone,
-            issued: issued.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "2-digit" }),
-            due: due.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "2-digit" }),
-            amount: Number(r.amount).toLocaleString("en-US"),
-            paid: paidAmt ? Number(r.amount).toLocaleString("en-US") : "0",
-            status,
-            viewed: "Viewed",
-          };
-        }));
-      })
-      .catch((e) => { if (active) setApiError(e?.message || "Failed to load invoices"); });
-    return () => { active = false; };
-  }, []);
 
   const generateStatement = () => {
     exportInvoicesLedger(
@@ -77,7 +53,72 @@ export default function InvoicesScreen() {
     show("Invoice ledger PDF generated");
   };
 
-  const bulkIssue = () => { show("Bulk issue queued \u00b7 148 invoices will be sent for the Sep window"); };
+  const mapRows = (list: any[]): InvRow[] =>
+    list.map((r) => {
+      const due = new Date(r.due);
+      const issuedDate = r.issued_at ? new Date(r.issued_at) : new Date(due.getTime() - 14 * 86400000);
+      const paidAmt = Number(r.paid ? r.amount : 0);
+      let status: string;
+      if (r.voided_at) status = "Void";
+      else if (!r.issued_at) status = "Draft";
+      else if (paidAmt) status = "Paid";
+      else if (due.getTime() < Date.now()) status = "Overdue";
+      else status = "Sent";
+      return {
+        id: Number(r.id),
+        no: "INV-H21-00" + String(r.no).replace("INV-", "").padStart(4, "0"),
+        buyer: r.buyer,
+        unit: r.unit_no,
+        inst: "Milestone \u00b7 " + r.milestone,
+        issued: issuedDate.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "2-digit" }),
+        due: due.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "2-digit" }),
+        amount: Number(r.amount).toLocaleString("en-US"),
+        paid: paidAmt ? Number(r.amount).toLocaleString("en-US") : "0",
+        status,
+        viewed: "Viewed",
+      };
+    });
+
+  const load = () => {
+    let active = true;
+    fetchJSON<{ invoices: any[] }>("/api/finance")
+      .then((j) => { if (active && j?.invoices?.length) setRows(mapRows(j.invoices)); else if (active) setRows([]); })
+      .catch((e) => { if (active) { setApiError(e?.message || "Failed to load invoices"); setRows(INV_ROWS); } });
+    return () => { active = false; };
+  };
+
+  useEffect(() => { return load(); }, []);
+
+  const bulkIssue = async () => {
+    setNotice("");
+    try {
+      const d = await fetchJSON<{ issued: number }>("/api/invoices", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "bulk-issue" }) });
+      show("Bulk issue complete \u00b7 " + (d.issued || 0) + " invoices issued");
+      load();
+    } catch (e: any) { show("Bulk issue failed: " + (e?.message || "request failed")); }
+  };
+
+  const issueInv = async (id: number) => {
+    try {
+      await fetchJSON<{ no: string }>("/api/invoices?id=" + id, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "issue", id }) });
+      show("Invoice issued and sent for delivery");
+      load();
+    } catch (e: any) { show("Issue failed: " + (e?.message || "request failed")); }
+  };
+
+  const voidInv = async () => {
+    if (!voidTarget) return;
+    if (!voidReason.trim()) { setVoidErr("A void reason is required"); return; }
+    setVoidBusy(true);
+    try {
+      await fetchJSON<{ no: string }>("/api/invoices?id=" + voidTarget.id, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "void", id: voidTarget.id, reason: voidReason.trim() }) });
+      show("Invoice " + voidTarget.no + " voided: " + voidReason.trim());
+      setVoidTarget(null); setVoidReason(""); setVoidErr("");
+      load();
+    } catch (e: any) { setVoidErr(e?.message || "Failed to void invoice"); }
+    finally { setVoidBusy(false); }
+  };
+
   const producePdf = () => { show("Statement PDF produced \u00b7 emailed + published to buyer portal"); };
 
   return (
@@ -110,11 +151,11 @@ export default function InvoicesScreen() {
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 300px", gap: 16, marginTop: 16, alignItems: "start" }}>
         <div style={{ background: "#fff", borderRadius: 20, boxShadow: "0 1px 3px rgba(20,22,31,.04)", overflow: "hidden" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "126px 1fr 96px 1.1fr 86px 86px 96px 96px 88px 76px", gap: 8, padding: "14px 22px", fontSize: 9.5, fontWeight: 700, letterSpacing: ".07em", color: "#9AA0AE", textTransform: "uppercase" as const, background: "#FAFBFD", borderBottom: "1px solid #EDEEF3" }}>
-            <span>Invoice</span><span>Buyer</span><span>Unit</span><span>Instalment</span><span>Issued</span><span>Due</span><span style={{ textAlign: "right" }}>Amount</span><span style={{ textAlign: "right" }}>Paid</span><span>Status</span><span>Viewed</span>
+          <div style={{ display: "grid", gridTemplateColumns: "126px 1fr 96px 1.1fr 86px 86px 96px 96px 88px 76px 76px", gap: 8, padding: "14px 22px", fontSize: 9.5, fontWeight: 700, letterSpacing: ".07em", color: "#9AA0AE", textTransform: "uppercase" as const, background: "#FAFBFD", borderBottom: "1px solid #EDEEF3" }}>
+            <span>Invoice</span><span>Buyer</span><span>Unit</span><span>Instalment</span><span>Issued</span><span>Due</span><span style={{ textAlign: "right" }}>Amount</span><span style={{ textAlign: "right" }}>Paid</span><span>Status</span><span>Viewed</span><span style={{ textAlign: "right" }}>Actions</span>
           </div>
           {rows.map((r) => (
-            <div key={r.no} style={{ display: "grid", gridTemplateColumns: "126px 1fr 96px 1.1fr 86px 86px 96px 96px 88px 76px", gap: 8, alignItems: "center", padding: "0 22px", height: 42, borderBottom: "1px solid #F6F7FA" }}>
+            <div key={r.no} style={{ display: "grid", gridTemplateColumns: "126px 1fr 96px 1.1fr 86px 86px 96px 96px 88px 76px 76px", gap: 8, alignItems: "center", padding: "0 22px", height: 42, borderBottom: "1px solid #F6F7FA" }}>
               <span style={{ fontFamily: "monospace", fontSize: 10.5, fontWeight: 600 }}>{r.no}</span>
               <span style={{ fontSize: 11.5, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.buyer}</span>
               <span style={{ fontFamily: "monospace", fontSize: 10, color: "#4A5060" }}>{r.unit}</span>
@@ -125,6 +166,14 @@ export default function InvoicesScreen() {
               <span style={{ textAlign: "right", fontSize: 11.5, fontWeight: 600, color: "#6B7180" }}>{r.paid}</span>
               <span style={{ fontSize: 10, fontWeight: 700, borderRadius: 7, padding: "3px 8px", textAlign: "center", background: pillBg(r.status), color: pillCol(r.status) }}>{r.status}</span>
               <span style={{ fontSize: 10.5, fontWeight: 600, color: r.viewed === "Viewed" ? "#6B7180" : "#C2C6D2" }}>{r.viewed}</span>
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: 4 }}>
+                {r.status === "Draft" && (
+                  <button onClick={() => issueInv(r.id)} style={{ height: 24, borderRadius: 7, border: 0, background: "#EDECFE", padding: "0 8px", fontFamily: "inherit", fontSize: 9.5, fontWeight: 700, color: AC, cursor: "pointer" }}>Issue</button>
+                )}
+                {(r.status === "Sent" || r.status === "Overdue") && (
+                  <button onClick={() => { setVoidTarget({ id: r.id, no: r.no }); setVoidErr(""); setVoidReason(""); }} style={{ height: 24, borderRadius: 7, border: "1px solid #EDEEF3", background: "#fff", padding: "0 8px", fontFamily: "inherit", fontSize: 9.5, fontWeight: 700, color: "#4A5060", cursor: "pointer" }}>Void</button>
+                )}
+              </div>
             </div>
           ))}
         </div>
@@ -143,6 +192,24 @@ export default function InvoicesScreen() {
           <button onClick={producePdf} style={{ marginTop: 18, width: "100%", height: 40, borderRadius: 12, background: "#14161F", color: "#fff", border: 0, fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}>Produce PDF</button>
         </div>
       </div>
+
+      {voidTarget && (
+        <div onMouseDown={() => { setVoidTarget(null); setVoidErr(""); setVoidReason(""); }} style={{ position: "fixed", inset: 0, background: "rgba(20,22,31,.42)", display: "grid", placeItems: "center", zIndex: 80, padding: 24 }}>
+          <div onMouseDown={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: 22, padding: "26px 28px", width: "100%", maxWidth: 480, boxShadow: "0 24px 60px rgba(20,22,31,.25)" }}>
+            <div style={{ fontSize: 18, fontWeight: 800, letterSpacing: "-.02em" }}>Void invoice {voidTarget.no}</div>
+            <div style={{ fontSize: 12.5, color: "#6B7180", fontWeight: 500, marginTop: 4, lineHeight: 1.5 }}>Provide a reason. This invoice will no longer appear in the payment schedule or collections queue.</div>
+            <div style={{ marginTop: 16 }}>
+              <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".05em", color: "#9AA0AE", textTransform: "uppercase", marginBottom: 6 }}>Reason</div>
+              <input value={voidReason} onChange={(e) => { setVoidReason(e.target.value); setVoidErr(""); }} placeholder="e.g. Buyer requested cancellation" autoFocus style={{ width: "100%", boxSizing: "border-box", height: 40, borderRadius: 12, border: "1px solid #E4E6EE", padding: "0 12px", fontFamily: "inherit", fontSize: 12.5, fontWeight: 600, outline: "none" }} />
+              {voidErr && <div style={{ fontSize: 11.5, fontWeight: 600, color: "#E5484D", marginTop: 6 }}>{voidErr}</div>}
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
+              <button onClick={() => { setVoidTarget(null); setVoidErr(""); setVoidReason(""); }} style={{ height: 38, borderRadius: 12, border: "1px solid #EDEEF3", background: "#fff", padding: "0 16px", fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, color: "#4A5060", cursor: "pointer" }}>Cancel</button>
+              <button onClick={voidInv} disabled={voidBusy} style={{ height: 38, borderRadius: 12, background: "#E5484D", color: "#fff", border: 0, padding: "0 20px", fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, cursor: voidBusy ? "wait" : "pointer" }}>{voidBusy ? "Voiding…" : "Void invoice"}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

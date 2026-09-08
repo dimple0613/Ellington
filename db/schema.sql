@@ -216,6 +216,9 @@ CREATE TABLE IF NOT EXISTS invoices (
   amount NUMERIC DEFAULT 0,
   paid BOOLEAN DEFAULT false
 );
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS issued_at DATE;
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS voided_at DATE;
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS void_reason TEXT;
 
 -- Construction module (PLINTH parity): work-package milestones with money release.
 CREATE TABLE IF NOT EXISTS construction_milestones (
