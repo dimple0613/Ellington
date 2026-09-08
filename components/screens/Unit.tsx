@@ -1,10 +1,77 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/router";
 import { AC, money } from "../../lib/format";
-import { ST, Unit, selectedUnit } from "../../lib/data";
+import { ST, Unit, UnitStatus, selectedUnit } from "../../lib/data";
+import { fetchJSON } from "../../lib/api";
 import { exportUnitSoa, exportUnitEoi } from "../../lib/pdf";
 
 const NET_DISCOUNT = 0.05;
+
+type LiveRow = {
+  id?: string | number | null;
+  no?: string | number | null;
+  type?: string | null;
+  beds?: string | number | null;
+  area?: string | number | null;
+  view?: string | null;
+  status?: string | null;
+  price?: string | number | null;
+  buyer?: string | null;
+};
+
+type MileRow = {
+  unit: string;
+  project: string;
+  milestone: string;
+  due: string;
+  percent: number;
+  amount: number;
+  status: string;
+};
+
+const LIVE_UNIT_STATUS: Record<string, UnitStatus> = {
+  available: "Available",
+  booked: "Booked",
+  reserved: "Reserved",
+  held: "Held",
+  blocked: "Blocked",
+  sold: "Sold",
+};
+
+function floorFromNo(no: string): number {
+  const m = no.match(/(\d+)\s*$/);
+  const n = m ? parseInt(m[1], 10) : 0;
+  return n > 0 && n <= 45 ? n : 12;
+}
+
+function mileStatus(s: string): "Paid" | "Due" | "Scheduled" {
+  if (s === "paid") return "Paid";
+  if (s === "due" || s === "overdue" || s === "invoiced") return "Due";
+  return "Scheduled";
+}
+
+function mapLiveUnit(row: LiveRow | null, unitId: string | undefined): Unit {
+  if (!row) return selectedUnit(unitId || null);
+  const price = Number(row.price) || 0;
+  const area = Number(row.area) || 0;
+  const no = row.no != null ? String(row.no) : row.id != null ? String(row.id) : "";
+  const st = (row.status || "available").toLowerCase();
+  return {
+    f: floorFromNo(no),
+    pos: 1,
+    no,
+    id: no || String(row.id ?? ""),
+    typ: row.type || "2BR",
+    beds: Number(row.beds) || 2,
+    area,
+    view: row.view || "Park",
+    psf: area > 0 ? Math.round(price / area) : 0,
+    price,
+    status: LIVE_UNIT_STATUS[st] || "Available",
+    base: area > 0 ? Math.round(price / area) : 1450,
+    buyer: row.buyer ? String(row.buyer) : "—",
+  };
+}
 
 export default function UnitScreen({
   scope = "ALL",
@@ -16,7 +83,38 @@ export default function UnitScreen({
   onSelectUnit?: (id: string) => void;
 }) {
   const router = useRouter();
-  const su: Unit = selectedUnit(unitId || null);
+  const [liveRow, setLiveRow] = useState<LiveRow | null>(null);
+  const [liveMiles, setLiveMiles] = useState<MileRow[]>([]);
+
+  useEffect(() => {
+    let active = true;
+    setLiveRow(null);
+    setLiveMiles([]);
+    if (!unitId) return;
+    fetchJSON<{ units: LiveRow[] }>("/api/inventory?unit=" + encodeURIComponent(unitId))
+      .then((j) => {
+        if (active && Array.isArray(j.units) && j.units.length) setLiveRow(j.units[0]);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [unitId]);
+
+  useEffect(() => {
+    if (!liveRow || liveRow.no == null) return;
+    let active = true;
+    fetchJSON<{ milestones: MileRow[] }>("/api/milestones?unit=" + encodeURIComponent(String(liveRow.no)))
+      .then((j) => {
+        if (active && Array.isArray(j.milestones)) setLiveMiles(j.milestones);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [liveRow]);
+
+  const su: Unit = useMemo(() => mapLiveUnit(liveRow, unitId), [liveRow, unitId]);
   const [tab, setTab] = useState<"overview" | "pay" | "docs" | "act">("overview");
 
   const data = useMemo(() => {
@@ -70,7 +168,7 @@ export default function UnitScreen({
     ["30%", "14 Sep 26", false], ["50%", "14 Mar 27", false], ["Handover", "Q4 2027", false],
   ];
 
-  const uInst = [
+  const uInstMock = [
     ["01", "Booking deposit", "On booking", "14 Mar 2026", "10%", "Paid"],
     ["02", "SPA execution", "30 days from booking", "13 Apr 2026", "10%", "Paid"],
     ["03", "Excavation complete", "Construction 20%", "14 Jun 2026", "15%", "Paid"],
@@ -82,6 +180,18 @@ export default function UnitScreen({
     seq: i[0], label: i[1], trigger: i[2], due: i[3], pct: i[4], status: i[5] as "Paid" | "Due" | "Scheduled",
     amount: money((net * parseInt(i[4])) / 100),
   }));
+
+  const uInst = liveMiles.length
+    ? liveMiles.map((m, i) => ({
+        seq: String(i + 1).padStart(2, "0"),
+        label: m.milestone,
+        trigger: "Milestone payment",
+        due: m.due || "—",
+        pct: m.percent + "%",
+        status: mileStatus(m.status || "scheduled"),
+        amount: money(m.amount),
+      }))
+    : uInstMock;
 
   const uDocs = [
     ["PDF", "Reservation form", "v1 \u00b7 214 KB \u00b7 A. Haddad \u00b7 14 Mar 2026", "Signed"],

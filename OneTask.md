@@ -6,7 +6,8 @@
 ## Push (current branch + what to push)
 > Branch-per-task rule (see AGENTS.md): never push directly to main. Update this section per task.
 
-- Current branch: `fix/aud-051-dead-use-api` (issue #51: dead `lib/useApi.ts` removed). To push: pages/dashboard.tsx switched from `useApi` to `fetchJSON` (same fallback/behavior), lib/useApi.ts deleted, AGENTS.md + docs/ARCHITECTURE.md refs tidied (AUD-016 recorded). lint green.
+- Current branch: `fix/plinth-parity` (PLINTH Parity Program). Pushed: commits `81d9b7b` (T1) + T2 → `81d9b7b..HEAD` once pushed. To push: `pages/api/inventory.ts` unit filter (`?unit=`), `components/screens/Unit.tsx` live wiring (unit + milestone fetch with mock fallback via `mapLiveUnit`/`mileStatus`), OneTask.md statuses. lint green. Merge to main only after operator approval.
+- Closed on GitHub (no merge): issue #51 (dead `lib/useApi.ts` removed) on `fix/aud-051-dead-use-api` (`f8cbbd0` + `7a0bd8b`); issue #52 (any-type cleanups) on `fix/aud-052-any-types` (`164047b`).
 - Current branch: `main` (`ad22adf`; `fix/aud-006-system`, `fix/aud-006-finance`, `fix/aud-015-analytics` merged; `fix/aud-015-analytics` branch deleted local+remote).
 - **AUD-015 (#37) CLOSED/MERGED** — `fix/aud-015-analytics` (`ad22adf`): cashflow forecast + report exports live via `/api/finance-analytics` + `/api/report-export`; branch deleted.
 - **DEPLOYED TO CLOUDFLARE** — `npx wrangler deploy` (`wrangler.jsonc`, account `49dcdcff…`): worker `ellington-worker` live at
@@ -40,6 +41,34 @@
   Merge pending operator approval.
 - Last task: merge `feat/cloudflare-hyperdrive` → `main` (Hyperdrive DB connection fix so production reads Neon, delivered 200 on `/api/auth/login` + `/api/auth/me` with admin `Dipin Ellington`/`admin@gmail.com`); pushed.
 - Admin on Neon: id 1 = `Dipin Ellington` / `admin@gmail.com` / `Admin123` (role super_admin) — verified login 200 on live worker.
+
+## PLINTH Parity Program (branch `fix/plinth-parity`)
+> Reference: `C:\Users\admin\Downloads\New folder\plinth-prompt-pack_1.html` (PLINTH prompt pack).
+> Goal: every screen/page functions like the reference. Wiring map verified at start:
+> **16 screens already live** (dashboard, inventory, leads, payments, collections, escrow, invoices,
+> pipeline, snagging, deeds, users, settings, audit, cashflow, reports, projects) via `fetchJSON`;
+> **5 static** (financials, unit, pricing, construction, mobile) + Sales sub-screens
+> (booking/buyer/brokers/documents) + missing write-APIs + loading states (#50). Do one at a time.
+> - [x] **T1** Wire `Financials` (`/dashboard?s=financials`) → live `/api/dashboard` project data
+> - [x] **T2** Wire `Unit Detail` (`/project?s=unit`) → `/api/inventory?unit=` + `/api/milestones?unit=`
+> - [ ] **T3** Wire `Pricing & Availability` (`/project?s=pricing`) → live units from `/api/inventory`
+> - [ ] **T4** `Construction Progress` → new `construction_milestones` table + `/api/construction` + wire screen
+> - [ ] **T5** `Mobile` exec app → new `/api/mobile` aggregate + wire the 5 tabs
+> - [ ] **T6** `Buyers` directory + Buyer 360 → new `/api/buyers` (GET) + wire Sales buyer subscreens
+> - [ ] **T7** `Leads` → add PUT stage to `/api/leads` + kanban persistence + leaderboard
+> - [ ] **T8** `Escrow` → add `/api/finance` PUT (reconcile match / drawdown submit) + wire actions
+> - [ ] **T9** `Invoices` → add `/api/invoices` POST/PUT (issue / void / bulk-issue) + wire actions
+> - [ ] **T10** `Collections` → dunning action PUT (remind/log/promise) + live default calculator (construction %)
+> - [ ] **T11** `Payments` → bank-statement import (CSV) + PDC register live from receipts
+> - [ ] **T12** `Handover` → payment-clear hard block from collections + readiness dashboard computed
+> - [ ] **T13** Loading states (closes issue #50) → spinner/skeleton on all wired screens while fetching
+> - [ ] **T14** `Bookings` → `bookings` table + `/api/bookings` + wire booking wizard + bookings register
+> - [ ] **T15** `Brokers & agencies` → `brokers` table + `/api/brokers` + wire screen
+> - [ ] **T16** `Documents vault` → `documents` table + `/api/documents` + wire generator + audit
+> - [ ] **T17** Shell audit → confirm/complete ⌘K global search, notification centre, project switcher, alerts ticker
+> - [ ] **T18** `Settings` → persist numbering / notification-matrix tabs via `/api/system` PUT
+>
+> Out of scope (flag as N/A): SSO/2FA, buyer portal, broker portal, Arabic/RTL, e-signature, WhatsApp/SMS channels, Mollak API.
 
 ## Today's Focus
 - [x] Task 1 — Scaffold project (complete md set)
