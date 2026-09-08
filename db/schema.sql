@@ -194,6 +194,9 @@ CREATE TABLE IF NOT EXISTS collections (
   stage TEXT DEFAULT 'Upcoming',        -- Upcoming / Reminder 1 / Reminder 2 / 30-day notice / Final notice
   action TEXT
 );
+ALTER TABLE collections ADD COLUMN IF NOT EXISTS last_contact DATE;
+ALTER TABLE collections ADD COLUMN IF NOT EXISTS promised_date DATE;
+ALTER TABLE collections ADD COLUMN IF NOT EXISTS promised_amount NUMERIC;
 CREATE INDEX IF NOT EXISTS idx_collections_stage ON collections(stage);
 
 CREATE TABLE IF NOT EXISTS drawdowns (
