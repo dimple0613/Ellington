@@ -218,8 +218,9 @@ export default function Sales({ scope }: { scope: string }) {
     go("booking")();
   };
 
-  if (s === "leads") return <Leads onNewBooking={blankBooking} onBookLead={goBooking} />;
+  if (s === "leads") return <Leads onNewBooking={blankBooking} onBookLead={goBooking} goRegister={go("bookings")} />;
   if (s === "booking") return <Booking step={step} setStep={setStep} onBack={go("leads")} lead={lead} blank={!lead} />;
+  if (s === "bookings") return <BookingsRegister onBack={go("leads")} />;
   if (s === "buyer") {
     if (router.query.id) return <Buyer360 btab={btab} setBtab={setBtab} goUnit={goUnit} />;
     return <BuyersDirectory onOpen={(id) => {
@@ -230,13 +231,13 @@ export default function Sales({ scope }: { scope: string }) {
   }
   if (s === "brokers") return <Brokers brtab={brtab} setBrtab={setBrtab} brstep={brstep} setBrstep={setBrstep} />;
   if (s === "documents") return <Documents dtab={dtab} setDtab={setDtab} doc={doc} setDoc={setDoc} />;
-  return <Leads onNewBooking={blankBooking} onBookLead={goBooking} />;
+  return <Leads onNewBooking={blankBooking} onBookLead={goBooking} goRegister={go("bookings")} />;
 }
 
 /* ═══════════════════════════════════════════════════════════════════
    LEADS
    ═══════════════════════════════════════════════════════════════════ */
-function Leads({ onNewBooking, onBookLead }: { onNewBooking: () => void; onBookLead: (card: Card) => void }) {
+function Leads({ onNewBooking, onBookLead, goRegister }: { onNewBooking: () => void; onBookLead: (card: Card) => void; goRegister: () => void }) {
   const [dbCols, setDbCols] = useState<Col[] | null>(null);
   const [liveLeads, setLiveLeads] = useState<ApiLead[] | null>(null);
   const [apiError, setApiError] = useState("");
@@ -366,6 +367,7 @@ function Leads({ onNewBooking, onBookLead }: { onNewBooking: () => void; onBookL
           <div style={{fontSize:13,color:"#6B7180",fontWeight:500,marginTop:5}}>34 open \u00b7 AED 62.4M potential value \u00b7 8 agents</div>
         </div>
         <button onClick={onNewBooking} style={{height:38,borderRadius:12,background:AC,color:"#fff",border:0,padding:"0 16px",fontFamily:"inherit",fontSize:12.5,fontWeight:700,cursor:"pointer"}}>New booking</button>
+        <button onClick={goRegister} style={{height:38,borderRadius:12,border:"1px solid #EDEEF3",background:"#fff",padding:"0 16px",fontFamily:"inherit",fontSize:12.5,fontWeight:700,color:"#4A5060",cursor:"pointer"}}>Bookings register</button>
       </div>
 
       {/* funnel */}
@@ -471,6 +473,10 @@ function Booking({ step, setStep, onBack, lead, blank }: { step:number; setStep:
   const [amount, setAmount] = useState("226688");
   const [stage, setStage] = useState(blank ? "New" : (leadChip(lead)));
   const [confirmed, setConfirmed] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [confirmErr, setConfirmErr] = useState("");
+  const [savedRef, setSavedRef] = useState("");
+  const [issuedReceipt, setIssuedReceipt] = useState("");
 
   const listPrice = 2450000;
   const discVal = parseFloat(disc || "0");
@@ -478,6 +484,39 @@ function Booking({ step, setStep, onBack, lead, blank }: { step:number; setStep:
   const net = money(netVal);
   const bookingAmt = Math.round(netVal * 0.1);
   const psf = Math.round(netVal / 1180);
+  const escrowRef = SFIELDS[5].find((f) => f[0] === "Escrow deposit reference")?.[1] || "";
+
+  const doConfirm = async () => {
+    setConfirming(true);
+    setConfirmErr("");
+    try {
+      const created = await fetchJSON<{ id: number; ref: string; unit: string }>("/api/bookings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          unit_no: "BLG-026",
+          buyer_name: buyer || leadName || "Prospective buyer",
+          buyer_mobile: mobile,
+          discount_pct: discVal,
+          list_price: listPrice,
+          net_price: netVal,
+          booking_amount: bookingAmt,
+        }),
+      });
+      const res = await fetchJSON<any>("/api/bookings?id=" + created.id, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "confirm", escrow_ref: escrowRef, payment_method: "bank_transfer", buyer_email: null, buyer_mobile: mobile }),
+      });
+      setSavedRef(res.ref || created.ref);
+      setIssuedReceipt(String(res.receiptId || ""));
+      setConfirmed(true);
+    } catch (e: any) {
+      setConfirmErr(e?.message || "Booking failed to persist");
+    } finally {
+      setConfirming(false);
+    }
+  };
 
   const fields = SFIELDS[step] || [];
   const showApproval = step === 1;
@@ -499,10 +538,11 @@ function Booking({ step, setStep, onBack, lead, blank }: { step:number; setStep:
     <div>
       {confirmed && (
         <div style={{ background:"#E9F8F1", color:"#1F9D6B", borderRadius:14, padding:"14px 18px", marginBottom:16, fontSize:12.5, fontWeight:700 }}>
-          Booking confirmed \u00b7 {buyer || leadName || "Prospective buyer"} \u00b7 {deal[4][1]} \u00b7 escrow ref {refOf(step)} \u00b7 receipt RCP-H21-004713 issued
-          <span style={{ display:"block", fontSize:11, fontWeight:600, marginTop:4, color:"#2EBD8B" }}>{blank ? "Blank booking created from lead pipeline." : "Created from lead \u2014 " + (lead?.name ?? "") + " (" + stage + " stage)."}</span>
+          Booking confirmed \u00b7 {buyer || leadName || "Prospective buyer"} \u00b7 {deal[4][1]} \u00b7 {savedRef || ("escrow ref " + escrowRef)} \u00b7 {issuedReceipt ? ("receipt RCP-00" + String(issuedReceipt).padStart(4, "0") + " issued") : "receipt issued"}
+          <span style={{ display:"block", fontSize:11, fontWeight:600, marginTop:4, color:"#2EBD8B" }}>{blank ? "Blank booking created from lead pipeline." : "Created from lead \u2014 " + (lead?.name ?? "") + " (" + stage + " stage)."} Registered in the bookings register \u00b7 unit marked Reserved.</span>
         </div>
       )}
+      {confirmErr && <div style={{ background:"#FDECEC", color:"#E5484D", borderRadius:12, padding:"11px 16px", fontSize:12, fontWeight:700, marginBottom:16 }}>Booking not persisted \u00b7 {confirmErr}</div>}
       <div style={{display:"grid",gridTemplateColumns:"210px 1fr 300px",gap:20,alignItems:"start"}}>
       {/* step rail */}
       <div style={{background:"#fff",borderRadius:20,padding:"20px 18px",boxShadow:"0 1px 3px rgba(20,22,31,.04)"}}>
@@ -605,7 +645,7 @@ function Booking({ step, setStep, onBack, lead, blank }: { step:number; setStep:
           <button style={{height:40,borderRadius:12,border:"1px solid #EDEEF3",background:"#fff",padding:"0 16px",fontFamily:"inherit",fontSize:12.5,fontWeight:700,color:"#4A5060",cursor:"pointer"}}>Save as draft</button>
           <div style={{flex:1}} />
           {step > 1 && <button onClick={() => setStep(step-1)} style={{height:40,borderRadius:12,border:"1px solid #EDEEF3",background:"#fff",padding:"0 16px",fontFamily:"inherit",fontSize:12.5,fontWeight:700,color:"#4A5060",cursor:"pointer"}}>Back</button>}
-          <button onClick={() => step === 5 ? setConfirmed(true) : setStep(step+1)} style={{height:40,borderRadius:12,background:AC,color:"#fff",border:0,padding:"0 20px",fontFamily:"inherit",fontSize:12.5,fontWeight:700,cursor:"pointer"}}>{nextLabel}</button>
+          <button onClick={() => step === 5 ? doConfirm() : setStep(step+1)} disabled={confirming} style={{height:40,borderRadius:12,background:AC,color:"#fff",border:0,padding:"0 20px",fontFamily:"inherit",fontSize:12.5,fontWeight:700,cursor:confirming?"progress":"pointer",opacity:confirming?0.7:1}}>{confirming ? "Confirming\u2026" : nextLabel}</button>
         </div>
       </div>
 
@@ -630,6 +670,112 @@ function Booking({ step, setStep, onBack, lead, blank }: { step:number; setStep:
           <div style={{fontSize:11,color:"#6B7180",fontWeight:500,marginTop:4}}>10% token \u00b7 escrow reference mandatory</div>
         </div>
       </div>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   BOOKINGS REGISTER
+   ═══════════════════════════════════════════════════════════════════ */
+type BookingRow = { id: number; ref: string | null; unit_no: string; project: string; buyer: string; status: string; discount_pct: number; discount_amt: number; list_price: number; net_price: number; booking_amount: number; payment_method: string | null; escrow_ref: string | null; created_at: string; expected_spa: string };
+const BOOKING_STATUS_PILL: Record<string, { bg: string; color: string }> = {
+  confirmed: { bg: "#E9F8F1", color: "#1F9D6B" },
+  pending_approval: { bg: "#FDF4E5", color: "#B07B14" },
+  draft: { bg: "#F1F2F6", color: "#6B7180" },
+  cancelled: { bg: "#FDECEC", color: "#E5484D" },
+};
+const BOOKINGS_FALLBACK: BookingRow[] = [
+  { id: 0, ref: "BKG-2026-00891", unit_no: "H21-T1-1204", project: "H21", buyer: "Rajesh Menon", status: "confirmed", discount_pct: 7.5, discount_amt: 183750, list_price: 2450000, net_price: 2266250, booking_amount: 226625, payment_method: "Bank transfer", escrow_ref: "ESC-2026-9001", created_at: "31 Aug 2026", expected_spa: "30 Nov 2026" },
+  { id: 0, ref: "BKG-2026-00890", unit_no: "H21-T1-2801", project: "H21", buyer: "Aisha Al Marri", status: "confirmed", discount_pct: 3, discount_amt: 61402, list_price: 2046750, net_price: 1985348, booking_amount: 198535, payment_method: "Cheque", escrow_ref: "ESC-2026-8996", created_at: "29 Aug 2026", expected_spa: "30 Nov 2026" },
+  { id: 0, ref: "BKG-2026-00889", unit_no: "H21-T1-4102", project: "H21", buyer: "Elena Petrova", status: "pending_approval", discount_pct: 9, discount_amt: 0, list_price: 6020000, net_price: 5478200, booking_amount: 547820, payment_method: "Bank transfer", escrow_ref: null, created_at: "28 Aug 2026", expected_spa: "30 Nov 2026" },
+];
+const bookingPill = (s: string) => { const m = BOOKING_STATUS_PILL[s] || BOOKING_STATUS_PILL.draft; return { display: "inline-block", fontSize: 10.5, fontWeight: 700, borderRadius: 7, padding: "3px 8px", background: m.bg, color: m.color }; };
+
+function BookingsRegister({ onBack }: { onBack: () => void }) {
+  const [rows, setRows] = useState<BookingRow[] | null>(null);
+  const [notice, setNotice] = useState("");
+  const [apiError, setApiError] = useState("");
+  const [loaded, setLoaded] = useState(false);
+  const [filter, setFilter] = useState<string>("all");
+
+  useEffect(() => {
+    let active = true;
+    fetchJSON<{ bookings: BookingRow[] }>("/api/bookings")
+      .then((j) => { if (active) { setLoaded(true); setRows(Array.isArray(j.bookings) ? j.bookings : []); } })
+      .catch((e) => { if (active) { setLoaded(true); setApiError(e?.message || "Failed to load bookings"); } });
+    return () => { active = false; };
+  }, []);
+
+  const banner = (m: string) => { setNotice(m); setTimeout(() => setNotice(""), 3500); };
+
+  const cancel = async (r: BookingRow) => {
+    if (r.id == null) { banner("Sample booking — switching to live register required"); return; }
+    if (!window.confirm("Cancel booking " + r.ref + " for " + r.buyer + "?")) return;
+    try {
+      await fetchJSON<any>("/api/bookings?id=" + r.id, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "cancel" }) });
+      setRows((rows || []).map((x) => x.id === r.id ? { ...x, status: "cancelled" } : x));
+      banner("Booking " + r.ref + " cancelled · unit released back to available");
+    } catch (e: any) { banner("Cancel failed: " + (e?.message || "request failed")); }
+  };
+
+  const show = rows || BOOKINGS_FALLBACK;
+  const avail = !!rows;
+  const filtered = filter === "all" ? show : show.filter((r) => r.status === filter);
+  const gross = show.reduce((a, b) => a + b.net_price, 0);
+  const tokens = show.reduce((a, b) => a + b.booking_amount, 0);
+
+  if (!loaded) {
+    return (
+      <div>
+        <PanelSkeleton headerW={220} rows={8} cols={6} />
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      {apiError && (
+        <div style={{ background: "#FDECEC", color: "#E5484D", borderRadius: 12, padding: "11px 16px", fontSize: 12, fontWeight: 700, marginBottom: 16 }}>
+          Live data unavailable ({apiError}) — showing sample rows
+        </div>
+      )}
+      {notice && <div style={{ background: "#E9F8F1", color: "#1F9D6B", borderRadius: 12, padding: "11px 16px", fontSize: 12, fontWeight: 700, marginBottom: 16 }}>{notice}</div>}
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 16, marginBottom: 18 }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: "-.03em", lineHeight: 1.15 }}>Bookings register</div>
+          <div style={{ fontSize: 13, color: "#6B7180", fontWeight: 500, marginTop: 5 }}>{show.length} bookings · {moneyM(gross)} contract value · {moneyM(tokens)} tokens held</div>
+        </div>
+        <button onClick={onBack} style={{ height: 38, borderRadius: 12, border: "1px solid #EDEEF3", background: "#fff", padding: "0 16px", fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, color: "#4A5060", cursor: "pointer" }}>{"\u2039"} Bookings</button>
+      </div>
+      <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
+        {["all", "confirmed", "pending_approval", "draft", "cancelled"].map((f) => (
+          <button key={f} onClick={() => setFilter(f)} style={{ height: 30, border: 0, borderRadius: 9, padding: "0 13px", cursor: "pointer", fontFamily: "inherit", fontSize: 11.5, fontWeight: 700, background: filter === f ? "#F0EFFE" : "#F1F2F6", color: filter === f ? AC : "#6B7180" }}>
+            {f.replace("_", " ")} ({f === "all" ? show.length : show.filter((x) => x.status === f).length})
+          </button>
+        ))}
+      </div>
+      <div style={{ background: "#fff", borderRadius: 20, padding: "18px 22px", boxShadow: "0 1px 3px rgba(20,22,31,.04)" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr 1.4fr 1fr 1fr 1fr 1fr 1fr", gap: 12, padding: "0 8px 10px", borderBottom: "1px solid #F1F2F6" }}>
+          {["Reference", "Unit", "Buyer", "Status", "List price", "Net price", "Token", "Scheduled"].map((h) => <div key={h} style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".05em", color: "#9AA0AE", textTransform: "uppercase" }}>{h}</div>)}
+        </div>
+        {filtered.map((r, i) => (
+          <div key={r.ref || "b" + i} style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr 1.4fr 1fr 1fr 1fr 1fr 1fr", gap: 12, alignItems: "center", padding: "12px 8px", borderBottom: i < filtered.length - 1 ? "1px solid #F6F7FA" : "none" }}>
+            <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 12, fontWeight: 600 }}>{r.ref || "\u2014"}</span>
+            <span style={{ fontSize: 12.5, fontWeight: 700 }}>{r.unit_no} <span style={{ color: "#9AA0AE", fontWeight: 600, fontSize: 11 }}>· {r.project}</span></span>
+            <span style={{ fontSize: 12.5, fontWeight: 600 }}>{r.buyer}</span>
+            <span style={bookingPill(r.status)}>{r.status.replace("_", " ")}</span>
+            <span style={{ fontSize: 12.5, fontWeight: 600 }}>{money(r.list_price)}</span>
+            <span style={{ fontSize: 12.5, fontWeight: 800 }}>{money(r.net_price)}</span>
+            <span style={{ fontSize: 12.5, fontWeight: 700, color: AC }}>{money(r.booking_amount)}</span>
+            <span style={{ fontSize: 12, color: "#6B7180", fontWeight: 600 }}>{r.expected_spa || "\u2014"}</span>
+          </div>
+        ))}
+        {filtered.length === 0 && <div style={{ padding: "18px 8px", textAlign: "center", fontSize: 12.5, color: "#9AA0AE", fontWeight: 600 }}>No {filter} bookings yet</div>}
+        <div style={{ display: "flex", gap: 10, paddingTop: 14, marginTop: 6, borderTop: "1px solid #F6F7FA" }}>
+          <span style={{ fontSize: 11.5, color: "#9AA0AE", fontWeight: 600, marginRight: 6 }}>This register updates from the booking wizard — confirm a booking to log it here.</span>
+          <button onClick={() => { if (window.confirm("Export booking register CSV?")) banner("Booking register exported · CSV"); }} style={{ marginLeft: "auto", height: 32, borderRadius: 10, border: "1px solid #EDEEF3", background: "#fff", padding: "0 13px", fontFamily: "inherit", fontSize: 11.5, fontWeight: 700, color: "#4A5060", cursor: "pointer" }}>Export CSV</button>
+        </div>
       </div>
     </div>
   );

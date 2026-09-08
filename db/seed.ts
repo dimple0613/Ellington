@@ -33,6 +33,13 @@ const H21_UNITS = [
 ];
 const AGENTS = ["Reema", "John D", "Sana", "Yusuf"];
 
+// bookings register (T14) — row set mirrors the register screen (confirmed / draft / cancelled).
+const BOOKINGS = [
+  { unit: "H21-T1-2705", buyer: "Sunil Rathore", mobile: "+971 50 4140312", ref: "BKG-2026-00891", discount_pct: 7.5, discount_amt: 309000, list_price: 4120000, net_price: 3811000, booking_amount: 381100, expected_spa: "2027-03-30", status: "confirmed", payment_method: "bank_transfer", escrow_ref: "ESC-2026-9021", age_days: 24 },
+  { unit: "H21-T1-2404", buyer: "Amara Okafor", mobile: "+971 50 4140422", ref: "BKG-2026-00847", discount_pct: 5, discount_amt: 97000, list_price: 1940000, net_price: 1843000, booking_amount: 184300, expected_spa: "2027-03-30", status: "draft", payment_method: null, escrow_ref: null, age_days: 6 },
+  { unit: "H21-T1-3601", buyer: "Daniel Petrova", mobile: "+971 50 4140533", ref: "BKG-2026-00612", discount_pct: 2.5, discount_amt: 16000, list_price: 640000, net_price: 624000, booking_amount: 62400, expected_spa: "2026-12-15", status: "cancelled", payment_method: null, escrow_ref: "ESC-2026-4510", age_days: 61 },
+];
+
 async function main() {
   // ensure database exists
   const dbName = new URL(url).pathname.slice(1) || "developer_inventory";
@@ -103,6 +110,22 @@ async function main() {
       `INSERT INTO units (project_id, no, type, beds, area, "view", status, price, buyer_id)
        VALUES ($1,$2,$3,$4,$5,'Skyline','sold',$6,NULL)`,
       [h21Id, u.no, u.type, u.beds, u.area, u.price]
+    );
+  }
+
+  // bookings register (T14) — one confirmed (sales ledger), one draft, one cancelled.
+  for (const bk of BOOKINGS) {
+    const u = await c.query(
+      `SELECT id FROM units WHERE no=$1 AND project_id=$2`, [bk.unit, h21Id]
+    );
+    if (u.rows.length === 0) continue;
+    await c.query(
+      `INSERT INTO bookings (project_id, unit_id, buyer_name, buyer_mobile, ref, discount_pct, discount_amt,
+         list_price, net_price, booking_amount, expected_spa, status, payment_method, escrow_ref, created_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14, now() - $15::interval)`,
+      [h21Id, u.rows[0].id, bk.buyer, bk.mobile, bk.ref, bk.discount_pct, bk.discount_amt,
+       bk.list_price, bk.net_price, bk.booking_amount, bk.expected_spa, bk.status, bk.payment_method,
+       bk.escrow_ref, bk.age_days]
     );
   }
 

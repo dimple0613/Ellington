@@ -128,6 +128,42 @@ CREATE TABLE IF NOT EXISTS payment_milestones (
   status TEXT DEFAULT 'scheduled'             -- paid / due / scheduled
 );
 
+-- Bookings (PLINTH parity T14): converts an available unit into a registered sale.
+CREATE TABLE IF NOT EXISTS bookings (
+  id SERIAL PRIMARY KEY,
+  project_id INT REFERENCES projects(id),
+  unit_id INT REFERENCES units(id) NOT NULL,
+  buyer_id INT REFERENCES buyers(id),
+  ref TEXT UNIQUE,                            -- BKG-2026-00891
+  buyer_name TEXT,
+  buyer_mobile TEXT,
+  buyer_email TEXT,
+  discount_pct NUMERIC DEFAULT 0,
+  discount_amt NUMERIC DEFAULT 0,
+  list_price NUMERIC DEFAULT 0,
+  net_price NUMERIC DEFAULT 0,
+  booking_amount NUMERIC DEFAULT 0,           -- token (default 10%)
+  dld_payer TEXT DEFAULT 'buyer',             -- buyer / developer
+  admin_fee NUMERIC DEFAULT 0,
+  broker_involved BOOLEAN DEFAULT false,
+  agency TEXT,
+  agent TEXT,
+  commission_pct NUMERIC DEFAULT 0,
+  expected_spa DATE,
+  status TEXT DEFAULT 'draft',                -- draft / pending_approval / confirmed / cancelled
+  payment_method TEXT,                        -- bank_transfer / cheque / card / cash
+  payment_bank TEXT,
+  payment_cheque_no TEXT,
+  payment_reference TEXT,
+  escrow_ref TEXT,                            -- mandatory for confirm
+  receipt_id INT REFERENCES receipts(id),
+  confirmed_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_bookings_unit ON bookings(unit_id);
+CREATE INDEX IF NOT EXISTS idx_bookings_status ON bookings(status);
+
 CREATE TABLE IF NOT EXISTS escrow_ledger (
   id SERIAL PRIMARY KEY,
   project_id INT REFERENCES projects(id),
