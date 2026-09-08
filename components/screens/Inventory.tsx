@@ -2,7 +2,19 @@ import { useEffect, useMemo, useState } from "react";
 import { AC, compact, money } from "../../lib/format";
 import { ST, UnitStatus, UNITS, Unit } from "../../lib/data";
 
-function toUnitShape(row: any, idx: number): Unit {
+type UnitRow = {
+  id?: string | number | null;
+  no?: string | number | null;
+  type?: string | null;
+  beds?: string | number | null;
+  area?: string | number | null;
+  view?: string | null;
+  status?: string | null;
+  price?: string | number | null;
+  buyer?: string | null;
+};
+
+function toUnitShape(row: UnitRow, idx: number): Unit {
   const price = Number(row.price) || 0;
   const area = Number(row.area) || 0;
   const f = Math.floor(idx / 6) + 1;
@@ -18,7 +30,7 @@ function toUnitShape(row: any, idx: number): Unit {
   return {
     f,
     pos: (idx % 6) + 1,
-    no: row.no || String(idx + 1).padStart(3, "0"),
+    no: row.no ? String(row.no) : String(idx + 1).padStart(3, "0"),
     id: "" + row.id,
     typ: row.type || "2BR",
     beds: Number(row.beds) || 2,
@@ -28,7 +40,7 @@ function toUnitShape(row: any, idx: number): Unit {
     price,
     status: statusMap[st] || "Available",
     base: 1450,
-    buyer: row.buyer || "—",
+    buyer: row.buyer ? String(row.buyer) : "—",
   };
 }
 

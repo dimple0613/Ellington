@@ -44,6 +44,11 @@ export async function sendPasswordReset(email: string, token: string): Promise<v
     }
   }
 
-  // No SMTP configured (or send failed): surface the link server-side for local/dev use.
-  console.log(`PASSWORD_RESET_LINK email=${email} url=${resetUrl}`);
+  // No SMTP configured (or send failed): surface the link server-side for local/dev use only.
+  const prod = typeof process.env.NODE_ENV === "undefined" || process.env.NODE_ENV === "production";
+  if (!prod) {
+    console.log(`PASSWORD_RESET_LINK email=${email} url=${resetUrl}`);
+  } else {
+    console.log(`PASSWORD_RESET_NO_SMTP email=${email} (link omitted in production)`);
+  }
 }

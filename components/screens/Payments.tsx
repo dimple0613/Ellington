@@ -22,6 +22,17 @@ type PdcRow = {
   status: string;
 };
 
+type ApiReceipt = {
+  id?: number | string | null;
+  amount?: number | string | null;
+  method?: string | null;
+  reference?: string | null;
+  matched?: boolean;
+  date?: string | null;
+  buyer?: string | null;
+  unit?: string | null;
+};
+
 export default function PaymentsScreen({ buyer }: { buyer?: string }) {
   const [tab, setTab] = useState<"receipts" | "pdc">("receipts");
   const [showForm, setShowForm] = useState(false);
@@ -39,7 +50,7 @@ export default function PaymentsScreen({ buyer }: { buyer?: string }) {
       .then((j) => {
         if (!active || !j || !Array.isArray(j.receipts)) return;
         setDbRows(
-          j.receipts.slice(0, 20).map((x: any) => ({
+          j.receipts.slice(0, 20).map((x: ApiReceipt) => ({
             rcp: "RCP-" + String(x.id).padStart(6, "0"),
             date: x.date,
             buyer: x.buyer || "",

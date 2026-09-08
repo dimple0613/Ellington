@@ -32,18 +32,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       full_name: admin.full_name || undefined,
     });
 
+    const proto = req.headers["x-forwarded-proto"];
+    const secure = Array.isArray(proto) ? proto.includes("https") : proto === "https";
+    const cookieName = secure ? "__Host-session" : "session";
+
     res.setHeader(
       "Set-Cookie",
-      serializeCookie("session", token, {
+      serializeCookie(cookieName, token, {
         path: "/",
         httpOnly: true,
         maxAge: 86400,
         sameSite: "lax",
+        secure,
       })
     );
     return res.status(200).json({ ok: true });
   } catch (e: any) {
-    console.error("LOGIN_ERROR", e);
-    return res.status(500).json({ error: "debug: " + (e?.message || String(e)) });
+    console.error("LOGIN_ERROR", e?.message || e);
+    return res.status(500).json({ error: "An unexpected error occurred. Please try again." });
   }
 }
