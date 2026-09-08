@@ -6,11 +6,8 @@
 ## Push (current branch + what to push)
 > Branch-per-task rule (see AGENTS.md): never push directly to main. Update this section per task.
 
-- Current branch: `chore/standardize-project` (created off `main` after DB-wiring merged)
-- Pending code to push (branch `chore/standardize-project`): the full project-standardization pass —
-  commits `b427dda` (docs/ARCHITECTURE.md audit findings) + `c2a0ba2` (AUD-001/002/003/003b/004/008/010/011/012/013/014 safe fixes;
-  lint + prod build green) + docs commit (AGENTS.md / TASKS.md / `.opencode/`). **Pushed to origin** (`chore/standardize-project`).
-  NOT merged to main yet — merge pending operator approval + Phase 8 retest (currently SKIPPED).
+- Current branch: `main` (`chore/standardize-project` fully merged)
+- **MERGED** — `chore/standardize-project` → `main` via **PR #35** (`1ed35b3`, includes `b427dda` ARCHITECTURE + `c2a0ba2` AUD safe fixes) plus doc commits `286c0a3` (AGENTS.md/TASKS.md/`.opencode/`) + `300a3da` (phase-8 status). All pushed to `origin/main`. Nothing pending to push.
 - Full audit tracked on GitHub: issues #20–#34 (AUD-001…AUD-014, severity labels). Board (project) still blocked:
   local `gh` token lacks `project` scope — operator must run `gh auth refresh -s project`, then board can be created
   (GraphQL create-project.json already prepared).
