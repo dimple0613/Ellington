@@ -6,8 +6,8 @@
 ## Push (current branch + what to push)
 > Branch-per-task rule (see AGENTS.md): never push directly to main. Update this section per task.
 
-- Current branch: `main` (`chore/standardize-project` + `fix/admin-email-consistency` fully merged)
-- **MERGED** — `chore/standardize-project` → `main` via **PR #35** (`1ed35b3`, includes `b427dda` ARCHITECTURE + `c2a0ba2` AUD safe fixes) plus doc commits `286c0a3` (AGENTS.md/TASKS.md/`.opencode/`) + `300a3da` (phase-8 status). **MERGED** — `fix/admin-email-consistency` → `main` (`2ea46bf`: default admin email now `admin@ellington.com` in seed fallback + login/forgot-password placeholders). All pushed to `origin/main`. Nothing pending to push.
+- Current branch: `main` (`chore/standardize-project`, `fix/admin-email-consistency`, `fix/aud-009-api-envelope` fully merged)
+- **MERGED** — `chore/standardize-project` → `main` via **PR #35** (`1ed35b3`, includes `b427dda` ARCHITECTURE + `c2a0ba2` AUD safe fixes) plus doc commits `286c0a3` (AGENTS.md/TASKS.md/`.opencode/`) + `300a3da` (phase-8 status). **MERGED** — `fix/admin-email-consistency` → `main` (`2ea46bf`: default admin email now `admin@ellington.com` in seed fallback + login/forgot-password placeholders). **MERGED** — `fix/aud-009-api-envelope` → `main` (`421594a` + `8058952`: 13 routes on `{ ok, data, error }` envelope). All pushed to `origin/main`. Nothing pending to push.
 - Full audit tracked on GitHub: issues #20–#34 (AUD-001…AUD-014, severity labels). Board (project) still blocked:
   local `gh` token lacks `project` scope — operator must run `gh auth refresh -s project`, then board can be created
   (GraphQL create-project.json already prepared).
