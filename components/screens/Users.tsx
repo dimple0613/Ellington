@@ -3,6 +3,12 @@ import { AC } from "../../lib/format";
 
 type UserRow = { name: string; email: string; role: string; projects: string; lastActive: string; tfa: string; status: string };
 
+type AdminRow = {
+  name?: string | null;
+  email: string;
+  role?: string | null;
+};
+
 const PERMS = ["CRE", "REA", "UPD", "DEL", "APR", "EXP"];
 const USERS: UserRow[] = [
   { name: "Khalid Al Fahim", email: "k.fahim@ellington.ae", role: "CEO", projects: "All", lastActive: "Just now", tfa: "Enabled", status: "Active" },
@@ -74,7 +80,7 @@ export default function UsersScreen() {
       .then((r) => (r.ok ? r.json() : null))
       .then((j) => {
         if (!active || !j || !Array.isArray(j.users)) return;
-        const rows: UserRow[] = j.users.map((u: any) => ({
+        const rows: UserRow[] = (j.users as AdminRow[]).map((u) => ({
           name: u.name || u.email,
           email: u.email,
           role: u.role === "super_admin" ? "CEO" : u.role || "viewer",

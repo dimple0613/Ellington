@@ -23,8 +23,17 @@ async function hmacSign(data: string, secret: string): Promise<string> {
 
 const SECRET_DEFAULT = "dev-secret-change-me";
 
+function requireSecret(): string {
+  const secret = process.env.JWT_SECRET;
+  if (secret) return secret;
+  if (typeof process.env.NODE_ENV !== "undefined" && process.env.NODE_ENV !== "production") {
+    return SECRET_DEFAULT;
+  }
+  throw new Error("JWT_SECRET is not set");
+}
+
 export async function sign(payload: Omit<Session, "exp"> & { exp?: number }): Promise<string> {
-  const SECRET = process.env.JWT_SECRET || SECRET_DEFAULT;
+  const SECRET = requireSecret();
   const exp = payload.exp ?? Date.now() + 86400000;
   const body = btoa(JSON.stringify({ ...payload, exp }));
   const sig = await hmacSign(body, SECRET);
@@ -33,7 +42,12 @@ export async function sign(payload: Omit<Session, "exp"> & { exp?: number }): Pr
 
 export async function verify(token: string | undefined | null): Promise<Session | null> {
   if (!token) return null;
-  const SECRET = process.env.JWT_SECRET || SECRET_DEFAULT;
+  let SECRET: string;
+  try {
+    SECRET = requireSecret();
+  } catch {
+    return null;
+  }
   const [body, sig] = token.split(".");
   if (!body || !sig) return null;
   const expectedSig = await hmacSign(body, SECRET);
@@ -61,13 +75,17 @@ function parseCookies(req: NextApiRequest): Record<string, string> {
   return out;
 }
 
+function findSessionCookie(cookies: Record<string, string>): string | undefined {
+  return cookies["__Host-session"] ?? cookies["session"];
+}
+
 export async function getSessionFromReq(req: NextApiRequest): Promise<Session | null> {
-  return verify(parseCookies(req)["session"]);
+  return verify(findSessionCookie(parseCookies(req)));
 }
 
 export async function verifyFromCookieHeader(cookieHeader: string | null | undefined): Promise<Session | null> {
   if (!cookieHeader) return null;
-  const match = /(?:^|;\s*)session=([^;]+)/.exec(cookieHeader);
+  const match = /(?:^|;\s*)(?:__Host-)?session=([^;]+)/.exec(cookieHeader);
   if (!match) return null;
   return verify(decodeURIComponent(match[1]));
 }
@@ -75,13 +93,14 @@ export async function verifyFromCookieHeader(cookieHeader: string | null | undef
 export function serializeCookie(
   name: string,
   value: string,
-  opts: { maxAge?: number; httpOnly?: boolean; path?: string; sameSite?: "lax" | "strict" | "none" } = {}
+  opts: { maxAge?: number; httpOnly?: boolean; path?: string; sameSite?: "lax" | "strict" | "none"; secure?: boolean } = {}
 ): string {
   const parts = [`${name}=${encodeURIComponent(value)}`];
   if (opts.maxAge != null) parts.push(`Max-Age=${opts.maxAge}`);
   if (opts.path) parts.push(`Path=${opts.path}`);
   if (opts.httpOnly) parts.push("HttpOnly");
   if (opts.sameSite) parts.push(`SameSite=${opts.sameSite}`);
+  if (opts.secure) parts.push("Secure");
   return parts.join("; ");
 }
 
@@ -93,7 +112,7 @@ export function withSession<
 ) {
   return async (req: R, res: S): Promise<void> => {
     const cookies = parseCookies(req);
-    const session = await verify(cookies["session"]);
+    const session = await verify(findSessionCookie(cookies));
     if (!session) {
       res.status(401).json({ error: "Not signed in" });
       return;

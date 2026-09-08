@@ -23,12 +23,16 @@
 # misc
 .DS_Store
 *.pem
+*.local
 npm-debug.log*
 next-env.d.ts
 tsconfig.tsbuildinfo
 next-env.d.ts
 *.tsbuildinfo
 .vscode/.idea/
+
+# database backups (production data snapshots — never commit)
+/backups/
 
 # local tools
 .playwright-mcp/

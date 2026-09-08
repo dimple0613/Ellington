@@ -1,25 +1,15 @@
 import { query } from "./db";
 import type { Session } from "./session";
+import type { NextApiRequest, NextApiResponse } from "next";
+import { withSession } from "./session";
+import { MODULE_LIST, ACTION_LIST } from "./permission-map";
+import type { PermAction, PermModule } from "./permission-map";
 
-export type Action = "CRE" | "REA" | "UPD" | "DEL" | "APR" | "EXP";
-export type Module =
-  | "Dashboard"
-  | "Inventory"
-  | "Sales"
-  | "Finance"
-  | "Handover"
-  | "Settings";
+export type Action = PermAction;
+export type Module = PermModule;
 
-export const MODULES: Module[] = [
-  "Dashboard",
-  "Inventory",
-  "Sales",
-  "Finance",
-  "Handover",
-  "Settings",
-];
-
-export const ACTIONS: Action[] = ["CRE", "REA", "UPD", "DEL", "APR", "EXP"];
+export const MODULES: PermModule[] = MODULE_LIST;
+export const ACTIONS: PermAction[] = ACTION_LIST;
 
 type PermRow = Partial<Record<Module, Partial<Record<Action, boolean>>>>;
 
@@ -59,11 +49,6 @@ export async function hasPerm(
   const perms = await getRolePerms(session.role);
   return !!(perms[module]?.[action]);
 }
-
-export const AUTH_ONLY_MODULES: Record<string, Module> = {};
-
-import type { NextApiRequest, NextApiResponse } from "next";
-import { withSession } from "./session";
 
 /**
  * Combine session auth with a module/action permission check.

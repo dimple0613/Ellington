@@ -17,6 +17,16 @@ const CONV = ["","52%","65%","60%","71%"];
 /* ── kanban columns ─────────────────────────────────────────────── */
 type Card = { name:string; flag:string; src:string; budget:string; chips:string[]; agent:string; age:string; live:boolean };
 type Col = { label:string; count:number; val:string; color:string; cards:Card[] };
+
+type ApiLead = {
+  name: string;
+  source?: string;
+  stage?: string;
+  budgetMin?: number;
+  budgetMax?: number;
+  agent?: string;
+  live?: boolean;
+};
 const LEADS_COLS: Col[] = [
   { label:"New",count:8,val:"AED 14.2M",color:"#8B7CF6",cards:[
     {name:"Hassan Al Rayes",flag:"UAE",src:"Property Finder",budget:"AED 2.0-2.6M",chips:["2BR","1204"],agent:"HA",age:"2 days",live:true},
@@ -174,11 +184,13 @@ function Leads({ onNewBooking, onBookLead }: { onNewBooking: () => void; onBookL
         if (!active || !j || !Array.isArray(j.leads)) return;
         const order = ["new", "contacted", "qualified", "viewing", "negotiation", "eoi", "booked", "lost"];
         const byStage: Record<string, Card[]> = { new: [], contacted: [], qualified: [], viewing: [], negotiation: [], eoi: [], booked: [], lost: [] };
-        (j.leads as any[]).forEach((l) => {
+        (j.leads as ApiLead[]).forEach((l) => {
           const st = (l.stage || "new").toLowerCase();
           const key = byStage[st] ? st : "new";
-          const budget = l.budgetMin || l.budgetMax
-            ? "AED " + (l.budgetMin || l.budgetMax).toLocaleString("en-US")
+          const budgetMin = l.budgetMin || 0;
+          const budgetMax = l.budgetMax || 0;
+          const budget = budgetMin || budgetMax
+            ? "AED " + (budgetMin || budgetMax).toLocaleString("en-US")
             : "AED -";
           byStage[key].push({
             name: l.name,
