@@ -19,6 +19,18 @@ const PROJECTS = [
 
 const BUYERS = ["Adam", "Fatima Al Mulla", "Khalid Rahman", "Priya Nair", "Omar Haddad", "Sara Bennett", "Ravi Menon", "Layla Hassan"];
 const UNIT_TYPES = ["1BR", "2BR", "3BR"];
+
+// H21 flagship tower referenced by the finance seeds (collections / invoices / PDC / refund calculator).
+const H21_UNITS = [
+  { no: "H21-T1-2705", type: "3BR", beds: 4, area: 1080, price: 4120000 },
+  { no: "H21-T1-4102", type: "2BR", beds: 2, area: 860, price: 2860000 },
+  { no: "H21-T1-2404", type: "3BR", beds: 3, area: 980, price: 1940000 },
+  { no: "H21-T1-1602", type: "2BR", beds: 2, area: 760, price: 1210000 },
+  { no: "H21-T1-2202", type: "2BR", beds: 2, area: 720, price: 864000 },
+  { no: "H21-T1-3601", type: "2BR", beds: 2, area: 700, price: 640000 },
+  { no: "H21-T1-1103", type: "1BR", beds: 1, area: 540, price: 412000 },
+  { no: "H21-T1-0904", type: "1BR", beds: 1, area: 500, price: 208000 },
+];
 const AGENTS = ["Reema", "John D", "Sana", "Yusuf"];
 
 async function main() {
@@ -80,6 +92,20 @@ async function main() {
     }
   }
 
+  // H21 flagship tower — referenced by finance seeds (collections / invoices / PDC / refund calculator).
+  const h21 = await c.query(
+    `INSERT INTO projects (code,name,location,status,units_total,gdv,sold,collected,due_date)
+     VALUES ('H21','Harbour Heights I','Palm Jumeirah, Dubai','under_construction',8,12600000,0,0,NULL) RETURNING id`
+  );
+  const h21Id = h21.rows[0].id;
+  for (const u of H21_UNITS) {
+    await c.query(
+      `INSERT INTO units (project_id, no, type, beds, area, "view", status, price, buyer_id)
+       VALUES ($1,$2,$3,$4,$5,'Skyline','sold',$6,NULL)`,
+      [h21Id, u.no, u.type, u.beds, u.area, u.price]
+    );
+  }
+
   // receipts
   for (const p of PROJECTS) {
     const pr = await c.query("SELECT id FROM projects WHERE code=$1", [p.code]);
@@ -89,6 +115,42 @@ async function main() {
       await c.query(
         "INSERT INTO receipts (project_id, amount, method, matched, received_at) VALUES ($1,$2,'bank_transfer',true, now() - ($3 || ' days')::interval)",
         [pid, Math.round(p.collected / parts), i]
+      );
+    }
+  }
+
+  // PDC sample cheques on H21 — register shows Held / Presented / Cleared / Bounced.
+  const h21r = await c.query("SELECT id FROM projects WHERE code='H21'");
+  if (h21r.rows.length) {
+    const pid = h21r.rows[0].id;
+    await c.query(
+      `INSERT INTO receipts (project_id, amount, method, reference, matched, received_at, cheque_no, cheque_date, bank_name, pdc_status) VALUES
+       ($1,640000,'cheque','RCP-H21-004706',false,now() - interval '27 days','CHQ-883964','2026-08-12','HSBC','Bounced'),
+       ($1,268000,'cheque','RCP-H21-004690',false,now() - interval '12 days','CHQ-883964','2026-08-12','HSBC','Bounced'),
+       ($1,298400,'cheque','RCP-H21-004708',false,now() - interval '5 days','CHQ-884120','2026-09-14','Mashreq','Presented'),
+       ($1,234500,'cheque','RCP-H21-004703',false,now() - interval '12 days','CHQ-884131','2026-09-22','Emirates NBD','Held'),
+       ($1,312000,'cheque','RCP-H21-004705',false,now() - interval '11 days','CHQ-884102','2026-09-01','Emirates NBD','Held'),
+       ($1,186250,'cheque','RCP-H21-004707',false,now() - interval '21 days','CHQ-883991','2026-08-18','ADIB','Cleared')`,
+      [pid]
+    );
+
+    // Bank-transfer receipts feeding the default-calculation refund check (T10).
+    const paidUnits: [string, number][] = [
+      ["H21-T1-2705", 1236000],
+      ["H21-T1-4102", 990000],
+      ["H21-T1-2404", 580000],
+      ["H21-T1-1602", 400000],
+      ["H21-T1-2202", 300000],
+      ["H21-T1-3601", 250000],
+      ["H21-T1-1103", 150000],
+      ["H21-T1-0904", 100000],
+    ];
+    for (const [no, amount] of paidUnits) {
+      const u = await c.query("SELECT id FROM units WHERE project_id=$1 AND no=$2", [pid, no]);
+      if (!u.rows.length) continue;
+      await c.query(
+        "INSERT INTO receipts (project_id, unit_id, amount, method, reference, matched) VALUES ($1,$2,$3,'bank_transfer','RCP-H21-RECON',true)",
+        [pid, u.rows[0].id, amount]
       );
     }
   }

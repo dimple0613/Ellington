@@ -100,6 +100,24 @@ CREATE TABLE IF NOT EXISTS receipts (
   received_at TIMESTAMPTZ DEFAULT now()
 );
 
+ALTER TABLE receipts ADD COLUMN IF NOT EXISTS cheque_no TEXT;
+ALTER TABLE receipts ADD COLUMN IF NOT EXISTS cheque_date DATE;
+ALTER TABLE receipts ADD COLUMN IF NOT EXISTS bank_name TEXT;
+ALTER TABLE receipts ADD COLUMN IF NOT EXISTS pdc_status TEXT;
+
+-- Finance (PLINTH parity T11): bank-statement import queue for escrow reconciliation.
+CREATE TABLE IF NOT EXISTS bank_statements (
+  id SERIAL PRIMARY KEY,
+  value_date DATE,
+  reference TEXT,
+  amount NUMERIC DEFAULT 0,
+  description TEXT,
+  matched BOOLEAN DEFAULT false,
+  matched_receipt_id INT REFERENCES receipts(id),
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_bankstatements_matched ON bank_statements(matched);
+
 CREATE TABLE IF NOT EXISTS payment_milestones (
   id SERIAL PRIMARY KEY,
   unit_id INT REFERENCES units(id),
@@ -345,5 +363,11 @@ BEGIN
       ('Facade complete', date '2027-06-14', date '2027-07-02', NULL, 'forecast', 14, 8, 4, 0.14),
       ('Handover', date '2027-12-31', date '2027-12-31', NULL, 'forecast', 16, 0, 0, 0.00)
     ) AS mk(milestone, planned, forecast, actual, status, weight, planned_pct, actual_pct, share);
+  END IF;
+IF NOT EXISTS (SELECT 1 FROM bank_statements) THEN
+    INSERT INTO bank_statements (value_date, reference, amount, description) VALUES
+      ('2026-08-24','RCP-H21-004712',367875,'MENON RM 3302'),
+      ('2026-08-24','RCP-H21-004711',512000,'AISHA AL MARRI'),
+      ('2026-08-23','CHQ-883964',268000,'CHQ BOUNCED · RE-PRESENTED');
   END IF;
 END $$;
