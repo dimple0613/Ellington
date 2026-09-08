@@ -18,7 +18,7 @@ export default withSession(async function (req: NextApiRequest, res: NextApiResp
     if (!(await hasPerm(session, "Settings", "REA"))) {
       return fail(res, "You don't have permission to perform this action.", 403);
     }
-    const admins = await query<any>(
+    const admins = await query<{ id: number; full_name: string; email: string; role: string }>(
       `SELECT id, full_name, email, role FROM admins ORDER BY id`
     );
     const data = admins.rows.map((a) => ({
@@ -44,14 +44,14 @@ export default withSession(async function (req: NextApiRequest, res: NextApiResp
     if (!ALLOWED_ROLES.has(r)) return fail(res, "Unsupported role: " + r);
     const pwd = password ? String(password) : DEFAULT_PASSWORD;
 
-    const existing = await query<any>(
+    const existing = await query<{ id: number }>(
       "SELECT id FROM admins WHERE lower(email) = lower($1)",
       [addr]
     );
     if (existing.rows.length) return fail(res, "Email already exists", 409);
 
     const hash = await hashPassword(pwd);
-    const ins = await query<any>(
+    const ins = await query<{ id: number }>(
       "INSERT INTO admins (full_name, email, password_hash, role) VALUES ($1,$2,$3,$4) RETURNING id",
       [String(name), addr, hash, r]
     );

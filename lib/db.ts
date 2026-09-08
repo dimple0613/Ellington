@@ -29,9 +29,9 @@ const isNeon = (connectionString: string) => {
   }
 };
 
-export async function query<T extends Record<string, any> = any>(
+export async function query<T extends object = Record<string, unknown>>(
   text: string,
-  params?: any[]
+  params?: unknown[]
 ): Promise<{ rows: T[] }> {
   // Priority: Hyperdrive binding (Cloudflare Worker) -> DATABASE_URL env.
   const connectionString = getHyperdriveConnection() || process.env.DATABASE_URL;

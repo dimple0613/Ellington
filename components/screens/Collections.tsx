@@ -3,6 +3,7 @@ import { useRouter } from "next/router";
 import { AC } from "../../lib/format";
 import { exportCollectionNotice } from "../../lib/pdf";
 import { fetchJSON } from "../../lib/api";
+import type { FinanceData } from "../../lib/api-types";
 
 type CollRow = { buyer: string; unit: string; amount: string; days: number; stage: string; action: string };
 type StageMap = Record<string, { bg: string; color: string }>;
@@ -47,7 +48,7 @@ export default function CollectionsScreen() {
 
   useEffect(() => {
     let active = true;
-    fetchJSON<{ collections: any[] }>("/api/finance")
+    fetchJSON<FinanceData>("/api/finance")
       .then((j) => {
         if (!active || !j?.collections) return;
         setLiveRows(j.collections.map((c) => ({

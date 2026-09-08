@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { AC } from "../../lib/format";
 import { fetchJSON } from "../../lib/api";
+import type { CashflowData } from "../../lib/api-types";
 
 const FC: Record<string, [string, number][]> = {
   "7": [["Mon", 8.4], ["Tue", 12.1], ["Wed", 6.2], ["Thu", 14.8], ["Fri", 3.1], ["Sat", 1.2], ["Sun", 0.6]],
@@ -40,7 +41,7 @@ export default function CashflowScreen() {
 
   useEffect(() => {
     let active = true;
-    fetchJSON<{ cashflow: any }>("/api/finance-analytics")
+    fetchJSON<{ cashflow: CashflowData }>("/api/finance-analytics")
       .then((j) => { if (active && j?.cashflow) setLive(j.cashflow); })
       .catch((e) => { if (active) setApiError(e?.message || "Failed to load cashflow"); });
     return () => { active = false; };

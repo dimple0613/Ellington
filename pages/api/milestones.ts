@@ -6,14 +6,23 @@ import { ok, methodNotAllowed } from "../../lib/api";
 export default withPerm("Finance", "REA", async function (req: NextApiRequest, res: NextApiResponse) {
   if (req.method === "GET") {
     const unitNo = (req.query.unit as string) || "";
-    const params: any[] = [];
+    const params: unknown[] = [];
     const where: string[] = [];
     if (unitNo) {
       params.push(unitNo);
       where.push("u.no = $1");
     }
 
-    const milestones = await query<any>(
+    const milestones = await query<{
+      id: number;
+      unit_no: string;
+      project_code: string;
+      milestone: string;
+      due_date: string | Date;
+      percent: number | string;
+      amount: number | string;
+      status: string;
+    }>(
       `SELECT m.id, u.no AS unit_no, p.code AS project_code, m.milestone, m.due_date,
               m."percent", m.amount, m.status
        FROM payment_milestones m

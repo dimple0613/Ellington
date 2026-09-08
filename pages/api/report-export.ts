@@ -2,7 +2,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { withPerm } from "../../lib/permissions";
 import { query } from "../../lib/db";
 
-type K = { col: string; label?: string; fn?: (v: any) => string };
+type K = { col: string; label?: string; fn?: (v: unknown) => string };
 const COLS: Record<string, K[]> = {
   "Sales register": [
     { col: "code", label: "Project" }, { col: "name", label: "Unit" }, { col: "type" },
@@ -25,20 +25,20 @@ const COLS: Record<string, K[]> = {
   ],
   "Receipts register": [
     { col: "reference", label: "Ref" }, { col: "name", label: "Buyer" }, { col: "method" },
-    { col: "received_at", label: "Date", fn: (v) => new Date(v).toLocaleDateString("en-GB") },
+{ col: "received_at", label: "Date", fn: (v) => new Date(String(v)).toLocaleDateString("en-GB") },
     { col: "amount", fn: (v) => Number(v).toLocaleString("en-US") }, { col: "matched" },
   ],
   "Cashflow forecast": [
-    { col: "unit", label: "Unit" }, { col: "milestone" }, { col: "due_date", label: "Due", fn: (v) => new Date(v).toLocaleDateString("en-GB") },
+    { col: "unit", label: "Unit" }, { col: "milestone" }, { col: "due_date", label: "Due", fn: (v) => new Date(String(v)).toLocaleDateString("en-GB") },
     { col: "amount", fn: (v) => Number(v).toLocaleString("en-US") }, { col: "status" },
   ],
   "Escrow reconciliation": [
-    { col: "reference", label: "Ref" }, { col: "direction" }, { col: "received_at", label: "Date", fn: (v) => new Date(v).toLocaleDateString("en-GB") },
+    { col: "reference", label: "Ref" }, { col: "direction" }, { col: "received_at", label: "Date", fn: (v) => new Date(String(v)).toLocaleDateString("en-GB") },
     { col: "amount", fn: (v) => Number(v).toLocaleString("en-US") }, { col: "bank" }, { col: "system", label: "System" }, { col: "matched" },
   ],
   "Invoice register": [
     { col: "no", label: "Invoice" }, { col: "buyer" }, { col: "unit_no", label: "Unit" },
-    { col: "milestone" }, { col: "due", label: "Due", fn: (v) => new Date(v).toLocaleDateString("en-GB") },
+    { col: "milestone" }, { col: "due", label: "Due", fn: (v) => new Date(String(v)).toLocaleDateString("en-GB") },
     { col: "amount", fn: (v) => Number(v).toLocaleString("en-US") }, { col: "paid" },
   ],
 };
@@ -71,23 +71,23 @@ const FALLBACK: Record<string, { sql: string; label: string }> = {
   "Snagging summary": { sql: `SELECT severity, COUNT(*)::int AS n FROM snag_items GROUP BY severity`, label: "Snag items by severity" },
 };
 
-const esc = (v: any) => {
+const esc = (v: unknown) => {
   const s = v === null || v === undefined ? "" : String(v);
   return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
 };
 
 export default withPerm("Finance", "REA", async function (req: NextApiRequest, res: NextApiResponse) {
   const name = String(req.query.report || "").trim();
-  let rows: Record<string, any>[];
+  let rows: Record<string, unknown>[];
   let cols: K[];
   const sql = SQL[name];
   const fb = FALLBACK[name];
   if (sql) {
     cols = COLS[name];
-    rows = (await query<any>(sql)).rows;
+    rows = (await query<Record<string, unknown>>(sql)).rows;
   } else if (fb) {
     cols = [{ col: fb.label }];
-    rows = (await query<any>(fb.sql)).rows;
+    rows = (await query<Record<string, unknown>>(fb.sql)).rows;
   } else {
     res.status(404).json({ ok: false, error: "Unknown report: " + name });
     return;

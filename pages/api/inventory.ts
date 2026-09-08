@@ -8,7 +8,7 @@ export default withPerm("Inventory", "REA", async function (req: NextApiRequest,
   const status = (req.query.status as string) || "all";
 
   const conds: string[] = [];
-  const params: any[] = [];
+  const params: unknown[] = [];
 
   if (project && project !== "all") {
     params.push(project);
@@ -21,7 +21,19 @@ export default withPerm("Inventory", "REA", async function (req: NextApiRequest,
 
   const where = conds.length ? "WHERE " + conds.join(" AND ") : "";
 
-  const units = await query<any>(
+  const units = await query<{
+    id: number;
+    no: string;
+    type: string;
+    beds: number | string;
+    area: number | string;
+    view: string;
+    status: string;
+    price: number | string;
+    project_code: string;
+    project_name: string;
+    buyer: string | null;
+  }>(
     `SELECT u.id, u.no, u.type, u.beds, u.area, u."view", u.status, u.price,
             p.code AS project_code, p.name AS project_name,
             b.name AS buyer
@@ -33,7 +45,7 @@ export default withPerm("Inventory", "REA", async function (req: NextApiRequest,
     params
   );
 
-  const summary = await query<any>(
+  const summary = await query<{ status: string; n: number }>(
     `SELECT u.status, COUNT(*)::int AS n FROM units u
      JOIN projects p ON p.id = u.project_id
      ${project && project !== "all" ? `WHERE p.code = $1` : ""}
@@ -41,7 +53,7 @@ export default withPerm("Inventory", "REA", async function (req: NextApiRequest,
     project && project !== "all" ? [project] : []
   );
 
-  const projects = await query<any>(
+  const projects = await query<{ code: string; name: string }>(
     `SELECT code, name FROM projects ORDER BY code`
   );
 

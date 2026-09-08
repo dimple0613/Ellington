@@ -4,12 +4,22 @@ import { query } from "../../lib/db";
 import { ok } from "../../lib/api";
 
 export default withPerm("Dashboard", "REA", async function (_req: NextApiRequest, res: NextApiResponse) {
-  const projects = await query<any>(
+  const projects = await query<{
+    code: string;
+    name: string;
+    location: string | null;
+    status: string;
+    units_total: number | string;
+    gdv: number | string;
+    sold: number | string;
+    collected: number | string;
+    due_date: string | Date | null;
+  }>(
     `SELECT code, name, location, status, units_total, gdv, sold, collected, due_date
      FROM projects ORDER BY code`
   );
 
-  const soldCounts = await query<any>(
+  const soldCounts = await query<{ code: string; n: number }>(
     `SELECT p.code, COUNT(u.id)::int AS n
      FROM projects p
      LEFT JOIN units u ON u.project_id = p.id AND u.status IN ('sold','booked')

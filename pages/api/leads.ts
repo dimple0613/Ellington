@@ -25,7 +25,17 @@ function stageIndex(stage: string): number {
 
 export default withPerm("Sales", "REA", async function (req: NextApiRequest, res: NextApiResponse) {
   if (req.method === "GET") {
-    const leads = await query<any>(
+    const leads = await query<{
+      id: number;
+      name: string;
+      source: string;
+      stage: string;
+      budget_min: number | string | null;
+      budget_max: number | string | null;
+      agent: string;
+      phone: string;
+      project_code: string | null;
+    }>(
       `SELECT l.id, l.name, COALESCE(l.source,'referral') AS source, COALESCE(l.stage,'new') AS stage,
               l.budget_min, l.budget_max, COALESCE(l.agent,'') AS agent, l.phone,
               p.code AS project_code
@@ -58,11 +68,11 @@ export default withPerm("Sales", "REA", async function (req: NextApiRequest, res
 
     let projectId: number | null = null;
     if (project_code) {
-      const pr = await query<any>("SELECT id FROM projects WHERE code = upper($1)", [project_code]);
+      const pr = await query<{ id: number }>("SELECT id FROM projects WHERE code = upper($1)", [project_code]);
       projectId = pr.rows.length ? pr.rows[0].id : null;
     }
 
-    const ins = await query<any>(
+    const ins = await query<{ id: number }>(
       `INSERT INTO leads (project_id, name, source, phone, stage, budget_min, budget_max, agent)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
        RETURNING id`,

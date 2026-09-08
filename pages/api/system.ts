@@ -6,11 +6,23 @@ import { ok, fail, methodNotAllowed } from "../../lib/api";
 export default withPerm("Settings", "REA", async function (req: NextApiRequest, res: NextApiResponse, session) {
   if (req.method === "GET") {
     const [audit, settings] = await Promise.all([
-      query<any>(
+      query<{
+        ts: string | Date;
+        actor: string;
+        role: string;
+        action: string;
+        object: string;
+        field: string | null;
+        before_val: string | null;
+        after_val: string | null;
+        sensitive: boolean | null;
+      }>(
         `SELECT ts, actor, role, action, object, field, before_val, after_val, sensitive
          FROM audit_log ORDER BY ts DESC LIMIT 200`
       ),
-      query<any>("SELECT company, brand FROM app_settings WHERE id = 1 LIMIT 1"),
+      query<{ company: Record<string, unknown> | null; brand: Record<string, unknown> | null }>(
+        "SELECT company, brand FROM app_settings WHERE id = 1 LIMIT 1"
+      ),
     ]);
     return ok(res, {
       audit: audit.rows,
@@ -25,7 +37,9 @@ export default withPerm("Settings", "REA", async function (req: NextApiRequest, 
     if ((!company || typeof company !== "object") && (!brand || typeof brand !== "object")) {
       return fail(res, "company or brand object is required");
     }
-    const existing = await query<any>("SELECT company, brand FROM app_settings WHERE id = 1 LIMIT 1");
+    const existing = await query<{ company: Record<string, unknown> | null; brand: Record<string, unknown> | null }>(
+      "SELECT company, brand FROM app_settings WHERE id = 1 LIMIT 1"
+    );
     const prev = existing.rows[0] || { company: {}, brand: {} };
     const nextCompany = company && typeof company === "object" ? company : prev.company;
     const nextBrand = brand && typeof brand === "object" ? brand : prev.brand;

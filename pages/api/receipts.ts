@@ -6,14 +6,25 @@ import { ok, fail, methodNotAllowed } from "../../lib/api";
 export default withPerm("Finance", "REA", async function (req: NextApiRequest, res: NextApiResponse) {
   if (req.method === "GET") {
     const project = (req.query.project as string) || "";
-    const params: any[] = [];
+    const params: unknown[] = [];
     const where: string[] = [];
     if (project && project !== "all") {
       params.push(project);
       where.push("p.code = $1");
     }
 
-    const receipts = await query<any>(
+    const receipts = await query<{
+      id: number;
+      amount: number | string;
+      method: string;
+      reference: string;
+      matched: boolean;
+      received_at: string | Date;
+      project_code: string;
+      project_name: string;
+      buyer_name: string | null;
+      unit_no: string | null;
+    }>(
       `SELECT r.id, r.amount, r.method, r.reference, r.matched, r.received_at,
               p.code AS project_code, p.name AS project_name,
               b.name AS buyer_name, u.no AS unit_no
@@ -46,18 +57,18 @@ export default withPerm("Finance", "REA", async function (req: NextApiRequest, r
       return fail(res, "project_code and amount are required");
     }
 
-    const pr = await query<any>("SELECT id FROM projects WHERE code = upper($1)", [project_code]);
+    const pr = await query<{ id: number }>("SELECT id FROM projects WHERE code = upper($1)", [project_code]);
     if (!pr.rows.length) return fail(res, "Unknown project");
     const projectId = pr.rows[0].id;
 
     let buyerId: number | null = null;
     if (buyer_name) {
-      const b = await query<any>(
+      const b = await query<{ id: number }>(
         "SELECT id FROM buyers WHERE lower(name) = lower($1) LIMIT 1",
         [buyer_name]
       );
       if (!b.rows.length) {
-        const nb = await query<any>(
+        const nb = await query<{ id: number }>(
           "INSERT INTO buyers (name, kyc_status) VALUES ($1,'pending') RETURNING id",
           [buyer_name]
         );
@@ -69,19 +80,19 @@ export default withPerm("Finance", "REA", async function (req: NextApiRequest, r
 
     let unitId: number | null = null;
     if (unit_no) {
-      const u = await query<any>(
+      const u = await query<{ id: number }>(
         "SELECT id FROM units WHERE no = $1 AND project_id = $2 LIMIT 1",
         [unit_no, projectId]
       );
       if (u.rows.length) unitId = u.rows[0].id;
     }
 
-    const ins = await query<any>(
+    const ins = await query<{ id: number }>(
       `INSERT INTO receipts (project_id, unit_id, buyer_id, amount, method, reference, matched)
        VALUES ($1,$2,$3,$4,$5,$6,false) RETURNING id`,
       [projectId, unitId, buyerId, amt, method || "bank_transfer", reference || null]
     );
-    await query<any>(
+    await query(
       "UPDATE projects SET collected = collected + $2 WHERE id = $1",
       [projectId, amt]
     );

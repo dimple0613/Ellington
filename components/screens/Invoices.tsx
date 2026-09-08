@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { AC } from "../../lib/format";
 import { exportInvoicesLedger } from "../../lib/pdf";
 import { fetchJSON } from "../../lib/api";
+import type { FinanceData } from "../../lib/api-types";
 
 type InvRow = { no: string; buyer: string; unit: string; inst: string; issued: string; due: string; amount: string; paid: string; status: string; viewed: string };
 
@@ -43,7 +44,7 @@ export default function InvoicesScreen() {
 
   useEffect(() => {
     let active = true;
-    fetchJSON<{ invoices: any[] }>("/api/finance")
+    fetchJSON<FinanceData>("/api/finance")
       .then((j) => {
         if (!active || !j?.invoices?.length) return;
         setRows(j.invoices.map((r) => {

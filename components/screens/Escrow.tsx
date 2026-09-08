@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { AC } from "../../lib/format";
 import { fetchJSON } from "../../lib/api";
+import type { FinanceData } from "../../lib/api-types";
 
 type QueueRow = { date: string; desc: string; amount: string; side: string };
 type Obligation = { label: string; value: string; flag: boolean };
@@ -32,7 +33,7 @@ export default function EscrowScreen() {
 
   useEffect(() => {
     let active = true;
-    fetchJSON<{ escrow: { queue: any[]; drawdowns: any[] } }>("/api/finance")
+    fetchJSON<FinanceData>("/api/finance")
       .then((j) => {
         if (!active || !j?.escrow) return;
         if (j.escrow.queue.length) {

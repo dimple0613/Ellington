@@ -6,6 +6,7 @@
 ## Push (current branch + what to push)
 > Branch-per-task rule (see AGENTS.md): never push directly to main. Update this section per task.
 
+- Current branch: `fix/aud-052-any-types` (issue #52: remove `any` types in screens + API routes). To push: lib/api-types.ts (shared FinanceData/CashflowData shapes), 4 screens (Collections/Invoices/Escrow/Cashflow) typed via fetchJSON, 11 API routes `query<any>` → typed rows, lib/db.ts default `any`→`Record<string, unknown>` (params `unknown[]`), report-export `any`→`unknown`. lint green. Other local branches: `feat/auth-ui-toast` (UP TO DATE WITH main, pushed).
 - Current branch: `main` (`ad22adf`; `fix/aud-006-system`, `fix/aud-006-finance`, `fix/aud-015-analytics` merged; `fix/aud-015-analytics` branch deleted local+remote).
 - **AUD-015 (#37) CLOSED/MERGED** — `fix/aud-015-analytics` (`ad22adf`): cashflow forecast + report exports live via `/api/finance-analytics` + `/api/report-export`; branch deleted.
 - **DEPLOYED TO CLOUDFLARE** — `npx wrangler deploy` (`wrangler.jsonc`, account `49dcdcff…`): worker `ellington-worker` live at

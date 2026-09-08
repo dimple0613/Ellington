@@ -10,10 +10,10 @@ export default withPerm("Inventory", "CRE", async function (req: NextApiRequest,
     const miss = missingFields(body, ["code", "name"]);
     if (miss) return fail(res, miss);
 
-    const existing = await query<any>("SELECT id FROM projects WHERE code = upper($1)", [code]);
+    const existing = await query<{ id: number }>("SELECT id FROM projects WHERE code = upper($1)", [code]);
     if (existing.rows.length) return fail(res, "Project code already exists", 409);
 
-    const ins = await query<any>(
+    const ins = await query<{ id: number }>(
       `INSERT INTO projects (code, name, location, status, units_total, gdv)
        VALUES (upper($1), $2, $3, 'launched', $4, $5) RETURNING id`,
       [code, name, location || null, parseInt(units_total as string, 10) || 0, gdv != null ? Number(gdv) : 0]
