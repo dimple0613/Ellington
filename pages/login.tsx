@@ -238,7 +238,7 @@ export default function Login() {
                   setEmail(v);
                   if (errors.email) setErrors((p) => ({ ...p, email: undefined }));
                 }}
-                placeholder="admin@gmail.com"
+                placeholder="admin@ellington.com"
                 error={errors.email}
               />
 

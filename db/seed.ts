@@ -43,7 +43,7 @@ async function main() {
   const initialHash = await hashPassword(process.env.INITIAL_ADMIN_PASSWORD || "Admin123");
   await c.query(
     "INSERT INTO admins (full_name, email, password_hash, role) VALUES ($1,$2,$3,$4)",
-    ["Super Admin", process.env.INITIAL_ADMIN_EMAIL || "admin@gmail.com", initialHash, "super_admin"]
+    ["Super Admin", process.env.INITIAL_ADMIN_EMAIL || "admin@ellington.com", initialHash, "super_admin"]
   );
 
   // projects + units
