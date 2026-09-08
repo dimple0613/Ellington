@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AC } from "../../lib/format";
 import { PROJECTS } from "../../lib/data";
+import { fetchJSON } from "../../lib/api";
 
 const PKG = [
   { name: "Enabling works", weight: 6, planned: 100, actual: 100 },
@@ -54,20 +55,134 @@ const lpill = (s: string) =>
     ? { background: "#FDF4E5", color: "#B07B14" }
     : { background: "#F1F2F6", color: "#6B7180" };
 
+type CMilestone = {
+  id: number;
+  project: string;
+  milestone: string;
+  planned: string;
+  forecast: string;
+  actual: string;
+  status: string;
+  weight: number;
+  planned_pct: number;
+  actual_pct: number;
+  trigger_amt: number;
+  trigger_buyers: number;
+};
+
+type MileView = {
+  id?: number;
+  name: string;
+  planned: string;
+  forecast: string;
+  actual: string;
+  variance: string;
+  status: "Certified" | "Pending" | "Forecast";
+  triggers: string;
+};
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+const fmtDate = (d: string) => {
+  if (!d) return "\u2014";
+  const [y, mo, dd] = d.split("-");
+  const m = MONTHS[Number(mo) - 1];
+  return m ? dd + " " + m + " " + String(y).slice(2) : d;
+};
+
+const dayDiff = (a: string, b: string) =>
+  Math.round((new Date(a).getTime() - new Date(b).getTime()) / 86400000);
+
+const aedCompact = (n: number) =>
+  n >= 1000000
+    ? "AED " + (n / 1000000).toFixed(1) + "M"
+    : "AED " + Math.round(n).toLocaleString("en-US");
+
+const toMileView = (m: CMilestone): MileView => {
+  const base = m.actual || m.forecast;
+  let variance = "On track";
+  if (base && m.planned) {
+    const d = dayDiff(base, m.planned);
+    variance = d === 0 ? "0 d" : (d > 0 ? "+" : "\u2212") + Math.abs(d) + " d";
+  }
+  const status: MileView["status"] =
+    m.status === "certified" ? "Certified" : m.status === "pending" ? "Pending" : "Forecast";
+  return {
+    id: m.id,
+    name: m.milestone,
+    planned: fmtDate(m.planned),
+    forecast: fmtDate(m.forecast),
+    actual: fmtDate(m.actual),
+    variance,
+    status,
+    triggers: aedCompact(m.trigger_amt) + " \u00b7 " + m.trigger_buyers + " buyers",
+  };
+};
+
 export default function ConstructionScreen({ scope = "ALL" }: { scope?: string }) {
   const proj = PROJECTS.find((p) => p.code === scope);
   const projName = proj ? proj.name : "Belgravia Heights III";
   const [certified, setCertified] = useState(false);
   const [uploaded, setUploaded] = useState(false);
   const [photoDates, setPhotoDates] = useState(PHOTOS);
+  const [rows, setRows] = useState<CMilestone[]>([]);
+
+  useEffect(() => {
+    let active = true;
+    fetchJSON<{ milestones: CMilestone[] }>(
+      "/api/construction" + (scope && scope !== "ALL" ? "?project=" + encodeURIComponent(scope) : "")
+    )
+      .then((j) => {
+        if (active && Array.isArray(j.milestones)) setRows(j.milestones);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [scope]);
+
+  const live = rows.length > 0;
+
+  const miles: MileView[] = useMemo(
+    () => (live ? rows.map(toMileView) : (MILES.map((m) => ({ ...m })) as MileView[])),
+    [rows, live]
+  );
+
+  const pkgs = useMemo(
+    () =>
+      live
+        ? rows.map((m) => ({ name: m.milestone, weight: m.weight, planned: m.planned_pct, actual: m.actual_pct }))
+        : PKG,
+    [rows, live]
+  );
+
+  const totalW = rows.reduce((a, m) => a + m.weight, 0) || 1;
+  const ovActual = rows.reduce((a, m) => a + m.weight * m.actual_pct, 0) / totalW;
+  const ovPlanned = rows.reduce((a, m) => a + m.weight * m.planned_pct, 0) / totalW;
+  const pctActual = live ? ovActual : 46;
+  const pctPlanned = live ? ovPlanned : 52;
+
+  const certIdx = () => {
+    if (!live) return 2;
+    const i = miles.findIndex((m) => m.status === "Pending");
+    return i >= 0 ? i : -1;
+  };
 
   const cert = (i: number) => {
-    const copy = CONSTRUCTION_MILES.slice();
-    const m = copy[i];
-    if (m.status === "Pending") {
-      m.status = "Certified";
-      m.actual = m.forecast;
-      m.variance = "0 d";
+    const m = miles[i];
+    if (!m || m.status !== "Pending") return;
+    if (live) {
+      const id = rows[i].id;
+      setRows((prev) => prev.map((r) => (r.id === id ? { ...r, status: "certified", actual: r.forecast, actual_pct: r.planned_pct } : r)));
+      setCertified(true);
+      fetchJSON("/api/construction", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      }).catch(() => {});
+    } else {
+      const copy = CONSTRUCTION_MILES.slice();
+      copy[i] = { ...copy[i], status: "Certified", actual: copy[i].forecast, variance: "0 d" };
       CONSTRUCTION_MILES.splice(0, CONSTRUCTION_MILES.length, ...copy);
       setCertified(true);
     }
@@ -81,7 +196,7 @@ export default function ConstructionScreen({ scope = "ALL" }: { scope?: string }
           <div style={{ fontSize: 13, color: "#6B7180", fontWeight: 500, marginTop: 5 }}>{projName} \u00b7 ALEC Engineering \u00b7 certified by WSP Middle East</div>
         </div>
         <button onClick={() => { setUploaded(true); setPhotoDates([new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }), ...photoDates]); }} style={{ height: 38, borderRadius: 12, border: "1px solid #EDEEF3", background: "#fff", padding: "0 14px", fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, color: "#4A5060", cursor: "pointer" }}>Upload photo set</button>
-        <button onClick={() => cert(2)} style={{ height: 38, borderRadius: 12, background: AC, color: "#fff", border: 0, padding: "0 16px", fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}>Certify milestone</button>
+        <button onClick={() => { const i = certIdx(); if (i >= 0) cert(i); }} style={{ height: 38, borderRadius: 12, background: AC, color: "#fff", border: 0, padding: "0 16px", fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}>Certify milestone</button>
       </div>
 
       {certified && (
@@ -98,11 +213,11 @@ export default function ConstructionScreen({ scope = "ALL" }: { scope?: string }
       <div style={{ display: "grid", gridTemplateColumns: "300px 1fr", gap: 16 }}>
         <div style={{ background: "#14161F", borderRadius: 20, padding: 24, color: "#fff" }}>
           <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".08em", color: "rgba(255,255,255,.55)", textTransform: "uppercase" }}>Overall completion</div>
-          <div style={{ fontSize: 52, fontWeight: 800, letterSpacing: "-.045em", lineHeight: 1, marginTop: 14 }}>46.0%</div>
-          <div style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,.66)", marginTop: 8 }}>Planned 52.0% \u00b7 6.0 points behind</div>
+          <div style={{ fontSize: 52, fontWeight: 800, letterSpacing: "-.045em", lineHeight: 1, marginTop: 14 }}>{pctActual.toFixed(1)}%</div>
+          <div style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,.66)", marginTop: 8 }}>Planned {pctPlanned.toFixed(1)}% \u00b7 {(pctPlanned - pctActual).toFixed(1)} points behind</div>
           <div style={{ height: 10, borderRadius: 6, background: "rgba(255,255,255,.14)", marginTop: 20, overflow: "hidden", position: "relative" }}>
-            <span style={{ display: "block", height: "100%", width: "46%", background: "#E2A33C" }}></span>
-            <span style={{ position: "absolute", top: -3, bottom: -3, left: "52%", width: 2, background: "#fff" }}></span>
+            <span style={{ display: "block", height: "100%", width: pctActual.toFixed(1) + "%", background: "#E2A33C" }}></span>
+            <span style={{ position: "absolute", top: -3, bottom: -3, left: pctPlanned.toFixed(1) + "%", width: 2, background: "#fff" }}></span>
           </div>
           <div style={{ marginTop: 22, paddingTop: 18, borderTop: "1px solid rgba(255,255,255,.12)", display: "flex", flexDirection: "column", gap: 12 }}>
             {TEAM.map((t) => (
@@ -124,7 +239,7 @@ export default function ConstructionScreen({ scope = "ALL" }: { scope?: string }
           <div style={{ display: "grid", gridTemplateColumns: "1.3fr 60px 1fr 68px 74px", gap: 12, padding: "14px 0 9px", fontSize: 9.5, fontWeight: 700, letterSpacing: ".07em", color: "#9AA0AE", textTransform: "uppercase", borderBottom: "1px solid #EDEEF3" }}>
             <span>Package</span><span style={{ textAlign: "right" }}>Weight</span><span>Actual vs planned</span><span style={{ textAlign: "right" }}>Actual</span><span style={{ textAlign: "right" }}>Variance</span>
           </div>
-          {PKG.map((p) => {
+          {pkgs.map((p) => {
             const variance = p.actual - p.planned === 0 ? "\u2014" : (p.actual - p.planned) + " pts";
             return (
               <div key={p.name} style={{ display: "grid", gridTemplateColumns: "1.3fr 60px 1fr 68px 74px", gap: 12, alignItems: "center", padding: "11px 0", borderBottom: "1px solid #F6F7FA" }}>
@@ -152,7 +267,7 @@ export default function ConstructionScreen({ scope = "ALL" }: { scope?: string }
         <div style={{ display: "grid", gridTemplateColumns: "1.3fr 92px 92px 92px 84px 96px 1.1fr", gap: 10, padding: "14px 24px", fontSize: 9.5, fontWeight: 700, letterSpacing: ".07em", color: "#9AA0AE", textTransform: "uppercase", borderBottom: "1px solid #EDEEF3" }}>
           <span>Milestone</span><span>Planned</span><span>Forecast</span><span>Actual</span><span style={{ textAlign: "right" }}>Variance</span><span>Status</span><span style={{ textAlign: "right" }}>Becomes due</span>
         </div>
-        {CONSTRUCTION_MILES.map((m) => {
+        {miles.map((m) => {
           const pl = pill(m.status);
           return (
             <div key={m.name} style={{ display: "grid", gridTemplateColumns: "1.3fr 92px 92px 92px 84px 96px 1.1fr", gap: 10, alignItems: "center", padding: "0 24px", height: 48, borderBottom: "1px solid #F6F7FA" }}>

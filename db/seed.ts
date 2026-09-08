@@ -117,6 +117,35 @@ async function main() {
     }
   }
 
+  // construction milestone fixtures per project (PLINTH parity T4)
+  const CONST_MILESTONES = [
+    { milestone: "Enabling works", weight: 6, planned: "2026-02-14", forecast: "2026-02-11", actual: "2026-02-11", status: "certified", pp: 100, ap: 100, share: 0.16 },
+    { milestone: "Substructure complete", weight: 14, planned: "2026-05-18", forecast: "2026-05-12", actual: "2026-05-12", status: "certified", pp: 100, ap: 100, share: 0.22 },
+    { milestone: "Structure 40%", weight: 32, planned: "2026-04-12", forecast: "2026-04-18", actual: "", status: "pending", pp: 62, ap: 54, share: 0.28 },
+    { milestone: "Structure 70%", weight: 18, planned: "2026-11-20", forecast: "2026-11-28", actual: "", status: "forecast", pp: 24, ap: 18, share: 0.2 },
+    { milestone: "Facade complete", weight: 14, planned: "2027-06-14", forecast: "2027-07-02", actual: "", status: "forecast", pp: 8, ap: 4, share: 0.14 },
+    { milestone: "Handover", weight: 16, planned: "2027-12-31", forecast: "2027-12-31", actual: "", status: "forecast", pp: 0, ap: 0, share: 0 },
+  ];
+  const cproj = await c.query("SELECT id, code, gdv, units_total FROM projects ORDER BY code");
+  for (let pi = 0; pi < cproj.rows.length; pi++) {
+    const pr = cproj.rows[pi];
+    const offset = pi * 10;
+    for (const mk of CONST_MILESTONES) {
+      const shift = (d: string) => {
+        if (!d) return null;
+        const dt = new Date(d + "T00:00:00Z");
+        dt.setUTCDate(dt.getUTCDate() + offset);
+        return dt.toISOString().slice(0, 10);
+      };
+      await c.query(
+        `INSERT INTO construction_milestones (project_id, milestone, planned, forecast, actual, status, weight, planned_pct, actual_pct, trigger_amt, trigger_buyers)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+        [pr.id, mk.milestone, shift(mk.planned), shift(mk.forecast), shift(mk.actual), mk.status,
+         mk.weight, mk.pp, mk.ap, Math.round(pr.gdv * mk.share), Math.round(pr.units_total * 0.9)]
+      );
+    }
+  }
+
   await c.end();
   console.log("seed ok");
 }

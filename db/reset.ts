@@ -8,7 +8,7 @@ async function main() {
   await client.connect();
   const tables = [
     "escrow_ledger", "payment_milestones", "receipts", "leads",
-    "units", "buyers", "projects", "admins",
+    "construction_milestones", "units", "buyers", "projects", "admins",
   ];
   for (const t of tables) {
     await client.query(`DROP TABLE IF EXISTS ${t} CASCADE`);

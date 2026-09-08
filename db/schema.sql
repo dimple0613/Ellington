@@ -17,10 +17,10 @@ CREATE TABLE IF NOT EXISTS role_permissions (
 );
 
 INSERT INTO role_permissions (role, perms) VALUES
-  ('super_admin', '{"Dashboard":{"CRE":true,"REA":true,"UPD":true,"DEL":false,"APR":true,"EXP":true},"Inventory":{"CRE":true,"REA":true,"UPD":true,"DEL":true,"APR":true,"EXP":true},"Sales":{"CRE":true,"REA":true,"UPD":true,"DEL":true,"APR":true,"EXP":true},"Finance":{"CRE":true,"REA":true,"UPD":true,"DEL":true,"APR":true,"EXP":true},"Handover":{"CRE":true,"REA":true,"UPD":true,"DEL":true,"APR":true,"EXP":true},"Settings":{"CRE":true,"REA":true,"UPD":true,"DEL":true,"APR":true,"EXP":true}}'),
-  ('ops', '{"Dashboard":{"CRE":false,"REA":true,"UPD":false,"DEL":false,"APR":false,"EXP":true},"Inventory":{"CRE":false,"REA":true,"UPD":true,"DEL":false,"APR":false,"EXP":true},"Sales":{"CRE":true,"REA":true,"UPD":true,"DEL":false,"APR":false,"EXP":true},"Finance":{"CRE":false,"REA":false,"UPD":false,"DEL":false,"APR":false,"EXP":false},"Handover":{"CRE":false,"REA":true,"UPD":true,"DEL":false,"APR":false,"EXP":false},"Settings":{"CRE":false,"REA":false,"UPD":false,"DEL":false,"APR":false,"EXP":false}}'),
-  ('finance', '{"Dashboard":{"CRE":false,"REA":true,"UPD":false,"DEL":false,"APR":false,"EXP":true},"Inventory":{"CRE":false,"REA":true,"UPD":false,"DEL":false,"APR":false,"EXP":false},"Sales":{"CRE":false,"REA":true,"UPD":false,"DEL":false,"APR":false,"EXP":true},"Finance":{"CRE":true,"REA":true,"UPD":true,"DEL":false,"APR":true,"EXP":true},"Handover":{"CRE":false,"REA":true,"UPD":false,"DEL":false,"APR":false,"EXP":false},"Settings":{"CRE":false,"REA":false,"UPD":false,"DEL":false,"APR":false,"EXP":false}}'),
-  ('viewer', '{"Dashboard":{"CRE":false,"REA":true,"UPD":false,"DEL":false,"APR":false,"EXP":true},"Inventory":{"CRE":false,"REA":true,"UPD":false,"DEL":false,"APR":false,"EXP":true},"Sales":{"CRE":false,"REA":true,"UPD":false,"DEL":false,"APR":false,"EXP":true},"Finance":{"CRE":false,"REA":true,"UPD":false,"DEL":false,"APR":false,"EXP":true},"Handover":{"CRE":false,"REA":true,"UPD":false,"DEL":false,"APR":false,"EXP":true},"Settings":{"CRE":false,"REA":false,"UPD":false,"DEL":false,"APR":false,"EXP":false}}')
+  ('super_admin', '{"Dashboard":{"CRE":true,"REA":true,"UPD":true,"DEL":false,"APR":true,"EXP":true},"Inventory":{"CRE":true,"REA":true,"UPD":true,"DEL":true,"APR":true,"EXP":true},"Sales":{"CRE":true,"REA":true,"UPD":true,"DEL":true,"APR":true,"EXP":true},"Finance":{"CRE":true,"REA":true,"UPD":true,"DEL":true,"APR":true,"EXP":true},"Handover":{"CRE":true,"REA":true,"UPD":true,"DEL":true,"APR":true,"EXP":true},"Settings":{"CRE":true,"REA":true,"UPD":true,"DEL":true,"APR":true,"EXP":true},"Construction":{"CRE":true,"REA":true,"UPD":true,"DEL":true,"APR":true,"EXP":true}}'),
+  ('ops', '{"Dashboard":{"CRE":false,"REA":true,"UPD":false,"DEL":false,"APR":false,"EXP":true},"Inventory":{"CRE":false,"REA":true,"UPD":true,"DEL":false,"APR":false,"EXP":true},"Sales":{"CRE":true,"REA":true,"UPD":true,"DEL":false,"APR":false,"EXP":true},"Finance":{"CRE":false,"REA":false,"UPD":false,"DEL":false,"APR":false,"EXP":false},"Handover":{"CRE":false,"REA":true,"UPD":true,"DEL":false,"APR":false,"EXP":false},"Settings":{"CRE":false,"REA":false,"UPD":false,"DEL":false,"APR":false,"EXP":false},"Construction":{"CRE":false,"REA":true,"UPD":true,"DEL":false,"APR":false,"EXP":false}}'),
+  ('finance', '{"Dashboard":{"CRE":false,"REA":true,"UPD":false,"DEL":false,"APR":false,"EXP":true},"Inventory":{"CRE":false,"REA":true,"UPD":false,"DEL":false,"APR":false,"EXP":false},"Sales":{"CRE":false,"REA":true,"UPD":false,"DEL":false,"APR":false,"EXP":true},"Finance":{"CRE":true,"REA":true,"UPD":true,"DEL":false,"APR":true,"EXP":true},"Handover":{"CRE":false,"REA":true,"UPD":false,"DEL":false,"APR":false,"EXP":false},"Settings":{"CRE":false,"REA":false,"UPD":false,"DEL":false,"APR":false,"EXP":false},"Construction":{"CRE":false,"REA":true,"UPD":false,"DEL":false,"APR":false,"EXP":false}}'),
+  ('viewer', '{"Dashboard":{"CRE":false,"REA":true,"UPD":false,"DEL":false,"APR":false,"EXP":true},"Inventory":{"CRE":false,"REA":true,"UPD":false,"DEL":false,"APR":false,"EXP":true},"Sales":{"CRE":false,"REA":true,"UPD":false,"DEL":false,"APR":false,"EXP":true},"Finance":{"CRE":false,"REA":true,"UPD":false,"DEL":false,"APR":false,"EXP":true},"Handover":{"CRE":false,"REA":true,"UPD":false,"DEL":false,"APR":false,"EXP":true},"Settings":{"CRE":false,"REA":false,"UPD":false,"DEL":false,"APR":false,"EXP":false},"Construction":{"CRE":false,"REA":true,"UPD":false,"DEL":false,"APR":false,"EXP":false}}')
 ON CONFLICT (role) DO NOTHING;
 
 CREATE TABLE IF NOT EXISTS password_resets (
@@ -212,6 +212,23 @@ CREATE TABLE IF NOT EXISTS invoices (
   paid BOOLEAN DEFAULT false
 );
 
+-- Construction module (PLINTH parity): work-package milestones with money release.
+CREATE TABLE IF NOT EXISTS construction_milestones (
+  id SERIAL PRIMARY KEY,
+  project_id INT REFERENCES projects(id),
+  milestone TEXT,
+  planned DATE,
+  forecast DATE,
+  actual DATE,
+  status TEXT DEFAULT 'pending',          -- certified / pending / forecast / scheduled
+  weight INT DEFAULT 0,                    -- contribution to overall completion
+  planned_pct INT DEFAULT 0,
+  actual_pct INT DEFAULT 0,
+  trigger_amt NUMERIC DEFAULT 0,           -- AED released to buyers when certified
+  trigger_buyers INT DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_construction_project ON construction_milestones(project_id);
+
 -- Seed handover data on first install (idempotent).
 DO $$
 BEGIN
@@ -303,5 +320,19 @@ BEGIN
       ('RCP-H21-004689 · E. Petrova','in',1204000,false,true,false, now() - interval '21 days'),
       ('BLG-1602','in',84600,true,false,false, now() - interval '24 days'),
       ('CHQ-883964','in',268000,true,false,false, now() - interval '27 days');
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM construction_milestones) AND EXISTS (SELECT 1 FROM projects WHERE code = 'BLG') THEN
+    INSERT INTO construction_milestones (project_id, milestone, planned, forecast, actual, status, weight, planned_pct, actual_pct, trigger_amt, trigger_buyers)
+    SELECT p.id, mk.milestone, mk.planned, mk.forecast, mk.actual, mk.status, mk.weight, mk.planned_pct, mk.actual_pct,
+           ROUND(p.gdv * mk.share)::numeric, ROUND(p.units_total * 0.9)::int
+    FROM projects p
+    CROSS JOIN (VALUES
+      ('Enabling works'::text, date '2026-02-14', date '2026-02-11', date '2026-02-11', 'certified'::text, 6, 100, 100, 0.16),
+      ('Substructure complete', date '2026-05-18', date '2026-05-12', date '2026-05-12', 'certified', 14, 100, 100, 0.22),
+      ('Structure 40%', date '2026-04-12', date '2026-04-18', NULL, 'pending', 32, 62, 54, 0.28),
+      ('Structure 70%', date '2026-11-20', date '2026-11-28', NULL, 'forecast', 18, 24, 18, 0.20),
+      ('Facade complete', date '2027-06-14', date '2027-07-02', NULL, 'forecast', 14, 8, 4, 0.14),
+      ('Handover', date '2027-12-31', date '2027-12-31', NULL, 'forecast', 16, 0, 0, 0.00)
+    ) AS mk(milestone, planned, forecast, actual, status, weight, planned_pct, actual_pct, share);
   END IF;
 END $$;
