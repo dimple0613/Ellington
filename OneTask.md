@@ -6,8 +6,15 @@
 ## Push (current branch + what to push)
 > Branch-per-task rule (see AGENTS.md): never push directly to main. Update this section per task.
 
-- Current branch: `feat/wire-db-screens` (created off `main` after Cloudflare deploy work merged)
-- Pending code to push: DB-implementation work (wire screens from static `lib/data` to the 10 Neon tables via API routes)
+- Current branch: `chore/standardize-project` (created off `main` after DB-wiring merged)
+- Pending code to push (branch `chore/standardize-project`): the full project-standardization pass —
+  commits `b427dda` (docs/ARCHITECTURE.md audit findings) + `c2a0ba2` (AUD-001/002/003/003b/004/008/010/011/012/013/014 safe fixes;
+  lint + prod build green). NOT pushed yet.
+- Full audit tracked on GitHub: issues #20–#34 (AUD-001…AUD-014, severity labels). Board (project) still blocked:
+  local `gh` token lacks `project` scope — operator must run `gh auth refresh -s project`, then board can be created
+  (GraphQL create-project.json already prepared).
+- Deferred (needs visual/contract change, no-visual-change rule): AUD-007 error states (#24), AUD-009 API envelope (#26).
+  AUD-005 (Jest/RTL/Playwright) requires operator approval to add dev deps. AUD-006 (role→permission-map rewiring) not started.
 - Last task: merge `feat/cloudflare-hyperdrive` → `main` (Hyperdrive DB connection fix so production reads Neon, delivered 200 on `/api/auth/login` + `/api/auth/me` with admin `Dipin Ellington`/`admin@gmail.com`); pushed.
 - Admin on Neon: id 1 = `Dipin Ellington` / `admin@gmail.com` / `Admin123` (role super_admin) — verified login 200 on live worker.
 
@@ -42,6 +49,8 @@
 - [x] **Issue #18 (favicon) fixed + closed** (`4c35ac0`, pushed) — added `public/favicon.svg` + head link in `_app.tsx`; verified clean + regression. NOTE: local DB admin email had drifted again to `kartik1111gohil@gmail.com` (were `admin@gmail.com`); re-seeded to `admin@gmail.com`/`Admin123`. Root cause of drift not yet pinned — monitor.
 - [x] **Issue #19 (server-side RBAC) fixed + verified** — `role_permissions` table + seeds; `lib/permission-map.ts` (edge-safe) + `lib/permissions.ts`/`withPerm` (DB source-of-truth API 403s); `middleware.ts` route→module gate → `/403`; Shell nav filtered client-side. **18/18** RBAC + **20/20** API + **8/8** browser regression.
 - [x] **Deploy prep started for production** — removed erroneous `wrangler.toml` (its `pages_build_output_dir = ".vercel/output/static"` points to a non-existent dir and caused the broken-worker misdiagnosis); confirmed correct config is `wrangler.jsonc` (Worker `ellington-worker`, `main: .open-next/worker.js`, assets `binding: ASSETS`); `npm run build:cf` with Node 22 emits valid `.open-next/worker.js` + `.open-next/assets` (incl. favicon). **Merged `kartik-gohil` → `main`** (18 commits: RBAC, favicon, build fix, config cleanup) and pushed to `origin/main` (`d1e3999..322bcd0`). Production APIs still **all 500/404** and do NOT show new code (no favicon after 5 min) — the `main` push did **NOT** trigger a Cloudflare auto-deploy. **HARD BLOCKER: production deploy cannot be run from this machine** — no Cloudflare auth anywhere (`CLOUDFLARE_API_TOKEN`/`ACCOUNT_ID` absent, no `wrangler` config, no git hooks, no GH Actions, no Pages auto-build). Only the Cloudflare account owner (`dimple0613`) can deploy via `wrangler login`/API token + `wrangler deploy` (Worker `ellington-worker`), then re-seed Neon admin/roles.
+
+- [~] **Project standardization pass** (`chore/standardize-project`, commits `b427dda` + `c2a0ba2`, unpushed) — Phase 1+2 audit → `docs/ARCHITECTURE.md`; 15 AUD issues filed (#20–#34) + severity labels; Phase 6+7 safe fixes applied (login error leak, JWT secret fail-closed, mail link leak, admins validation, permissions dedupe, dead deps, Stub dedupe, `any` mappers, cookie Secure/`__Host-`, `.env.example` generic, `.gitignore` backups). lint + prod build green. Deferred: AUD-007/009 (+AUD-005 pending approval, AUD-006 pending). Remaining: Phase 3 AGENTS.md rewrite, Phase 4 `.opencode/`, Phase 5 folder-structure doc, Phase 8 build re-check + round-trip retest, Phase 9 TASKS.md, Phase 10 final GitHub status summary; board creation after operator grants `project` scope.
 
 ## Backlog (pending)
 - [ ] Issue #1 — Task 3: CEO-Review baseline (feature spec from Ellington reference)
