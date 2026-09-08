@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import { AC } from "../../lib/format";
 import { exportCollectionNotice } from "../../lib/pdf";
+import { fetchJSON } from "../../lib/api";
 
 type CollRow = { buyer: string; unit: string; amount: string; days: number; stage: string; action: string };
 type StageMap = Record<string, { bg: string; color: string }>;
@@ -30,7 +31,7 @@ export default function CollectionsScreen() {
     { label: "Legal", value: "AED 4.1M", note: "3 buyers", idx: 5 },
   ];
 
-  const rows: CollRow[] = [
+  const MOCK_ROWS: CollRow[] = [
     { buyer: "Sunil Rathore", unit: "H21-T1-2705", amount: "4,120,000", days: 118, stage: "Final notice", action: "Legal review \u00b7 28 Aug" },
     { buyer: "Elena Petrova", unit: "H21-T1-4102", amount: "2,860,000", days: 104, stage: "30-day notice", action: "Notice issued 12 Aug" },
     { buyer: "Marcus Lindqvist", unit: "H21-T1-2404", amount: "1,940,000", days: 96, stage: "Reminder 2", action: "Promise to pay 02 Sep" },
@@ -40,6 +41,29 @@ export default function CollectionsScreen() {
     { buyer: "Grace Okonkwo", unit: "H21-T1-1103", amount: "412,000", days: 31, stage: "Reminder 1", action: "Email sent 22 Aug" },
     { buyer: "Priya Nair", unit: "H21-T1-0904", amount: "208,000", days: 18, stage: "Upcoming", action: "Auto-reminder 27 Aug" },
   ];
+
+  const [liveRows, setLiveRows] = useState<CollRow[]>([]);
+  const [apiError, setApiError] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    fetchJSON<{ collections: any[] }>("/api/finance")
+      .then((j) => {
+        if (!active || !j?.collections) return;
+        setLiveRows(j.collections.map((c) => ({
+          buyer: c.buyer,
+          unit: c.unit_no,
+          amount: Number(c.amount).toLocaleString("en-US"),
+          days: c.days_due,
+          stage: c.stage,
+          action: c.action || "",
+        })));
+      })
+      .catch((e) => { if (active) setApiError(e?.message || "Failed to load collections"); });
+    return () => { active = false; };
+  }, []);
+
+  const rows = liveRows.length ? liveRows : MOCK_ROWS;
 
   const tiers: [string, string, boolean][] = [
     ["Construction < 60%", "up to 25%", true],
@@ -78,6 +102,11 @@ export default function CollectionsScreen() {
 
   return (
     <div>
+      {apiError && (
+        <div style={{ background: "#FDECEC", color: "#E5484D", borderRadius: 12, padding: "11px 16px", fontSize: 12, fontWeight: 700, marginBottom: 16 }}>
+          Live data unavailable ({apiError}) — showing sample rows
+        </div>
+      )}
       {notice && <div style={{ background: "#E9F8F1", color: "#1F9D6B", borderRadius: 12, padding: "11px 16px", fontSize: 12, fontWeight: 700, marginBottom: 16 }}>{notice}</div>}
       {logEntry && <div style={{ background: "#F0EFFE", color: AC, borderRadius: 12, padding: "11px 16px", fontSize: 12, fontWeight: 700, marginBottom: 16 }}>Call logged for {logEntry} \u00b7 15-min follow-up scheduled</div>}
       <div style={{ display: "flex", alignItems: "flex-end", gap: 16, marginBottom: 18 }}>

@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AC } from "../../lib/format";
+import { fetchJSON } from "../../lib/api";
 
 type QueueRow = { date: string; desc: string; amount: string; side: string };
 type Obligation = { label: string; value: string; flag: boolean };
@@ -27,6 +28,35 @@ export default function EscrowScreen() {
     { id: "DDR-0001", milestone: "Mobilisation", amount: "14,800,000", cert: "WSP \u00b7 A. Faruqi \u00b7 18 Nov 25", rera: "Approved", status: "Released" },
   ]);
   const [ddrOpen, setDdrOpen] = useState(false);
+  const [apiError, setApiError] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    fetchJSON<{ escrow: { queue: any[]; drawdowns: any[] } }>("/api/finance")
+      .then((j) => {
+        if (!active || !j?.escrow) return;
+        if (j.escrow.queue.length) {
+          setQueue(j.escrow.queue.map((q) => ({
+            date: new Date(q.received_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "2-digit" }),
+            desc: q.reference,
+            amount: Number(q.amount).toLocaleString("en-US"),
+            side: q.bank && !q.system_side ? "Bank only" : q.system_side && !q.bank ? "System only" : "Bank only",
+          })));
+        }
+        if (j.escrow.drawdowns.length) {
+          setDrawdowns(j.escrow.drawdowns.map((d) => ({
+            id: d.ref,
+            milestone: d.milestone,
+            amount: Number(d.amount).toLocaleString("en-US"),
+            cert: d.cert,
+            rera: d.rera,
+            status: d.status,
+          })));
+        }
+      })
+      .catch((e) => { if (active) setApiError(e?.message || "Failed to load escrow"); });
+    return () => { active = false; };
+  }, []);
   const [ddrMilestone, setDdrMilestone] = useState("Structure 40%");
   const [ddrAmount, setDdrAmount] = useState("");
   const [ddrRera, setDdrRera] = useState("Submitted");
@@ -103,6 +133,11 @@ export default function EscrowScreen() {
 
   return (
     <div>
+      {apiError && (
+        <div style={{ background: "#FDECEC", color: "#E5484D", borderRadius: 12, padding: "11px 16px", fontSize: 12, fontWeight: 700, marginBottom: 16 }}>
+          Live data unavailable ({apiError}) — showing sample rows
+        </div>
+      )}
       {notice && <div style={{ background: "#E9F8F1", color: "#1F9D6B", borderRadius: 12, padding: "11px 16px", fontSize: 12, fontWeight: 700, marginBottom: 16 }}>{notice}</div>}
       <div style={{ background: "#fff", borderRadius: 20, padding: "22px 24px", boxShadow: "0 1px 3px rgba(20,22,31,.04)", marginBottom: 16 }}>
         <div style={{ display: "flex", alignItems: "flex-start", gap: 16 }}>

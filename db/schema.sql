@@ -113,8 +113,10 @@ CREATE TABLE IF NOT EXISTS escrow_ledger (
   amount NUMERIC DEFAULT 0,
   "bank" BOOLEAN DEFAULT false,
   system BOOLEAN DEFAULT false,
-  matched BOOLEAN DEFAULT false
+  matched BOOLEAN DEFAULT false,
+  received_at TIMESTAMPTZ DEFAULT now()
 );
+ALTER TABLE escrow_ledger ADD COLUMN IF NOT EXISTS received_at TIMESTAMPTZ DEFAULT now();
 
 CREATE INDEX IF NOT EXISTS idx_units_project ON units(project_id);
 CREATE INDEX IF NOT EXISTS idx_units_status ON units(status);
@@ -177,6 +179,39 @@ CREATE TABLE IF NOT EXISTS app_settings (
   brand JSONB NOT NULL DEFAULT '{}'
 );
 
+-- Finance module (AUD-006): collections ageing ledger, escrow drawdowns, invoice ledger.
+CREATE TABLE IF NOT EXISTS collections (
+  id SERIAL PRIMARY KEY,
+  buyer TEXT,
+  unit_no TEXT,
+  amount NUMERIC DEFAULT 0,
+  days_due INT DEFAULT 0,
+  stage TEXT DEFAULT 'Upcoming',        -- Upcoming / Reminder 1 / Reminder 2 / 30-day notice / Final notice
+  action TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_collections_stage ON collections(stage);
+
+CREATE TABLE IF NOT EXISTS drawdowns (
+  id SERIAL PRIMARY KEY,
+  ref TEXT UNIQUE,
+  milestone TEXT,
+  amount NUMERIC DEFAULT 0,
+  cert TEXT,
+  rera TEXT DEFAULT 'Submitted',        -- Submitted / Approved
+  status TEXT DEFAULT 'Awaiting trustee' -- Awaiting trustee / Released
+);
+
+CREATE TABLE IF NOT EXISTS invoices (
+  id SERIAL PRIMARY KEY,
+  no TEXT UNIQUE,
+  buyer TEXT,
+  unit_no TEXT,
+  milestone TEXT,
+  due DATE,
+  amount NUMERIC DEFAULT 0,
+  paid BOOLEAN DEFAULT false
+);
+
 -- Seed handover data on first install (idempotent).
 DO $$
 BEGIN
@@ -232,5 +267,41 @@ BEGIN
     INSERT INTO app_settings (id, company, brand) VALUES (1,
       '{"Legal name":"Ellington Properties Development LLC","Trade licence":"CN-2847192","ORN":"21281","RERA":"1884","VAT TRN":"100234567800003"}'::jsonb,
       '{"Primary color":"#4F46F5","Currency":"AED","Date format":"DD MMM YYYY","Timezone":"Asia/Dubai (GMT+4)","Fiscal year":"Jan – Dec"}'::jsonb);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM collections) THEN
+    INSERT INTO collections (buyer, unit_no, amount, days_due, stage, action) VALUES
+      ('Sunil Rathore','H21-T1-2705',4120000,118,'Final notice','Legal review · 28 Aug'),
+      ('Elena Petrova','H21-T1-4102',2860000,104,'30-day notice','Notice issued 12 Aug'),
+      ('Marcus Lindqvist','H21-T1-2404',1940000,96,'Reminder 2','Promise to pay 02 Sep'),
+      ('Wei Chen','H21-T1-1602',1210000,92,'Reminder 2','Cheque bounced · re-present'),
+      ('Nadia Khoury','H21-T1-2202',864000,61,'Reminder 1','Call scheduled 26 Aug'),
+      ('Omar Al Suwaidi','H21-T1-3601',640000,44,'Reminder 1','Awaiting bank confirmation'),
+      ('Grace Okonkwo','H21-T1-1103',412000,31,'Reminder 1','Email sent 22 Aug'),
+      ('Priya Nair','H21-T1-0904',208000,18,'Upcoming','Auto-reminder 27 Aug');
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM drawdowns) THEN
+    INSERT INTO drawdowns (ref, milestone, amount, cert, rera, status) VALUES
+      ('DDR-0004','Structure 40%',62400000,'WSP · A. Faruqi · 04 Aug 26','Submitted','Awaiting trustee'),
+      ('DDR-0003','Substructure complete',48200000,'WSP · A. Faruqi · 12 May 26','Approved','Released'),
+      ('DDR-0002','Enabling works',21600000,'WSP · A. Faruqi · 03 Feb 26','Approved','Released'),
+      ('DDR-0001','Mobilisation',14800000,'WSP · A. Faruqi · 18 Nov 25','Approved','Released');
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM invoices) THEN
+    INSERT INTO invoices (no, buyer, unit_no, milestone, due, amount, paid) VALUES
+      ('INV-0041','Nadia Khoury','WPK-T1-0402','Structure 40%','2026-08-01',1180000,false),
+      ('INV-0040','Elena Petrova','H21-T1-4102','Substructure complete','2026-07-15',640000,true),
+      ('INV-0039','Marcus Lindqvist','H21-T1-2404','Enabling works','2026-07-01',412000,false),
+      ('INV-0038','Wei Chen','H21-T1-1602','Structure 20%','2026-06-20',960000,true),
+      ('INV-0037','Sunil Rathore','H21-T1-2705','Structure 40%','2026-06-01',1236000,false),
+      ('INV-0036','Priya Nair','H21-T1-0904','Enabling works','2026-05-25',208000,true);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM escrow_ledger) THEN
+    INSERT INTO escrow_ledger (reference, direction, amount, bank, "system", matched, received_at) VALUES
+      ('MENON RM 3302','in',367875,true,false,false, now() - interval '17 days'),
+      ('RCP-H21-004706 · M. Lindqvist','in',640000,false,true,false, now() - interval '18 days'),
+      ('No reference quoted','in',112400,true,false,false, now() - interval '20 days'),
+      ('RCP-H21-004689 · E. Petrova','in',1204000,false,true,false, now() - interval '21 days'),
+      ('BLG-1602','in',84600,true,false,false, now() - interval '24 days'),
+      ('CHQ-883964','in',268000,true,false,false, now() - interval '27 days');
   END IF;
 END $$;

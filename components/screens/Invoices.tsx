@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AC } from "../../lib/format";
 import { exportInvoicesLedger } from "../../lib/pdf";
+import { fetchJSON } from "../../lib/api";
 
 type InvRow = { no: string; buyer: string; unit: string; inst: string; issued: string; due: string; amount: string; paid: string; status: string; viewed: string };
 
@@ -36,11 +37,41 @@ const pillCol = (s: string) => s === "Paid" ? "#1F9D6B" : s === "Overdue" ? "#E5
 
 export default function InvoicesScreen() {
   const [notice, setNotice] = useState("");
+  const [apiError, setApiError] = useState("");
+  const [rows, setRows] = useState<InvRow[]>(INV_ROWS);
   const show = (msg: string) => { setNotice(msg); setTimeout(() => setNotice(""), 3000); };
+
+  useEffect(() => {
+    let active = true;
+    fetchJSON<{ invoices: any[] }>("/api/finance")
+      .then((j) => {
+        if (!active || !j?.invoices?.length) return;
+        setRows(j.invoices.map((r) => {
+          const due = new Date(r.due);
+          const issued = new Date(due.getTime() - 14 * 86400000);
+          const paidAmt = Number(r.paid ? r.amount : 0);
+          const status = r.paid ? "Paid" : due.getTime() < Date.now() ? "Overdue" : "Sent";
+          return {
+            no: "INV-H21-00" + String(r.no).replace("INV-", "").padStart(4, "0"),
+            buyer: r.buyer,
+            unit: r.unit_no,
+            inst: "Milestone · " + r.milestone,
+            issued: issued.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "2-digit" }),
+            due: due.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "2-digit" }),
+            amount: Number(r.amount).toLocaleString("en-US"),
+            paid: paidAmt ? Number(r.amount).toLocaleString("en-US") : "0",
+            status,
+            viewed: "Viewed",
+          };
+        }));
+      })
+      .catch((e) => { if (active) setApiError(e?.message || "Failed to load invoices"); });
+    return () => { active = false; };
+  }, []);
 
   const generateStatement = () => {
     exportInvoicesLedger(
-      INV_ROWS.map((r) => ({ no: r.no, buyer: r.buyer, unit: r.unit, inst: r.inst, issued: r.issued, due: r.due, amount: r.amount, paid: r.paid, status: r.status })),
+      rows.map((r) => ({ no: r.no, buyer: r.buyer, unit: r.unit, inst: r.inst, issued: r.issued, due: r.due, amount: r.amount, paid: r.paid, status: r.status })),
       { issued: "AED 96.4M", paid: "AED 61.2M", outstanding: "AED 35.2M", overdue: "AED 31.4M" }
     );
     show("Invoice ledger PDF generated");
@@ -51,6 +82,11 @@ export default function InvoicesScreen() {
 
   return (
     <div>
+      {apiError && (
+        <div style={{ background: "#FDECEC", color: "#E5484D", borderRadius: 12, padding: "11px 16px", fontSize: 12, fontWeight: 700, marginBottom: 16 }}>
+          Live data unavailable ({apiError}) — showing sample rows
+        </div>
+      )}
       {notice && <div style={{ background: "#E9F8F1", color: "#1F9D6B", borderRadius: 12, padding: "11px 16px", fontSize: 12, fontWeight: 700, marginBottom: 16 }}>{notice}</div>}
 
       <div style={{ display: "flex", alignItems: "flex-end", gap: 16, marginBottom: 18 }}>
@@ -77,7 +113,7 @@ export default function InvoicesScreen() {
           <div style={{ display: "grid", gridTemplateColumns: "126px 1fr 96px 1.1fr 86px 86px 96px 96px 88px 76px", gap: 8, padding: "14px 22px", fontSize: 9.5, fontWeight: 700, letterSpacing: ".07em", color: "#9AA0AE", textTransform: "uppercase" as const, background: "#FAFBFD", borderBottom: "1px solid #EDEEF3" }}>
             <span>Invoice</span><span>Buyer</span><span>Unit</span><span>Instalment</span><span>Issued</span><span>Due</span><span style={{ textAlign: "right" }}>Amount</span><span style={{ textAlign: "right" }}>Paid</span><span>Status</span><span>Viewed</span>
           </div>
-          {INV_ROWS.map((r) => (
+          {rows.map((r) => (
             <div key={r.no} style={{ display: "grid", gridTemplateColumns: "126px 1fr 96px 1.1fr 86px 86px 96px 96px 88px 76px", gap: 8, alignItems: "center", padding: "0 22px", height: 42, borderBottom: "1px solid #F6F7FA" }}>
               <span style={{ fontFamily: "monospace", fontSize: 10.5, fontWeight: 600 }}>{r.no}</span>
               <span style={{ fontSize: 11.5, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.buyer}</span>
