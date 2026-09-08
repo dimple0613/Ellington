@@ -46,7 +46,7 @@
 ## Phase 8 — Build & regression
 - [x] `npm run lint` (tsc) green
 - [x] `npm run build` green
-- [ ] Round-trip retest: browser smoke across groups after fixes (operator or harness)
+- [ ] Round-trip retest: browser smoke across groups after fixes — SKIPPED per operator (resume later). Note found: local `next start` login 401s on `admin@gmail.com`/`Admin123` — local DB admin email likely drifted again (known OneTask issue); investigate before resuming tests.
 
 ## Phase 9 — TASKS.md
 - [x] This runbook
