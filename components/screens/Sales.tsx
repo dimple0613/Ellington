@@ -63,6 +63,48 @@ const SFIELDS: Record<number,Field[]> = {
 const DEAL = [["Unit","H21-T1-1204"],["Typology","2BR-B \u00b7 1,180 sq.ft"],["List price","AED 2,450,000"],["Discount","\u22127.5%"],["Net price","AED 2,266,250"],["Price/sq.ft","AED 1,920"],["Plan","20/40/40"],["Buyer","Hassan Al Rayes"],["Broker","Betterhomes \u00b7 2.0%"]];
 
 /* ── buyer 360 ──────────────────────────────────────────────────── */
+const moneyM = (v: number) =>
+  v >= 1e6 ? "AED " + (v / 1e6).toFixed(2).replace(/\.00$/, "") + "M" : money(v);
+const fmtShort = (d: string) => {
+  if (!d) return "\u2014";
+  const [y, mo, dd] = d.split("-");
+  const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  return (dd ? dd + " " : "") + MON[Number(mo) - 1] + " " + y.slice(2);
+};
+
+type BuyerRow = {
+  id: number;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  kyc: string;
+  units: number;
+  contracted: number;
+  collected: number;
+  outstanding: number;
+  overdue: number;
+  next: { amount: number; date: string; unit: string; milestone: string } | null;
+};
+type BuyerDetail = {
+  id: number;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  kyc: string;
+  units: { no: string; status: string; type: string; beds: number; area: number; price: number; view: string; pct: number }[];
+  ledger: { date: string; unit: string; desc: string; debit: number | null; credit: number; balance: number }[];
+  schedule: { ym: string; amt: number }[];
+  next: { amount: number; date: string; unit: string; milestone: string } | null;
+  overdue: number;
+  firstPaid: string | null;
+  miles: { paid: number; total: number };
+};
+const DIR_FALLBACK: BuyerRow[] = [
+  { id: 1, name: "Rajesh Menon", email: "r.menon@arvexcapital.ae", phone: "+971 50 442 1187", kyc: "cleared", units: 2, contracted: 4780000, collected: 2870000, outstanding: 1910000, overdue: 0, next: { amount: 465500, date: "2026-09-14", unit: "H21-T1-1204", milestone: "Structure 40%" } },
+  { id: 2, name: "Aisha Al Marri", email: "a.almarri@gmail.com", phone: "+971 50 221 8810", kyc: "cleared", units: 1, contracted: 2940000, collected: 1764000, outstanding: 1176000, overdue: 0, next: { amount: 512000, date: "2026-09-14", unit: "H21-T1-2801", milestone: "Excavation 20%" } },
+  { id: 3, name: "Sunil Rathore", email: "sunil@rathore.co.in", phone: "+971 50 771 2219", kyc: "cleared", units: 1, contracted: 4120000, collected: 1296000, outstanding: 2824000, overdue: 1220000, next: null },
+];
+
 const B_TILES = [{l:"Total contracted",v:"AED 4.78M",n:"2 units \u00b7 Belgravia Heights III",ok:false},{l:"Collected",v:"AED 2.87M",n:"60.0% of contracted",ok:true},{l:"Outstanding",v:"AED 1.91M",n:"across 8 instalments",ok:false},{l:"Overdue",v:"AED 0",n:"no arrears on record",ok:false}];
 const B_UNITS = [{no:"H21-T1-1204",st:"Sold",meta:"2BR-B \u00b7 1,180 sq.ft \u00b7 Level 12",price:"AED 2,327,500",pct:"62%",p:62},{no:"H21-T1-3302",st:"Booked",meta:"1BR-A \u00b7 748 sq.ft \u00b7 Level 33",price:"AED 2,452,500",pct:"58%",p:58}];
 const B_LEDGER: [string,string,string,string,string,string][] = [
@@ -165,7 +207,14 @@ export default function Sales({ scope }: { scope: string }) {
 
   if (s === "leads") return <Leads onNewBooking={blankBooking} onBookLead={goBooking} />;
   if (s === "booking") return <Booking step={step} setStep={setStep} onBack={go("leads")} lead={lead} blank={!lead} />;
-  if (s === "buyer") return <Buyer360 btab={btab} setBtab={setBtab} goUnit={goUnit} />;
+  if (s === "buyer") {
+    if (router.query.id) return <Buyer360 btab={btab} setBtab={setBtab} goUnit={goUnit} />;
+    return <BuyersDirectory onOpen={(id) => {
+      const q: Record<string,string> = { s: "buyer", id: String(id) };
+      if (scope && scope !== "ALL") q.scope = scope;
+      router.replace({ pathname: "/sales", query: q }, undefined, { shallow: true });
+    }} />;
+  }
   if (s === "brokers") return <Brokers brtab={brtab} setBrtab={setBrtab} brstep={brstep} setBrstep={setBrstep} />;
   if (s === "documents") return <Documents dtab={dtab} setDtab={setDtab} doc={doc} setDoc={setDoc} />;
   return <Leads onNewBooking={blankBooking} onBookLead={goBooking} />;
@@ -474,18 +523,168 @@ function Booking({ step, setStep, onBack, lead, blank }: { step:number; setStep:
 }
 
 /* ═══════════════════════════════════════════════════════════════════
+   BUYER DIRECTORY
+   ═══════════════════════════════════════════════════════════════════ */
+function BuyersDirectory({ onOpen }: { onOpen: (id: number) => void }) {
+  const [rows, setRows] = useState<BuyerRow[] | null>(null);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    fetchJSON<{ buyers: BuyerRow[] }>("/api/buyers")
+      .then((j) => { if (active) setRows(Array.isArray(j.buyers) ? j.buyers : []); })
+      .catch(() => { if (active) setError("Live data unavailable \u2014 showing sample rows"); });
+    return () => { active = false; };
+  }, []);
+
+  const show = rows || DIR_FALLBACK;
+  const avail = !!rows;
+  const contracted = show.reduce((a, b) => a + b.contracted, 0);
+  const collected = show.reduce((a, b) => a + b.collected, 0);
+  const outstanding = show.reduce((a, b) => a + b.outstanding, 0);
+
+  const open = (r: BuyerRow) => () => {
+    if (avail) onOpen(r.id);
+    else setError("Directory is in read-only sample mode \u2014 reload to view live records");
+  };
+
+  return (
+    <div>
+      {error && (
+        <div style={{ background: "#FDECEC", color: "#B33745", borderRadius: 12, padding: "11px 16px", fontSize: 12, fontWeight: 700, marginBottom: 16 }}>{error}</div>
+      )}
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 16, marginBottom: 18 }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: "-.03em", lineHeight: 1.15 }}>Buyers directory</div>
+          <div style={{ fontSize: 13, color: "#6B7180", fontWeight: 500, marginTop: 5 }}>
+            {avail ? show.length + " buyers on record" : "Sample of on-record buyers"} \u00b7 click a row for the full 360 view
+          </div>
+        </div>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 14, marginBottom: 16 }}>
+        {[["Total buyers", String(show.length), "kyc-linked"], ["Contract value", moneyM(contracted), "across all units"], ["Collected", moneyM(collected), moneyM(outstanding) + " outstanding"], ["Overdue", moneyM(show.reduce((a, b) => a + b.overdue, 0)), "needs follow-up"]].map(([l, v, n]) => (
+          <div key={l} style={{ background: "#fff", borderRadius: 20, padding: "18px 20px", boxShadow: "0 1px 3px rgba(20,22,31,.04)" }}>
+            <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".06em", color: "#9AA0AE", textTransform: "uppercase" }}>{l}</div>
+            <div style={{ fontSize: 20, fontWeight: 800, letterSpacing: "-.03em", marginTop: 11 }}>{v}</div>
+            <div style={{ fontSize: 11, color: "#6B7180", fontWeight: 500, marginTop: 4 }}>{n}</div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ background: "#fff", borderRadius: 20, boxShadow: "0 1px 3px rgba(20,22,31,.04)", overflow: "hidden" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr 56px 1fr 1fr 1fr 1fr 32px", gap: 10, padding: "14px 22px", fontSize: 9.5, fontWeight: 700, letterSpacing: ".07em", color: "#9AA0AE", textTransform: "uppercase", background: "#FAFBFD", borderBottom: "1px solid #EDEEF3" }}>
+          <span>Buyer</span><span>Contact</span><span>KYC</span><span style={{ textAlign: "right" }}>Units</span><span style={{ textAlign: "right" }}>Contracted</span><span style={{ textAlign: "right" }}>Collected</span><span style={{ textAlign: "right" }}>Overdue</span><span />
+        </div>
+        {show.map((r) => (
+          <div key={r.id} onClick={open(r)} style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr 56px 1fr 1fr 1fr 1fr 32px", gap: 10, alignItems: "center", padding: "0 22px", height: 64, borderBottom: "1px solid #F6F7FA", cursor: avail ? "pointer" : "default", background: avail ? "transparent" : "#FAFBFC" }}>
+            <span style={{ display: "flex", alignItems: "center", gap: 11, minWidth: 0 }}>
+              <span style={{ width: 36, height: 36, flex: "none", borderRadius: 12, background: "#EDECFE", display: "grid", placeItems: "center", fontSize: 12.5, fontWeight: 800, color: AC }}>{r.name.split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase()}</span>
+              <span style={{ minWidth: 0 }}>
+                <span style={{ display: "block", fontSize: 13, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.name}</span>
+                <span style={{ display: "block", fontSize: 10.5, color: "#9AA0AE", fontWeight: 500, marginTop: 2 }}>{r.next ? "Next due " + money(r.next.amount) + " \u00b7 " + fmtShort(r.next.date) : "No upcoming instalments"}</span>
+              </span>
+            </span>
+            <span style={{ minWidth: 0 }}>
+              <span style={{ display: "block", fontSize: 11, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.phone || "\u2014"}</span>
+              <span style={{ display: "block", fontSize: 10.5, color: "#9AA0AE", fontWeight: 500, marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.email || "\u2014"}</span>
+            </span>
+            <span style={{ fontSize: 10, fontWeight: 700, borderRadius: 7, padding: "3px 0", textAlign: "center", background: r.kyc === "cleared" ? "#E9F8F1" : "#FDF4E5", color: r.kyc === "cleared" ? "#1F9D6B" : "#B07B14" }}>{r.kyc === "cleared" ? "Cleared" : "Pending"}</span>
+            <span style={{ textAlign: "right", fontFamily: "'JetBrains Mono',monospace", fontSize: 11.5, fontWeight: 600 }}>{r.units}</span>
+            <span style={{ textAlign: "right", fontSize: 12.5, fontWeight: 700 }}>{moneyM(r.contracted)}</span>
+            <span style={{ textAlign: "right", fontSize: 12.5, fontWeight: 700, color: "#1F9D6B" }}>{moneyM(r.collected)}</span>
+            <span style={{ textAlign: "right", fontSize: 12.5, fontWeight: 700, color: r.overdue > 0 ? "#E5484D" : "#9AA0AE" }}>{r.overdue > 0 ? moneyM(r.overdue) : "\u2014"}</span>
+            <span style={{ fontSize: 13, color: "#B9BDC9", fontWeight: 700 }}>{"\u203A"}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════
    BUYER 360
    ═══════════════════════════════════════════════════════════════════ */
 function Buyer360({ btab, setBtab, goUnit }: { btab:string; setBtab:(v:any)=>void; goUnit:(id:string)=>void }) {
   const router = useRouter();
   const [sent, setSent] = useState(false);
+  const [live, setLive] = useState<BuyerDetail | null>(null);
+  const idRaw = router.query.id;
+  const bid = typeof idRaw === "string" ? Number(idRaw) : NaN;
+
+  useEffect(() => {
+    if (!Number.isInteger(bid) || bid <= 0) return;
+    let active = true;
+    fetchJSON<{ buyer: BuyerDetail }>("/api/buyers?id=" + bid)
+      .then((j) => { if (active) setLive(j.buyer); })
+      .catch(() => {});
+    return () => { active = false; };
+  }, [bid]);
+
   const tabs: [string,string][] = [["units","Units"],["ledger","Ledger"],["sched","Schedule"]];
-  const buyerName = "Rajesh Menon";
-  const buyerId = "H21-B-00147";
+  const buyerName = live ? live.name : "Rajesh Menon";
+  const buyerId = live ? "B-00" + String(live.id).padStart(3,"0") : "H21-B-00147";
+  const initials = buyerName.split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase();
+  const kyc = live ? live.kyc : "cleared";
+
+  const contracted = live ? live.units.reduce((a, u) => a + u.price, 0) : 4780000;
+  const collected = live ? live.ledger.reduce((a, r) => a + r.credit, 0) : 2870000;
+  const outstanding = Math.max(0, contracted - collected);
+  const overdue = live ? live.overdue : 0;
+  const nextDue = live && live.next ? live.next : { amount: 465500, date: "2026-09-14", unit: "H21-T1-1204", milestone: "Structure 40%" };
+
+  const tiles = [
+    { l: "Total contracted", v: moneyM(contracted), n: (live ? live.units.length : 2) + " units", ok: false },
+    { l: "Collected", v: moneyM(collected), n: ((collected / Math.max(1, contracted)) * 100).toFixed(1) + "% of contracted", ok: true },
+    { l: "Outstanding", v: moneyM(outstanding), n: "across " + (live ? live.ledger.length : 8) + " instalments", ok: false },
+    { l: "Overdue", v: moneyM(overdue), n: overdue > 0 ? "needs follow-up" : "no arrears on record", ok: false },
+  ];
+
+  const units = live
+    ? live.units.map((u) => ({ no: u.no, st: u.status === "sold" ? "Sold" : u.status.charAt(0).toUpperCase() + u.status.slice(1), meta: u.type + " \u00b7 " + u.area.toLocaleString("en-US") + " sq.ft" + (u.view ? " \u00b7 " + u.view : ""), price: money(u.price), pct: u.pct + "%", p: u.pct }))
+    : [{no:"H21-T1-1204", st:"Sold", meta:"2BR-B \u00b7 1,180 sq.ft \u00b7 Level 12", price:"AED 2,327,500", pct:"62%", p:62},{no:"H21-T1-3302", st:"Booked", meta:"1BR-A \u00b7 748 sq.ft \u00b7 Level 33", price:"AED 2,452,500", pct:"58%", p:58}];
+
+  const fmtLD = (d: string) => {
+    const [y, mo, dd] = d.split("-");
+    const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    return dd + " " + MON[Number(mo) - 1] + " " + y.slice(2);
+  };
+  const ledger: [string,string,string,string,string,string][] = live
+    ? live.ledger.map((r) => [fmtLD(r.date), r.unit, r.desc, "", r.credit.toLocaleString("en-US"), r.balance.toLocaleString("en-US")] as [string,string,string,string,string,string])
+    : B_LEDGER;
+
+  const numM = (v: number) => (v >= 1e6 ? (v / 1e6).toFixed(1) + "M" : v >= 1e3 ? Math.round(v / 1e3) + "k" : String(Math.round(v)));
+  const schedBars = (() => {
+    if (!live) return B_SCHED.map((v, i) => ({ label: B_SCHED_LABELS[i], v: Math.round(v * 1000), pct: Math.max(3, v / 0.93 * 100), text: v ? (v * 1000).toFixed(0) + "k" : "\u2014" }));
+    const now = new Date();
+    const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const byYm: Record<string, number> = {};
+    live.schedule.forEach((s) => { byYm[s.ym] = s.amt; });
+    const bars: { label: string; amt: number }[] = [];
+    for (let k = 0; k < 12; k++) {
+      const d = new Date(now.getFullYear(), now.getMonth() + k, 1);
+      const ym = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
+      bars.push({ label: MON[d.getMonth()], amt: byYm[ym] || 0 });
+    }
+    const mx = Math.max(...bars.map((b) => b.amt), 1);
+    return bars.map((b) => ({ label: b.label, v: b.amt, pct: b.amt ? Math.max(3, (b.amt / mx) * 93) : 3, text: b.amt ? numM(b.amt) : "\u2014" }));
+  })();
+
+  const score = live ? Math.max(1, Math.min(5, Math.round((live.miles.paid / Math.max(1, live.miles.total)) * 5))) : 4;
+  const behaviorSub = live
+    ? live.miles.paid + " of " + live.miles.total + " instalments paid in full."
+    : "11 of 12 instalments paid on or before the due date. One payment 6 days late (Mar 2026).";
+  const rel: [string,string][] = live
+    ? [["First purchase", fmtShort(live.firstPaid || "")], ["Lifetime value", moneyM(contracted)], ["Units", String(live.units.length)], ["Instalments", live.miles.paid + "/" + live.miles.total + " paid"], ["KYC", kyc === "cleared" ? "Cleared" : "Pending"], ["Preferred contact", "Email"], ["Relationship manager", "\u2014"]]
+    : B_REL;
 
   const sendStatement = () => {
-    const totals = { contracted: "AED 4.78M", collected: "AED 2.87M", outstanding: "AED 1.91M" };
-    exportBuyerStatement(buyerName, buyerId, B_UNITS, B_LEDGER.map((r) => ({ date: r[0], unit: r[1], desc: r[2], debit: r[3], credit: r[4], balance: r[5] })), totals);
+    const totals = { contracted: moneyM(contracted), collected: moneyM(collected), outstanding: moneyM(outstanding) };
+    const uRows = live ? units : B_UNITS;
+    const lRows = live
+      ? live.ledger.map((r) => ({ date: r.date, unit: r.unit, desc: r.desc, debit: "", credit: String(r.credit), balance: String(r.balance) }))
+      : B_LEDGER.map((r) => ({ date: r[0], unit: r[1], desc: r[2], debit: r[3], credit: r[4], balance: r[5] }));
+    exportBuyerStatement(buyerName, buyerId, uRows, lRows, totals);
     setSent(true);
     setTimeout(() => setSent(false), 4000);
   };
@@ -495,8 +694,20 @@ function Buyer360({ btab, setBtab, goUnit }: { btab:string; setBtab:(v:any)=>voi
     router.push({ pathname: "/finance", query: q }, undefined, { shallow: true });
   };
 
+  const backToDir = () => {
+    const q: Record<string,string> = { s: "buyer" };
+    const sc = router.query.scope;
+    if (sc && sc !== "ALL") q.scope = String(sc);
+    router.replace({ pathname: "/sales", query: q }, undefined, { shallow: true });
+  };
+
+  const contactLine = live
+    ? [live.phone, live.email, "Risk rating: Low"].filter(Boolean).join(" \u00b7 ")
+    : "+971 50 442 1187 \u00b7 r.menon@arvexcapital.ae \u00b7 Dubai Marina, Dubai \u00b7 Risk rating: Low";
+
   return (
     <div>
+      <button onClick={backToDir} style={{ height: 32, borderRadius: 10, border: "1px solid #EDEEF3", background: "#fff", padding: "0 13px", fontFamily: "inherit", fontSize: 12, fontWeight: 700, color: "#6B7180", cursor: "pointer", marginBottom: 14 }}>{"\u2039"} Back to directory</button>
       {sent && (
         <div style={{ background:"#E9F8F1", color:"#1F9D6B", borderRadius:12, padding:"11px 16px", fontSize:12, fontWeight:700, marginBottom:16 }}>
           Statement generated and emailed to {buyerName} \u00b7 PDF downloaded \u00b7 logged to buyer vault
@@ -505,15 +716,15 @@ function Buyer360({ btab, setBtab, goUnit }: { btab:string; setBtab:(v:any)=>voi
       {/* header card */}
       <div style={{background:"#fff",borderRadius:20,padding:"22px 24px",boxShadow:"0 1px 3px rgba(20,22,31,.04)"}}>
         <div style={{display:"flex",alignItems:"flex-start",gap:16}}>
-          <div style={{width:54,height:54,flex:"none",borderRadius:18,background:"#EDECFE",display:"grid",placeItems:"center",fontSize:17,fontWeight:800,color:AC}}>RM</div>
+          <div style={{width:54,height:54,flex:"none",borderRadius:18,background:"#EDECFE",display:"grid",placeItems:"center",fontSize:17,fontWeight:800,color:AC}}>{initials}</div>
           <div style={{flex:1,minWidth:0}}>
             <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
-              <span style={{fontSize:22,fontWeight:800,letterSpacing:"-.03em"}}>Rajesh Menon</span>
-              <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:11,fontWeight:600,background:"#F1F2F7",borderRadius:8,padding:"4px 8px",color:"#6B7180"}}>H21-B-00147</span>
-              <span style={{fontSize:11,fontWeight:700,background:"#E9F8F1",color:"#1F9D6B",borderRadius:8,padding:"4px 9px"}}>KYC cleared</span>
-              <span style={{fontSize:11,fontWeight:700,background:"#F1F2F7",color:"#4A5060",borderRadius:8,padding:"4px 9px"}}>Individual \u00b7 India</span>
+              <span style={{fontSize:22,fontWeight:800,letterSpacing:"-.03em"}}>{buyerName}</span>
+              <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:11,fontWeight:600,background:"#F1F2F7",borderRadius:8,padding:"4px 8px",color:"#6B7180"}}>{buyerId}</span>
+              <span style={{fontSize:11,fontWeight:700,background:kyc==="cleared"?"#E9F8F1":"#FDF4E5",color:kyc==="cleared"?"#1F9D6B":"#B07B14",borderRadius:8,padding:"4px 9px"}}>{kyc==="cleared"?"KYC cleared":"KYC pending"}</span>
+              <span style={{fontSize:11,fontWeight:700,background:"#F1F2F7",color:"#4A5060",borderRadius:8,padding:"4px 9px"}}>Individual</span>
             </div>
-            <div style={{fontSize:12.5,color:"#6B7180",fontWeight:500,marginTop:7}}>+971 50 442 1187 \u00b7 r.menon@arvexcapital.ae \u00b7 Dubai Marina, Dubai \u00b7 Risk rating: Low</div>
+            <div style={{fontSize:12.5,color:"#6B7180",fontWeight:500,marginTop:7}}>{contactLine}</div>
           </div>
           <div style={{display:"flex",gap:8}}>
             <button onClick={sendStatement} style={{height:38,borderRadius:12,border:"1px solid #EDEEF3",background:"#fff",padding:"0 14px",fontFamily:"inherit",fontSize:12.5,fontWeight:700,color:"#4A5060",cursor:"pointer"}}>Send statement</button>
@@ -524,7 +735,7 @@ function Buyer360({ btab, setBtab, goUnit }: { btab:string; setBtab:(v:any)=>voi
 
       {/* tiles */}
       <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr) 1.2fr",gap:14,marginTop:16}}>
-        {B_TILES.map(t => (
+        {tiles.map(t => (
           <div key={t.l} style={{background:"#fff",borderRadius:20,padding:"18px 20px",boxShadow:"0 1px 3px rgba(20,22,31,.04)"}}>
             <div style={{fontSize:10.5,fontWeight:700,letterSpacing:".06em",color:"#9AA0AE",textTransform:"uppercase"}}>{t.l}</div>
             <div style={{fontSize:20,fontWeight:800,letterSpacing:"-.03em",marginTop:11,color:t.ok?AC:"#14161F"}}>{t.v}</div>
@@ -533,8 +744,8 @@ function Buyer360({ btab, setBtab, goUnit }: { btab:string; setBtab:(v:any)=>voi
         ))}
         <div style={{background:"#14161F",borderRadius:20,padding:"18px 20px",color:"#fff"}}>
           <div style={{fontSize:10.5,fontWeight:700,letterSpacing:".06em",color:"rgba(255,255,255,.6)",textTransform:"uppercase"}}>Next due</div>
-          <div style={{fontSize:21,fontWeight:800,letterSpacing:"-.03em",marginTop:12}}>AED 465,500</div>
-          <div style={{fontSize:11.5,color:"rgba(255,255,255,.7)",fontWeight:500,marginTop:4}}>14 Sep 2026 \u00b7 H21-T1-1204 \u00b7 Structure 40%</div>
+          <div style={{fontSize:21,fontWeight:800,letterSpacing:"-.03em",marginTop:12}}>{money(nextDue.amount)}</div>
+          <div style={{fontSize:11.5,color:"rgba(255,255,255,.7)",fontWeight:500,marginTop:4}}>{fmtShort(nextDue.date)} \u00b7 {nextDue.unit} \u00b7 {nextDue.milestone}</div>
         </div>
       </div>
 
@@ -579,7 +790,7 @@ function Buyer360({ btab, setBtab, goUnit }: { btab:string; setBtab:(v:any)=>voi
               {B_LEDGER.map(([date,unit,desc,debit,credit,bal],i) => (
                 <div key={i} style={{display:"grid",gridTemplateColumns:"84px 96px 1.3fr 92px 92px 100px",gap:8,alignItems:"center",padding:"0 22px",height:38,borderBottom:"1px solid #F6F7FA"}}>
                   <span style={{fontSize:11.5,color:"#6B7180",fontWeight:600}}>{date}</span>
-                  <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:11,color:"#4A5060"}}>H21-T1-{unit}</span>
+                  <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:11,color:"#4A5060"}}>{unit.length > 4 ? unit : "H21-T1-" + unit}</span>
                   <span style={{fontSize:11.5,fontWeight:600,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{desc}</span>
                   <span style={{textAlign:"right",fontSize:11.5,color:"#6B7180"}}>{debit || "\u2014"}</span>
                   <span style={{textAlign:"right",fontSize:11.5,fontWeight:700,color:"#1F9D6B"}}>{credit || "\u2014"}</span>
@@ -594,11 +805,11 @@ function Buyer360({ btab, setBtab, goUnit }: { btab:string; setBtab:(v:any)=>voi
               <div style={{fontSize:14,fontWeight:700,letterSpacing:"-.015em",marginBottom:4}}>Forward schedule \u00b7 12 months</div>
               <div style={{fontSize:11.5,color:"#9AA0AE",fontWeight:500}}>Merged across both units</div>
               <div style={{display:"flex",alignItems:"flex-end",gap:10,height:180,marginTop:20}}>
-                {B_SCHED.map((v,i) => (
+                {schedBars.map((b,i) => (
                   <div key={i} style={{flex:1,display:"flex",flexDirection:"column",justifyContent:"flex-end",alignItems:"center",height:"100%",gap:7}}>
-                    <span style={{fontSize:9.5,fontWeight:700,color:"#6B7180"}}>{v ? (v*1000).toFixed(0)+"k" : "\u2014"}</span>
-                    <span style={{display:"block",width:"100%",maxWidth:38,borderRadius:"9px 9px 3px 3px",background:v?AC:"#EDEEF3",height:Math.max(3,v/0.93*100)+"%"}} />
-                    <span style={{fontSize:9.5,fontWeight:600,color:"#9AA0AE"}}>{B_SCHED_LABELS[i]}</span>
+                    <span style={{fontSize:9.5,fontWeight:700,color:"#6B7180"}}>{b.text}</span>
+                    <span style={{display:"block",width:"100%",maxWidth:38,borderRadius:"9px 9px 3px 3px",background:b.v?AC:"#EDEEF3",height:b.pct+"%"}} />
+                    <span style={{fontSize:9.5,fontWeight:600,color:"#9AA0AE"}}>{b.label}</span>
                   </div>
                 ))}
               </div>
@@ -611,14 +822,14 @@ function Buyer360({ btab, setBtab, goUnit }: { btab:string; setBtab:(v:any)=>voi
           <div style={{background:"#fff",borderRadius:20,padding:"20px 22px",boxShadow:"0 1px 3px rgba(20,22,31,.04)"}}>
             <div style={{fontSize:13,fontWeight:700,letterSpacing:"-.015em",marginBottom:14}}>Payment behaviour</div>
             <div style={{display:"flex",gap:5,marginBottom:10}}>
-              {[1,1,1,1,0].map((m,i) => <span key={i} style={{flex:1,height:8,borderRadius:5,background:m?"#34C08A":"#EDEEF3"}} />)}
+              {[1,1,1,1,1].map((m,i) => <span key={i} style={{flex:1,height:8,borderRadius:5,background:i<score?"#34C08A":"#EDEEF3"}} />)}
             </div>
-            <div style={{fontSize:12,fontWeight:700}}>Reliable \u00b7 4 of 5</div>
-            <div style={{fontSize:11,color:"#9AA0AE",fontWeight:500,marginTop:4,lineHeight:1.55}}>11 of 12 instalments paid on or before the due date. One payment 6 days late (Mar 2026).</div>
+            <div style={{fontSize:12,fontWeight:700}}>Reliable \u00b7 {score} of 5</div>
+            <div style={{fontSize:11,color:"#9AA0AE",fontWeight:500,marginTop:4,lineHeight:1.55}}>{behaviorSub}</div>
           </div>
           <div style={{background:"#fff",borderRadius:20,padding:"20px 22px",boxShadow:"0 1px 3px rgba(20,22,31,.04)"}}>
             <div style={{fontSize:13,fontWeight:700,letterSpacing:"-.015em",marginBottom:12}}>Relationship</div>
-            {B_REL.map(([k,v]) => (
+            {rel.map(([k,v]) => (
               <div key={k} style={{display:"flex",justifyContent:"space-between",gap:12,padding:"8px 0",borderBottom:"1px solid #F6F7FA"}}>
                 <span style={{fontSize:11.5,color:"#9AA0AE",fontWeight:500}}>{k}</span>
                 <span style={{fontSize:11.5,fontWeight:700}}>{v}</span>
