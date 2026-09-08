@@ -6,7 +6,7 @@
 ## Push (current branch + what to push)
 > Branch-per-task rule (see AGENTS.md): never push directly to main. Update this section per task.
 
-- Current branch: `fix/plinth-parity` (PLINTH Parity Program). Pushed: `81d9b7b` (T1), `8e405db` (T2), `a518b68` (T3), `20d764d` (T4), `91adcb5` (T5). In progress: T6 (`/api/buyers` GET + Buyer directory/360 wired over the weekend; live-verified 8 buyers, overdue only for lapsed instalments, ledger de-duplicated, dates `YYYY-MM-DD`). Note: local Postgres died mid-verification (0xC0000142 at backend spawn) and was restarted by the operator; dev server + `.next` healthy. Merge to main only after operator approval.
+- Current branch: `fix/plinth-parity` (PLINTH Parity Program). Pushed: `81d9b7b` (T1), `8e405db` (T2), `a518b68` (T3), `20d764d` (T4), `91adcb5` (T5), `3fbec64` (T6). In progress: T7 (`/api/leads` PUT stage + kanban drag-persist + agent leaderboard; leads enriched in dev DB → 29 rows across 8 stages, 5 agents; live-verified PUT round-trip + invalid-stage 400; lint green). Note: local Postgres died mid-T6 (0xC0000142 at backend spawn) and was restarted by the operator; keep an eye on it — if it dies again: retry start; if irretrievable, commit on lint-only and mark re-verify pending. Operator out of office — running T7→T18 standalone, no merges to main. Merge to main only after operator approval.
 - Closed on GitHub (no merge): issue #51 (dead `lib/useApi.ts` removed) on `fix/aud-051-dead-use-api` (`f8cbbd0` + `7a0bd8b`); issue #52 (any-type cleanups) on `fix/aud-052-any-types` (`164047b`).
 - Current branch: `main` (`ad22adf`; `fix/aud-006-system`, `fix/aud-006-finance`, `fix/aud-015-analytics` merged; `fix/aud-015-analytics` branch deleted local+remote).
 - **AUD-015 (#37) CLOSED/MERGED** — `fix/aud-015-analytics` (`ad22adf`): cashflow forecast + report exports live via `/api/finance-analytics` + `/api/report-export`; branch deleted.
@@ -55,7 +55,7 @@
 > - [x] **T4** `Construction Progress` → new `construction_milestones` table + `/api/construction` + wire screen
 > - [x] **T5** `Mobile` exec app → new `/api/mobile` aggregate + wire the 5 tabs
 > - [x] **T6** `Buyers` directory + Buyer 360 → new `/api/buyers` (GET) + wire Sales buyer subscreens
-> - [ ] **T7** `Leads` → add PUT stage to `/api/leads` + kanban persistence + leaderboard
+> - [x] **T7** `Leads` → PUT stage to `/api/leads` (drag-persist) + agent leaderboard (live aggregate by agent)
 > - [ ] **T8** `Escrow` → add `/api/finance` PUT (reconcile match / drawdown submit) + wire actions
 > - [ ] **T9** `Invoices` → add `/api/invoices` POST/PUT (issue / void / bulk-issue) + wire actions
 > - [ ] **T10** `Collections` → dunning action PUT (remind/log/promise) + live default calculator (construction %)

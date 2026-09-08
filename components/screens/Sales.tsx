@@ -16,10 +16,11 @@ const FUNNEL: [string,string,string][] = [
 const CONV = ["","52%","65%","60%","71%"];
 
 /* ── kanban columns ─────────────────────────────────────────────── */
-type Card = { name:string; flag:string; src:string; budget:string; chips:string[]; agent:string; age:string; live:boolean };
+type Card = { name:string; flag:string; src:string; budget:string; chips:string[]; agent:string; age:string; live:boolean; id?:number; disc?:number; days?:number };
 type Col = { label:string; count:number; val:string; color:string; cards:Card[] };
 
 type ApiLead = {
+  id?: number;
   name: string;
   source?: string;
   stage?: string;
@@ -27,6 +28,8 @@ type ApiLead = {
   budgetMax?: number;
   agent?: string;
   live?: boolean;
+  discountPct?: number;
+  daysToClose?: number;
 };
 const LEADS_COLS: Col[] = [
   { label:"New",count:8,val:"AED 14.2M",color:"#8B7CF6",cards:[
@@ -48,6 +51,15 @@ const LEADS_COLS: Col[] = [
     {name:"Aisha Al Marri",flag:"UAE",src:"Broker \u00b7 Betterhomes",budget:"AED 2.8M",chips:["2801"],agent:"AH",age:"closed",live:true}]},
   { label:"Lost",count:1,val:"AED 1.9M",color:"#8A94A6",cards:[
     {name:"Peter Nowak",flag:"DE",src:"Property Finder",budget:"AED 1.9M",chips:["\u2014"],agent:"RK",age:"price objection",live:false}]},
+];
+
+type LbRow = { agent:string; units:number; value:number; conv:number; disc:number; days:number };
+const LB_FALLBACK: LbRow[] = [
+  { agent:"Sarah Bennett", units:4, value:9800000, conv:57, disc:3.2, days:28 },
+  { agent:"Ravi Khan", units:3, value:7100000, conv:43, disc:2.8, days:34 },
+  { agent:"Hamza Ali", units:2, value:5400000, conv:33, disc:4.1, days:41 },
+  { agent:"Dana Scott", units:2, value:4900000, conv:29, disc:2.1, days:22 },
+  { agent:"Arvind Mehta", units:3, value:6600000, conv:38, disc:3.6, days:31 },
 ];
 
 /* ── booking wizard ─────────────────────────────────────────────── */
@@ -225,6 +237,7 @@ export default function Sales({ scope }: { scope: string }) {
    ═══════════════════════════════════════════════════════════════════ */
 function Leads({ onNewBooking, onBookLead }: { onNewBooking: () => void; onBookLead: (card: Card) => void }) {
   const [dbCols, setDbCols] = useState<Col[] | null>(null);
+  const [liveLeads, setLiveLeads] = useState<ApiLead[] | null>(null);
   const [apiError, setApiError] = useState("");
 
   useEffect(() => {
@@ -244,6 +257,7 @@ function Leads({ onNewBooking, onBookLead }: { onNewBooking: () => void; onBookL
             ? "AED " + (budgetMin || budgetMax).toLocaleString("en-US")
             : "AED -";
           byStage[key].push({
+            id: l.id,
             name: l.name,
             flag: "AE",
             src: l.source || "Referral",
@@ -252,6 +266,8 @@ function Leads({ onNewBooking, onBookLead }: { onNewBooking: () => void; onBookL
             agent: (l.agent || "AD").split(/\s+/).map((w: string) => w[0]).slice(0, 2).join("").toUpperCase() || "AD",
             age: "live",
             live: l.live !== false,
+            disc: l.discountPct != null ? l.discountPct : undefined,
+            days: l.daysToClose != null ? l.daysToClose : undefined,
           });
         });
         const cols = order.map((st) => {
@@ -262,6 +278,7 @@ function Leads({ onNewBooking, onBookLead }: { onNewBooking: () => void; onBookL
           return { label: labels[st], count: cards.length, val, color: colors[st], cards };
         });
         setDbCols(cols);
+        setLiveLeads(leads);
       })
       .catch((e) => {
         if (active) setApiError(e?.message || "Failed to load leads");
@@ -270,6 +287,60 @@ function Leads({ onNewBooking, onBookLead }: { onNewBooking: () => void; onBookL
   }, []);
 
   const cols = dbCols && dbCols.some((c) => c.cards.length > 0) ? dbCols : LEADS_COLS;
+
+  const [dragId, setDragId] = useState<number | null>(null);
+
+  const moveLead = (targetLabel: string) => {
+    if (dragId == null || !dbCols) return;
+    const stageMap: Record<string, string> = { New: "new", Contacted: "contacted", Qualified: "qualified", Viewing: "viewing", Negotiation: "negotiation", "EOI signed": "eoi", Booked: "booked", Lost: "lost" };
+    const to = stageMap[targetLabel];
+    if (!to) return;
+    const fromCol = dbCols.find((c) => c.cards.some((k) => k.id === dragId));
+    if (!fromCol) return;
+    const card = fromCol.cards.find((k) => k.id === dragId);
+    if (!card) return;
+    const next = dbCols.map((c) => {
+      if (c.label === fromCol.label) return { ...c, count: c.cards.length - 1, cards: c.cards.filter((k) => k.id !== dragId) };
+      if (c.label === targetLabel) return { ...c, count: c.cards.length + 1, cards: [...c.cards, { ...card, age: "just moved" }] };
+      return c;
+    });
+    setDragId(null);
+    setDbCols(next);
+    fetchJSON<{ id: number }>("/api/leads?id=" + dragId, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ stage: to }),
+    })
+      .then(() => {})
+      .catch((e) => setApiError(e?.message || "Failed to move lead"));
+  };
+
+  const leader: LbRow[] = (() => {
+    if (!liveLeads || liveLeads.length === 0) return LB_FALLBACK;
+    const byAgent: Record<string, ApiLead[]> = {};
+    liveLeads.forEach((l) => {
+      const a = (l.agent || "Unassigned").trim() || "Unassigned";
+      (byAgent[a] = byAgent[a] || []).push(l);
+    });
+    return Object.entries(byAgent)
+      .map(([agent, ls]) => {
+        const booked = ls.filter((l) => l.stage === "booked");
+        const closed = ls.filter((l) => l.stage === "booked" || l.stage === "lost");
+        const summed = (sel: (l: ApiLead) => number, key: "disc" | "days") => {
+          const arr = ls.filter((l) => (key === "disc" ? l.discountPct != null : l.daysToClose != null));
+          return arr.reduce((a, l) => a + sel(l), 0) / Math.max(1, arr.length);
+        };
+        return {
+          agent,
+          units: booked.length,
+          value: booked.reduce((a, l) => a + (l.budgetMax || 0), 0),
+          conv: closed.length ? Math.round((booked.length / closed.length) * 100) : 0,
+          disc: summed((l) => l.discountPct || 0, "disc"),
+          days: Math.round(summed((l) => l.daysToClose || 0, "days")),
+        };
+      })
+      .sort((a, b) => b.value - a.value);
+  })();
 
   return (
     <div>
@@ -303,10 +374,37 @@ function Leads({ onNewBooking, onBookLead }: { onNewBooking: () => void; onBookL
         </div>
       </div>
 
+      {/* agent leaderboard */}
+      <div style={{background:"#fff",borderRadius:20,padding:"20px 24px",boxShadow:"0 1px 3px rgba(20,22,31,.04)",marginBottom:16}}>
+        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
+          <div style={{fontSize:13,fontWeight:800,letterSpacing:"-.02em"}}>Agent leaderboard</div>
+          <span style={{fontSize:10.5,fontWeight:600,color:"#9AA0AE"}}>Units booked \u00b7 Value booked \u00b7 Conversion \u00b7 Avg discount \u00b7 Avg days to close</span>
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"1.6fr 1fr 1.4fr 1fr 1fr 1fr",gap:12,fontSize:10.5,fontWeight:700,color:"#9AA0AE",textTransform:"uppercase",letterSpacing:".04em",padding:"0 6px 9px"}}>
+          <span>Agent</span><span style={{textAlign:"right"}}>Units booked</span><span style={{textAlign:"right"}}>Value booked</span><span style={{textAlign:"right"}}>Conv.</span><span style={{textAlign:"right"}}>Avg disc</span><span style={{textAlign:"right"}}>Avg days</span>
+        </div>
+        {leader.map((r, i) => (
+          <div key={r.agent} style={{display:"grid",gridTemplateColumns:"1.6fr 1fr 1.4fr 1fr 1fr 1fr",gap:12,alignItems:"center",padding:"10px 6px",borderTop:"1px solid #F3F4F8"}}>
+            <span style={{display:"flex",alignItems:"center",gap:9,minWidth:0}}>
+              <span style={{width:26,height:26,flex:"none",borderRadius:9,background:i===0?"#EDECFE":"#E7E9F0",display:"grid",placeItems:"center",fontSize:9.5,fontWeight:800,color:i===0?AC:"#4A5060"}}>{r.agent.split(/\s+/).map((w) => w[0]).slice(0,2).join("")}</span>
+              <span style={{fontSize:12,fontWeight:700,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{r.agent}</span>
+              {i===0 && <span style={{fontSize:9,fontWeight:800,color:AC,background:"#F0EFFE",borderRadius:6,padding:"2px 6px"}}>#1</span>}
+            </span>
+            <span style={{textAlign:"right",fontSize:12,fontWeight:800}}>{r.units}</span>
+            <span style={{textAlign:"right",fontSize:12,fontWeight:800,fontFamily:"'JetBrains Mono',monospace"}}>{moneyM(r.value)}</span>
+            <span style={{textAlign:"right",fontSize:12,fontWeight:700,color:"#6B7180"}}>{r.conv}%</span>
+            <span style={{textAlign:"right",fontSize:12,fontWeight:700,color:"#6B7180"}}>{r.disc.toFixed(1)}%</span>
+            <span style={{textAlign:"right",fontSize:12,fontWeight:700,color:"#6B7180"}}>{Math.round(r.days)} d</span>
+          </div>
+        ))}
+      </div>
+
       {/* kanban */}
       <div style={{display:"flex",gap:12,overflowX:"auto",paddingBottom:8,alignItems:"flex-start"}}>
         {cols.map(col => (
-          <div key={col.label} style={{width:240,flex:"none",background:"#EFF0F5",borderRadius:18,padding:12}}>
+          <div key={col.label} style={{width:240,flex:"none",background:"#EFF0F5",borderRadius:18,padding:12}}
+               onDragOver={(e) => e.preventDefault()}
+               onDrop={() => moveLead(col.label)}>
             <div style={{display:"flex",alignItems:"center",gap:8,padding:"2px 6px 12px"}}>
               <span style={{width:8,height:8,borderRadius:4,background:col.color}} />
               <span style={{flex:1,fontSize:12,fontWeight:700}}>{col.label}</span>
@@ -315,7 +413,11 @@ function Leads({ onNewBooking, onBookLead }: { onNewBooking: () => void; onBookL
             <div style={{fontSize:10.5,fontWeight:700,color:"#9AA0AE",padding:"0 6px 10px"}}>{col.val} potential</div>
             <div style={{display:"flex",flexDirection:"column",gap:8}}>
               {col.cards.map(k => (
-                <div key={k.name} onClick={() => onBookLead(k)} title="New booking for this lead" style={{background:"#fff",borderRadius:14,padding:"13px 14px",boxShadow:"0 1px 2px rgba(20,22,31,.05)",cursor:"pointer",transition:"box-shadow .15s,border-color .15s",border:"1px solid transparent"}}>
+                <div key={k.id ?? k.name} onClick={() => onBookLead(k)} draggable={k.id != null}
+                     onDragStart={() => setDragId(k.id ?? null)}
+                     onDragEnd={() => setDragId(null)}
+                     title={k.id != null ? "Drag to move stage \u00b7 click for new booking" : "New booking for this lead"}
+                     style={{background:"#fff",borderRadius:14,padding:"13px 14px",boxShadow:"0 1px 2px rgba(20,22,31,.05)",cursor:"pointer",transition:"box-shadow .15s,border-color .15s",border:"1px solid transparent"}}>
                   <div style={{display:"flex",alignItems:"center",gap:7}}>
                     <span style={{flex:1,fontSize:12.5,fontWeight:700,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{k.name}</span>
                     <span style={{fontSize:10,fontWeight:700,color:"#9AA0AE"}}>{k.flag}</span>

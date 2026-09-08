@@ -80,8 +80,13 @@ CREATE TABLE IF NOT EXISTS leads (
   budget_min NUMERIC,
   budget_max NUMERIC,
   agent TEXT,
-  stage_changed_at TIMESTAMPTZ DEFAULT now()
+  stage_changed_at TIMESTAMPTZ DEFAULT now(),
+  discount_pct NUMERIC,
+  days_to_close INT
 );
+
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS discount_pct NUMERIC;
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS days_to_close INT;
 
 CREATE TABLE IF NOT EXISTS receipts (
   id SERIAL PRIMARY KEY,
