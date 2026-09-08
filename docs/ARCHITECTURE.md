@@ -151,9 +151,12 @@ Only parameterized SQL is used. Seeds/scripts under `db/` (`schema.sql`, `seed.t
   new `pipeline_items` / `snag_items` / `deeds` tables (idempotent DDL + seed guard in
   `db/schema.sql`), new `pages/api/handover.ts` (envelope, `Handover:REA`), and the three
   screens (Pipeline / Snagging / Deeds) now fetch live rows via `fetchJSON` with surfaced
-  errors. Tables applied to the dev DB the app runs against. Remaining static screens to
-  wire: Finance ops (Collections/Ageing, Escrow, Cashflow, Invoices, Reports), System
-  (AuditLog, Settings), Exec mobile — tracked in #22.
+  errors. Tables applied to the dev DB the app runs against. **System module wired**
+  (`7a2b0b4` on branch `fix/aud-006-system`): new `audit_log` + `app_settings` tables
+  (idempotent DDL + seed guard), `pages/api/system.ts` (GET envelope + PUT upsert behind
+  `Settings:UPD`), AuditLog and Settings screens live via `fetchJSON`, Settings saves
+  persist to `app_settings`. Remaining static screens to
+  wire: Finance ops (Collections/Ageing, Escrow, Cashflow, Invoices, Reports), Exec mobile — tracked in #22.
 - **AUD-007 — Fetch error handling swallowed.** Screens use local `let active` blocks
   with `.catch(() => {})`, silent fallback to mock data; shared `lib/useApi.ts` exists
   but is unused. Fix: adopt `useApi` (or equivalent) with `loading/error/data` states
