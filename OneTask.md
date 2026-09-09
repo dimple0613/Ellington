@@ -6,10 +6,11 @@
 ## Push (current branch + what to push)
 > Branch-per-task rule (see AGENTS.md): never push directly to main. Update this section per task.
 
-- Current branch: `fix/parity-live-data` (PLINTH parity — verified remaining gaps). Push target: this branch only.
-- Pushed (ALL SEVEN DONE + findings + gaps): **D1** `728b479` · **D2** `bf3f350` · **D3** `0c94935` · **D4** `57adfdd` · **D5** `bc4f84f` · **D6** `31ff7aa` · tracker `79fbe32` · audit findings `886e757`+`b1c8828` · receipts-date fix `6179180` · Settings/Audit gaps `02fbe52`.
+- Current branch: `feat/audit-halfdone-completion` (complete amber "Half-finished" audit items). Push target: this branch only.
+- PUSH THIS: **`0c36607`** "feat(audit): complete amber items — Reports pivot builder + schedule, per-role approval thresholds, notif matrix 'who' column, Mobile Pulse/Buyers tabs, brand token #3B6EF6 + Inter + compact money" (6 files: Mobile.tsx, Reports.tsx, Settings.tsx, Users.tsx, lib/format.ts, pages/_document.tsx). Lint + `next build` green (build run with dev server stopped, then restarted).
+- Audit HTML updated: `C:\Users\admin\Downloads\New folder\ELLINGTON-AUDIT-REPORT.html` — 40/51 checked; Escrow gauges + Construction risk register flipped to done (were already implemented); 1 honest open: dark-theme-as-default NOT converted (app stays light).
 - Everything intended for this task is on this branch — NO commit on `main` from this program.
-- Prior `fix/plinth-parity` commits (T1–T18) are historical and NOT completion evidence.
+- Prior `fix/plinth-parity` and `fix/parity-live-data` commits (T1–T18, D1–D6) are historical and NOT completion evidence for this task.
 
 ## PLINTH Parity Program — verified remaining tasks
 > Re-audited from scratch against `C:\Users\admin\Downloads\New folder\plinth-prompt-pack_1.html`
