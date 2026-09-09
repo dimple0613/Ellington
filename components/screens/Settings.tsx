@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useRouter } from "next/router";
 import { AC, MONTHS_ABBR } from "../../lib/format";
 import { fetchJSON } from "../../lib/api";
 
@@ -98,7 +99,9 @@ const PII_DEFAULT: PiiRow[] = [
 ];
 
 export default function SettingsScreen() {
-  const [tab, setTab] = useState<Tab>("company");
+  const router = useRouter();
+  const tabFromUrl = typeof router.query.tab === "string" && TABS.some(([k]) => k === router.query.tab) ? (router.query.tab as Tab) : "company";
+  const [tab, setTab] = useState<Tab>(tabFromUrl);
   const [notice, setNotice] = useState("");
   const [notif, setNotif] = useState<NotifRow[]>(NOTIF_ROWS);
   const [numbering, setNumbering] = useState<NumRow[]>(NUMBERING_ROWS);

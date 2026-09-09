@@ -127,14 +127,7 @@ type Props = {
   scopeCode?: string;
 };
 
-const NOTIFS = [
-  { id: "n1", who: "R. Menon", what: "requested a 7.5% discount on T2-0806", time: "2 min ago", unread: true },
-  { id: "n2", who: "Oqood", what: "3 registrations pending >14 days", time: "18 min ago", unread: true },
-  { id: "n3", who: "Escrow", what: "AED 340,000 variance unmatched", time: "41 min ago", unread: true },
-  { id: "n4", who: "Collections", what: "4 units overdue >90 days — AED 8.2M", time: "1 hr ago", unread: true },
-  { id: "n5", who: "Handover", what: "Wilton Park — 12 SPAs unsigned beyond 21 days", time: "2 hr ago", unread: false },
-  { id: "n6", who: "Compliance", what: "6 buyer passports expiring within 60 days", time: "Yesterday", unread: false },
-];
+type Notif = { id: string; who: string; what: string; time: string; unread: boolean };
 
 export default function Shell({
   group,
@@ -194,8 +187,8 @@ export default function Shell({
   const [newProj, setNewProj] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [rtl, setRtl] = useState(false);
-  const [notifs, setNotifs] = useState(NOTIFS);
-  const [ticker, setTicker] = useState("AED 4.2M");
+  const [notifs, setNotifs] = useState<Notif[]>([]);
+  const [ticker, setTicker] = useState("");
   const [live, setLive] = useState<{ receipts: any[]; docs: any[]; bookings: any[] }>({ receipts: [], docs: [], bookings: [] });
   const [focusIdx, setFocusIdx] = useState(0);
   const [inv, setInv] = useState<{ units: any[]; projects: { code: string; name: string }[] }>({ units: [], projects: [] });
@@ -227,12 +220,11 @@ export default function Shell({
     return () => { alive = false; };
   }, [cmdk]);
 
-  useEffect(() => {
-    let alive = true;
+  const loadNotifs = useCallback(() => {
     fetch("/api/finance")
       .then((r) => (r.ok ? r.json() : null))
       .then((j) => {
-        if (!alive || !j || !j.ok) return;
+        if (!j || !j.ok) return;
         const d = j.data || {};
         const collections: any[] = d.collections || [];
         const escrow: any[] = (d.escrow && d.escrow.queue) || [];
@@ -243,17 +235,24 @@ export default function Shell({
         const variance = escrow.reduce((a: number, e: any) => a + (Number(e.amount) || 0), 0);
         const awaiting = drawdowns.filter((x: any) => String(x.status || "") === "Awaiting trustee").length;
         if (due > 0) setTicker(fmtM(due));
-        const ns: typeof NOTIFS = [];
+        else setTicker("");
+        const ns: Notif[] = [];
         const note = (who: string, what: string, unread: boolean) => { ns.push({ id: "n" + (ns.length + 1), who, what, time: unread ? "now" : "today", unread }); };
         if (over90.length) note("Collections", over90.length + " units overdue >90 days \u2014 " + fmtM(over90.reduce((a: number, c: any) => a + (Number(c.amount) || 0), 0)), true);
         if (escrow.length) note("Escrow", escrow.length + " escrow entries unmatched \u2014 " + fmtM(variance), true);
         if (awaiting) note("Drawdowns", awaiting + " drawdowns awaiting trustee approval", false);
         if (collections.length) note("Collections", collections.length + " items on the collections worklist", false);
-        if (ns.length) setNotifs(ns);
+        setNotifs(ns);
       })
       .catch(() => {});
-    return () => { alive = false; };
   }, []);
+
+  useEffect(() => {
+    loadNotifs();
+    const onFocus = () => loadNotifs();
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [loadNotifs]);
 
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const showToast = useCallback((m: string) => {
@@ -317,6 +316,11 @@ export default function Shell({
   const openProfile = () => {
     setProfileMenu(false);
     router.push("/profile");
+  };
+
+  const openPrefs = () => {
+    setProfileMenu(false);
+    router.push("/system?s=settings&tab=notif");
   };
 
   const liveAvailable = inv.units.filter((u: any) => String(u.status || "").toLowerCase() === "available").length;
@@ -592,6 +596,7 @@ export default function Shell({
         profileOpen={profileMenu}
         onCloseProfile={() => setProfileMenu(false)}
         onProfile={openProfile}
+        onPrefs={openPrefs}
         rtl={rtl}
         onToggleRtl={() => setRtl((r) => !r)}
         onSignOut={signOut}
@@ -836,6 +841,7 @@ function TopbarFloating({
   profileOpen,
   onCloseProfile,
   onProfile,
+  onPrefs,
   rtl,
   onToggleRtl,
   onSignOut,
@@ -853,6 +859,7 @@ function TopbarFloating({
   profileOpen: boolean;
   onCloseProfile: () => void;
   onProfile: () => void;
+  onPrefs: () => void;
   rtl: boolean;
   onToggleRtl: () => void;
   onSignOut: () => void;
@@ -871,8 +878,8 @@ function TopbarFloating({
           </div>
           <div style={{ borderTop: "1px solid #EDEEF3", margin: "6px 8px" }} />
           <MenuRow icon="◎" label="My profile" sub="Identity & credentials" onClick={() => { onCloseProfile(); onProfile(); }} />
-          <MenuRow icon="⚙" label="Preferences" sub="Notifications & quiet hours" onClick={() => { onCloseProfile(); onToast("Preferences opened"); }} />
-          <MenuRow icon="⟳" label="Offline cache" sub="Last synced 09:39" onClick={() => { onCloseProfile(); onToast("Offline cache synced"); }} />
+          <MenuRow icon="⚙" label="Preferences" sub="Notifications & quiet hours" onClick={() => { onCloseProfile(); onPrefs(); }} />
+          <MenuRow icon="⟳" label="Offline cache" sub="Stored on this device" onClick={() => { onCloseProfile(); onToast("Offline cache synced"); }} />
           <MenuRow icon="⇄" label={rtl ? "Direction: RTL" : "Direction: LTR"} sub="Mirror the shell" onClick={() => { onToggleRtl(); onCloseProfile(); }} />
           <div style={{ borderTop: "1px solid #EDEEF3", margin: "6px 8px" }} />
           <button onClick={() => { onCloseProfile(); onSignOut(); }} style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 10px", border: 0, background: "transparent", borderRadius: 10, cursor: "pointer", fontFamily: "inherit", color: "#E5484D", fontSize: 12, fontWeight: 700, textAlign: "left", width: "100%" }}>

@@ -435,7 +435,7 @@ export default function MobileScreen() {
                   </div>
                 </div>
               </Card>
-              { [["Notifications", "12 unread"], ["My approvals", "2 pending"], ["Documents", "Shared with me"], ["Help & support", "FAQ + contact"], ["Settings", "App preferences"]].map(([label, note]) => (
+              { [["Notifications", "Center & quiet hours"], ["My approvals", "2 pending"], ["Documents", "Shared with me"], ["Help & support", "FAQ + contact"], ["Settings", "App preferences"]].map(([label, note]) => (
                 <Card key={label}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <span style={{ fontSize: 11, fontWeight: 700 }}>{label}</span>

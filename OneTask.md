@@ -9,6 +9,7 @@
 - Current branch: **`refactor/purge-static-data`** (made from `feat/audit-halfdone-completion`). Push target: this branch only.
 - PUSH THIS (next commit, purge batch 1):
   - **All UI screen static/mock row purges** (14 screens): `components/screens/{AuditLog,Cashflow,Collections,Construction,Deeds,Escrow,Financials,Invoices,Payments,Pipeline,Reports,Sales,Snagging,Users}.tsx`.
+- Also on branch (already committed, not pushed): wizard rewire commit `11a015c`, remaining-fabricated-data commit `0e53c6e`, and notification fix (Shell tray live-only, ticker dynamic, Preferences → Settings ?tab=notif, Mobile "Notifications" sub honest).
 - NOT in commit (never): `docs/ARCHITECTURE.md`, `auto-push.ps1`, `test-*.mjs`, `dev.log`.
 - Status: `npm run lint` (tsc --noEmit) **green**; `next build` **green** (dev server stopped during build, restarted, up on :3000).
 - Prior task `feat/audit-halfdone-completion` (portals/unit-builder/pricing) is fully shipped on its own branch — historical, NOT in this commit. Demo portal logins: `buyer@example.com` / `broker@example.com`, `Portal123!`.
@@ -31,6 +32,7 @@
 - [x] **Users** — static `USERS` fallback emptied; header count computed; empty-state; `ROLE_PERMS`/`THRESHOLDS_BASE`/`PLAIN` kept as role config.
 - [x] **Sales** — dead `DEAL`/`refOf` removed; `BROK_FALLBACK` left (already all-empty, harmless).
 - [x] **Sales booking wizard rewired to live data** (operator-approved) — deleted `SFIELDS` static step data; wizard now loads available units from `/api/inventory?status=available` (scoped to `?scope=`), unit picked in a live `<select>`, and `listPrice`/`psf`/`booking token`/`DLD` derived from the selected unit's `price`/`area`. `saveDraft`/`doConfirm` POST `unit_no` + `list_price` from the live unit; escrow/bank/ref defaults emptied (escrow is mandatory input before confirm); discount default 0 with live approval copy; step 2 identity fields honest ("Captured at KYC"/"—"/"Pending screening"); step 4 docs "Queued after confirmation"; deal rail + step-5 review + confirmed screen all live. Save-draft/continue disabled until a unit is selected.
+- [x] **Notifications now fully dynamic** — Shell tray no longer seeded with 6 fabricated notifications (`NOTIFS` removed); tray/ticker built only from `/api/finance` (overdue >90d, unmatched escrow, drawdowns awaiting trustee, worklist), re-fetched on window focus; "Due today" fallback now `AED 0` instead of fake `AED 4.2M`; profile "Preferences · Notifications & quiet hours" opens Settings on the real Notifications tab (`?s=settings&tab=notif`); "Offline cache · Last synced 09:39" fake timestamp neutralized; Mobile "Notifications · 12 unread" fake count neutralized. Settings notification matrix already live (loads/merges/saves `app_settings.notif` via `/api/system`).
 
 ## PLINTH Parity Program — verified remaining tasks
 > Re-audited from scratch against `C:\Users\admin\Downloads\New folder\plinth-prompt-pack_1.html`
