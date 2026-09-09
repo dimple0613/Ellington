@@ -7,8 +7,12 @@
 > Branch-per-task rule (see AGENTS.md): never push directly to main. Update this section per task.
 
 - Current branch: `feat/audit-halfdone-completion` (complete amber "Half-finished" audit items). Push target: this branch only.
-- PUSH THIS: **`0c36607`** "feat(audit): complete amber items — Reports pivot builder + schedule, per-role approval thresholds, notif matrix 'who' column, Mobile Pulse/Buyers tabs, brand token #3B6EF6 + Inter + compact money" (6 files: Mobile.tsx, Reports.tsx, Settings.tsx, Users.tsx, lib/format.ts, pages/_document.tsx). Lint + `next build` green (build run with dev server stopped, then restarted).
-- Audit HTML updated: `C:\Users\admin\Downloads\New folder\ELLINGTON-AUDIT-REPORT.html` — 41/51 checked, 0 half-finished; Escrow gauges + Construction risk register flipped to done (were already implemented); dark-theme-as-default skipped by operator decision (app stays light).
+- PUSH THIS:
+  - **`c4fa370`** "feat(audit): buyer + broker portals (external, invite/enable from Sales)" (11 files: lib/portal.ts, lib/session.ts, lib/mail.ts, pages/api/portal/{buyer,broker}.ts, pages/portal/{buyer,broker}.tsx, components/portal/{PortalChrome,BuyerPortalInvite,BrokerPortalEnable}.tsx, components/screens/Sales.tsx).
+  - **`d2abe81`** "feat(audit): new project wizard + bulk unit builder + pricing manager" (11 files: components/app/ProjectWizard.tsx, components/screens/{Projects,UnitBuilder,Pricing}.tsx, components/Shell.tsx, pages/api/{projects,unit-builder,pricing}.ts, pages/project.tsx, lib/screens.ts, db/schema.sql).
+  - Prior **`0c36607`** (amber items: Reports/notif/approvals/mobile/tokens) already recorded; all on this branch.
+- Lint (`npx tsc --noEmit`) + `next build` green (build run with dev server stopped, then restarted). Smoke-tested live: unit-builder generate (inserted 4), pricing preview→submit→approve (6 units, revision applied), buyer portal login + data (units/schedule/docs), broker login + reserve (reservation created). Demo portal logins seeded in dev DB: `buyer@example.com` / `broker@example.com`, password `Portal123!`.
+- Audit HTML updated: `C:\Users\admin\Downloads\New folder\ELLINGTON-AUDIT-REPORT.html` — **all 5 remaining MISSING cards flipped to DONE** (New Project wizard, Unit Builder, Pricing &amp; availability manager, Buyer portal, Broker portal); only 24 DONE cards remain (release-phases + compliance checkboxes also ticked).
 - Everything intended for this task is on this branch — NO commit on `main` from this program.
 - Prior `fix/plinth-parity` and `fix/parity-live-data` commits (T1–T18, D1–D6) are historical and NOT completion evidence for this task.
 
