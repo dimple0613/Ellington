@@ -7,7 +7,7 @@
 > Branch-per-task rule (see AGENTS.md): never push directly to main. Update this section per task.
 
 - Current branch: `fix/parity-live-data` (PLINTH parity — verified remaining gaps). Push target: this branch only.
-- Pushed (ALL SIX): **D1** `728b479` · **D2** `bf3f350` · **D3** `0c94935` · **D4** `57adfdd` · **D5** `bc4f84f` · **D6** `31ff7aa` · tracker `79fbe32` · audit-vs-reference findings `<commit>`.
+- Pushed (ALL SIX): **D1** `728b479` · **D2** `bf3f350` · **D3** `0c94935` · **D4** `57adfdd` · **D5** `bc4f84f` · **D6** `31ff7aa` · tracker `79fbe32` · audit-vs-reference findings `886e757`.
 - Everything intended for this task is on this branch — NO commit on `main` from this program.
 - Prior `fix/plinth-parity` commits (T1–T18) are historical and NOT completion evidence.
 
