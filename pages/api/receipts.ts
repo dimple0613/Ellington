@@ -26,7 +26,8 @@ export default withPerm("Finance", "REA", async function (req: NextApiRequest, r
        LEFT JOIN buyers b ON b.id = r.buyer_id
        LEFT JOIN units u ON u.id = r.unit_id
        ${where.length ? "WHERE " + where.join(" AND ") : ""}
-       ORDER BY r.received_at DESC`
+       ORDER BY r.received_at DESC`,
+      params
     );
 
     const data = receipts.rows.map((r) => ({

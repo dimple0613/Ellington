@@ -20,7 +20,8 @@ export default withPerm("Finance", "REA", async function (req: NextApiRequest, r
        JOIN units u ON u.id = m.unit_id
        JOIN projects p ON p.id = u.project_id
        ${where.length ? "WHERE " + where.join(" AND ") : ""}
-       ORDER BY m.due_date`
+       ORDER BY m.due_date`,
+      params
     );
 
     const data = milestones.rows.map((m) => ({
