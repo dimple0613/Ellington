@@ -293,8 +293,22 @@ CREATE TABLE IF NOT EXISTS app_settings (
   company JSONB NOT NULL DEFAULT '{}',
   brand JSONB NOT NULL DEFAULT '{}',
   numbering JSONB NOT NULL DEFAULT '{}',
-  notif JSONB NOT NULL DEFAULT '{}'
+  notif JSONB NOT NULL DEFAULT '{}',
+  fx JSONB NOT NULL DEFAULT '[]',
+  vat JSONB NOT NULL DEFAULT '{}',
+  banks JSONB NOT NULL DEFAULT '[]',
+  templates JSONB NOT NULL DEFAULT '[]',
+  retention JSONB NOT NULL DEFAULT '[]',
+  pii JSONB NOT NULL DEFAULT '[]',
+  integrations JSONB NOT NULL DEFAULT '[]'
 );
+ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS fx JSONB NOT NULL DEFAULT '[]';
+ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS vat JSONB NOT NULL DEFAULT '{}';
+ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS banks JSONB NOT NULL DEFAULT '[]';
+ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS templates JSONB NOT NULL DEFAULT '[]';
+ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS retention JSONB NOT NULL DEFAULT '[]';
+ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS pii JSONB NOT NULL DEFAULT '[]';
+ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS integrations JSONB NOT NULL DEFAULT '[]';
 
 -- Finance module (AUD-006): collections ageing ledger, escrow drawdowns, invoice ledger.
 CREATE TABLE IF NOT EXISTS collections (

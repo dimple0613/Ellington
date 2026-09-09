@@ -140,7 +140,7 @@ export default function SettingsScreen() {
 
   useEffect(() => {
     let active = true;
-    fetchJSON<{ settings: { company: Record<string, string>; brand: Record<string, string>; numbering: NumRow[]; notif: { event: string; inapp: boolean; email: boolean; slack: boolean }[] } }>("/api/system")
+    fetchJSON<{ settings: { company: Record<string, string>; brand: Record<string, string>; numbering: NumRow[]; notif: { event: string; inapp: boolean; email: boolean; slack: boolean }[]; fx: [string, string, string, string][]; vat: Record<string, string>; banks: BankRow[]; templates: Tpl[]; retention: RetentionRow[]; pii: PiiRow[]; integrations: { name: string; status: string; note: string; ok: boolean }[] } }>("/api/system")
       .then((j) => {
         if (!active || !j?.settings) return;
         if (j.settings.company && Object.keys(j.settings.company).length) setCompany((prev) => ({ ...prev, ...j.settings.company }));
@@ -150,6 +150,13 @@ export default function SettingsScreen() {
           setNumbering(NUMBERING_ROWS.map((row) => byObj.get(row.object) ? { object: row.object, prefix: byObj.get(row.object)!.prefix, pattern: byObj.get(row.object)!.pattern, next: byObj.get(row.object)!.next || 1 } : row));
         }
         if (j.settings.notif && j.settings.notif.length) setNotif(j.settings.notif.map((r) => [r.event, !!r.inapp, !!r.email, !!r.slack]));
+        if (j.settings.fx && j.settings.fx.length) setFx(j.settings.fx.map((r) => [String(r[0]), String(r[1]), String(r[2]), String(r[3])]));
+        if (j.settings.vat && Object.keys(j.settings.vat).length) setVat((prev) => ({ ...prev, ...j.settings.vat }));
+        if (j.settings.banks && j.settings.banks.length) setBanks(j.settings.banks);
+        if (j.settings.templates && j.settings.templates.length) setTpls(j.settings.templates);
+        if (j.settings.retention && j.settings.retention.length) setRetention(j.settings.retention);
+        if (j.settings.pii && j.settings.pii.length) setPii(j.settings.pii);
+        if (j.settings.integrations && j.settings.integrations.length) setIntegrations(j.settings.integrations);
       })
       .catch((e) => {
         if (active) setApiError(e?.message || "Failed to load settings");
@@ -160,11 +167,18 @@ export default function SettingsScreen() {
   const banner = (m: string) => { setNotice(m); setTimeout(() => setNotice(""), 3000); };
 
   const save = () => {
-    const payload: { company: Record<string, string>; brand: Record<string, string>; numbering: NumRow[]; notif: { event: string; inapp: boolean; email: boolean; slack: boolean }[] } = {
+    const payload = {
       company,
       brand,
       numbering,
       notif: notif.map(([event, inapp, email, slack]) => ({ event, inapp, email, slack })),
+      fx,
+      vat,
+      banks,
+      templates: tpls,
+      retention,
+      pii,
+      integrations,
     };
     fetchJSON<{ settings: Record<string, unknown> }>("/api/system", {
       method: "PUT",
