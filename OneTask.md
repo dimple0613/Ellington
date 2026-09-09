@@ -7,7 +7,7 @@
 > Branch-per-task rule (see AGENTS.md): never push directly to main. Update this section per task.
 
 - Current branch: `fix/parity-live-data` (PLINTH parity — verified remaining gaps). Push target: this branch only.
-- Pushed (ALL SEVEN DONE + findings): **D1** `728b479` · **D2** `bf3f350` · **D3** `0c94935` · **D4** `57adfdd` · **D5** `bc4f84f` · **D6** `31ff7aa` · tracker `79fbe32` · audit findings `886e757`+`b1c8828` · receipts-date fix `6179180`.
+- Pushed (ALL SEVEN DONE + findings + gaps): **D1** `728b479` · **D2** `bf3f350` · **D3** `0c94935` · **D4** `57adfdd` · **D5** `bc4f84f` · **D6** `31ff7aa` · tracker `79fbe32` · audit findings `886e757`+`b1c8828` · receipts-date fix `6179180` · Settings/Audit gaps `02fbe52`.
 - Everything intended for this task is on this branch — NO commit on `main` from this program.
 - Prior `fix/plinth-parity` commits (T1–T18) are historical and NOT completion evidence.
 
@@ -40,8 +40,6 @@
       (open/potential/agents) computed from live leads; leaderboard was already live. Committed `31ff7aa`.
 
 ### Deferred / N/A (needs operator approval — NOT started)
-- [ ] **Settings extra tabs** (Financial/Templates/Data) — `Settings.tsx:6` has 5 tabs
-      (Company/Numbering/Notifications/Integrations/Other). Visual change → AGENTS.md approval required.
 - [ ] **`lib/data.ts` mock purge** (`POS :22-29`, `BUYERS :31-44`, `PROJECTS :60-66`, `UNITS :84-122`)
       — retained as offline fallback; every screen above is API-first.
 
@@ -54,10 +52,13 @@
       `Payments.tsx:126` regex expecting 3-letter → `parseD` null → 0. Fixed `6179180` via `fmtShortDate`
       (`lib/format.ts`) used in receipts + statements APIs. Verified: today AED 38.02M/13 receipts,
       MTD AED 208.40M/39 receipts. Also matches reference `24 Aug 26` date style.
-- [ ] **Gap: Settings** — 5 tabs only; reference needs Financial/Templates/Data (Data folds retention/
-      export schedules/IP allow-list/SSO). Was deferred; still needs operator approval.
-- [ ] **Gap: Audit Log** — live data present but no expandable before→after diff rows and no date-range/
-      actor filters (`before_val`/`after_val` columns already exist).
+- [x] **Gap: Settings** — now 7 tabs incl. Financial (FX rates + refresh, VAT/fiscal, banks w/ escrow),
+      Templates (EN/AR library, merge fields, preview, test-send, activate/draft) and Data (retention, PII,
+      backup, JSON export); Numbering + Booking/Invoice/Quote rows w/ live preview; stored vars merged over
+      defaults on load. Approved + verified live, committed `02fbe52`.
+- [x] **Gap: Audit Log** — added expandable rows (before→after field-diff panel, red→green), date-range +
+      actor + action + project filters, high-sensitivity toggle, Clear filters, append-only banner, live
+      count, Export CSV (client-side over live `/api/system` rows). Verified live, committed `02fbe52`.
 
 ## Working baseline (verified in code, NOT re-litigated)
 - Live DB-backed today: receipts (create/PDC/import), invoices (issue/void/bulk), collections, escrow,
