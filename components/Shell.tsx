@@ -6,6 +6,7 @@ import { groupUrl, screenUrl, GROUP_PAGE } from "../lib/nav";
 import { useWindowSize } from "../lib/useWindowSize";
 import { useSession, SessionUser } from "../lib/useSession";
 import { roleHasPerm, type PermModule } from "../lib/permission-map";
+import ProjectWizard from "./app/ProjectWizard";
 
 export type GroupId =
   | "portfolio"
@@ -45,6 +46,7 @@ const NAV: Record<GroupId, { label: string; items: NavItem[] }> = {
     label: "Project · BLG",
     items: [
       { screen: "inventory", label: "Inventory" },
+      { screen: "unit-builder", label: "Unit Builder" },
       { screen: "pricing", label: "Pricing & availability" },
       { screen: "construction", label: "Construction" },
     ],
@@ -646,12 +648,13 @@ export default function Shell({
         </div>
       )}
 
-      {newProj && (
-        <NewProjectModal
+{newProj && (
+        <ProjectWizard
+          open={newProj}
           onClose={() => setNewProj(false)}
-          onCreate={(name, code) => {
+          onCreated={(p) => {
             setNewProj(false);
-            showToast("Project " + code + " · " + name + " created");
+            showToast("Project " + p.code + " \u00b7 " + p.name + " created");
           }}
         />
       )}
@@ -675,36 +678,6 @@ function MenuRow({ icon, label, sub, onClick }: { icon: string; label: string; s
         {sub && <span style={{ display: "block", fontSize: 10.5, color: "#9AA0AE", fontWeight: 500 }}>{sub}</span>}
       </span>
     </button>
-  );
-}
-
-function NewProjectModal({ onClose, onCreate }: { onClose: () => void; onCreate: (name: string, code: string) => void }) {
-  const [name, setName] = useState("");
-  const [code, setCode] = useState("");
-  return (
-    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(20,22,31,.4)", zIndex: 60, display: "grid", placeItems: "center" }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ width: 440, maxWidth: "calc(100vw - 40px)", background: "#fff", borderRadius: 18, boxShadow: "0 24px 64px rgba(20,22,31,.22)", padding: 24 }}>
-        <div style={{ fontSize: 17, fontWeight: 800, letterSpacing: "-.02em" }}>New project</div>
-        <div style={{ fontSize: 12.5, color: "#6B7180", fontWeight: 500, marginTop: 4 }}>Set up a new development project.</div>
-        <label style={{ display: "block", marginTop: 18 }}>
-          <span style={{ display: "block", fontSize: 11, fontWeight: 700, color: "#6B7180", marginBottom: 6 }}>Project name</span>
-          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Cordoba Residences" style={{ width: "100%", height: 40, border: "1px solid #EDEEF3", borderRadius: 12, padding: "0 12px", fontFamily: "inherit", fontSize: 13, outline: "none", background: "#F8F9FB" }} />
-        </label>
-        <label style={{ display: "block", marginTop: 12 }}>
-          <span style={{ display: "block", fontSize: 11, fontWeight: 700, color: "#6B7180", marginBottom: 6 }}>Project code (3 letters)</span>
-          <input value={code} onChange={(e) => setCode(e.target.value.toUpperCase().slice(0, 3))} placeholder="CRD" style={{ width: "100%", height: 40, border: "1px solid #EDEEF3", borderRadius: 12, padding: "0 12px", fontFamily: "'JetBrains Mono',monospace", fontSize: 13, outline: "none", background: "#F8F9FB" }} />
-        </label>
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 24 }}>
-          <button onClick={onClose} style={{ height: 38, border: "1px solid #EDEEF3", background: "#fff", borderRadius: 12, padding: "0 16px", fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}>Cancel</button>
-          <button
-            onClick={() => onCreate(name || "Untitled project", code || "NEW")}
-            style={{ height: 38, border: 0, background: "#14161F", color: "#fff", borderRadius: 12, padding: "0 16px", fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}
-          >
-            Create project
-          </button>
-        </div>
-      </div>
-    </div>
   );
 }
 

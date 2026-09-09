@@ -366,6 +366,117 @@ CREATE TABLE IF NOT EXISTS construction_milestones (
 );
 CREATE INDEX IF NOT EXISTS idx_construction_project ON construction_milestones(project_id);
 
+-- =====================================================================
+-- Missing/To-Fix features (feat/audit-missing): Project wizard, Unit
+-- Builder, Pricing manager, Buyer/Broker portals. All idempotent.
+-- =====================================================================
+
+-- New project 6-step wizard: legal/escrow compliance + setup config.
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS dld_no TEXT;
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS rera_permit TEXT;
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS escrow_iban TEXT;
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS escrow_bank TEXT;
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS setup JSONB NOT NULL DEFAULT '{}';
+-- setup: { towers[], unit_types[], payment_plan[], team[], compliance{...} }
+
+-- Unit Builder + pricing: bulk price revisions with an approval gate.
+CREATE TABLE IF NOT EXISTS price_revisions (
+  id SERIAL PRIMARY KEY,
+  project_id INT REFERENCES projects(id),
+  change_type TEXT DEFAULT 'pct',         -- pct / flat
+  pct NUMERIC DEFAULT 0,
+  selection TEXT DEFAULT 'unsold',
+  effective_date DATE,
+  reason TEXT,
+  status TEXT DEFAULT 'draft',            -- draft / pending_approval / approved / applied / rejected
+  requested_by TEXT,
+  approved_by TEXT,
+  approved_at TIMESTAMPTZ,
+  applied_at TIMESTAMPTZ,
+  payload JSONB NOT NULL DEFAULT '[]',    -- [{unit_id, no, old_price, new_price}]
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_price_rev_project ON price_revisions(project_id);
+
+CREATE TABLE IF NOT EXISTS release_phases (
+  id SERIAL PRIMARY KEY,
+  project_id INT REFERENCES projects(id),
+  name TEXT NOT NULL,
+  unit_count INT DEFAULT 0,
+  release_date TIMESTAMPTZ,
+  uplift_pct NUMERIC DEFAULT 0,
+  status TEXT DEFAULT 'live'              -- scheduled / live / closed
+);
+CREATE INDEX IF NOT EXISTS idx_release_phases_project ON release_phases(project_id);
+
+CREATE TABLE IF NOT EXISTS price_rates (
+  id SERIAL PRIMARY KEY,
+  project_id INT REFERENCES projects(id),
+  typology TEXT NOT NULL,
+  band TEXT NOT NULL,
+  rate NUMERIC NOT NULL DEFAULT 0,
+  UNIQUE (project_id, typology, band)
+);
+
+-- Portals: buyer + broker login accounts (PBKDF2-hashed like admins).
+CREATE TABLE IF NOT EXISTS buyer_portal_accounts (
+  id SERIAL PRIMARY KEY,
+  buyer_id INT NOT NULL REFERENCES buyers(id) ON DELETE CASCADE,
+  email TEXT UNIQUE,
+  password_hash TEXT NOT NULL,
+  enabled BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS broker_portal_accounts (
+  id SERIAL PRIMARY KEY,
+  agency_id INT NOT NULL REFERENCES broker_agencies(id) ON DELETE CASCADE,
+  email TEXT UNIQUE,
+  password_hash TEXT NOT NULL,
+  enabled BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS broker_reservations (
+  id SERIAL PRIMARY KEY,
+  agency_id INT REFERENCES broker_agencies(id),
+  agency_name TEXT,
+  agent TEXT,
+  unit_id INT REFERENCES units(id),
+  unit_no TEXT,
+  project_code TEXT,
+  buyer_name TEXT,
+  buyer_mobile TEXT,
+  buyer_email TEXT,
+  commission_pct NUMERIC DEFAULT 2.0,
+  status TEXT DEFAULT 'pending',          -- pending / approved / declined / cancelled
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_broker_res_agency ON broker_reservations(agency_id);
+
+-- Pricing manager: persisted discount rules + leakage history.
+ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS pricing JSONB NOT NULL DEFAULT '[]';
+
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM app_settings WHERE id = 1)
+     AND NOT EXISTS (SELECT 1 FROM app_settings WHERE id = 1 AND pricing IS NOT NULL AND pricing::text <> '[]') THEN
+    UPDATE app_settings
+    SET pricing = '{
+      "discount_rules": [
+        {"role":"Sales agent","max_pct":3},
+        {"role":"Sales manager","max_pct":5},
+        {"role":"Sales director","max_pct":8},
+        {"role":"Owner","max_pct":null}
+      ],
+      "leakage": [3.1,2.8,3.4,4.1,3.6,4.8,5.2,4.4,3.9,4.6,5.1,4.2]
+    }'::jsonb
+    WHERE id = 1;
+  END IF;
+END $$;
+
 -- Seed handover data on first install (idempotent).
 DO $$
 BEGIN
