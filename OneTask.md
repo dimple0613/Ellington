@@ -6,136 +6,56 @@
 ## Push (current branch + what to push)
 > Branch-per-task rule (see AGENTS.md): never push directly to main. Update this section per task.
 
-- Current branch: `fix/plinth-parity` (PLINTH Parity Program). Pushed: `81d9b7b` (T1), `8e405db` (T2), `a518b68` (T3), `20d764d` (T4), `91adcb5` (T5), `3fbec64` (T6), `b0ed1df` (T7), `234e74c` (T8), `b2b6180` (T9), `02da04c` (T10), `734c4ed` (T11), `35b4e9b` (T12), `d905002` (T13), `363d1be` (T14), `7cac9bd` (T15), `fb72f6e` (T16), `a6c5872` (T17), `aef6db9` (T18). Final phase: ALL 18 parity tasks committed and pushed. T18 Settings — `app_settings` gained `numbering` + `notif` JSONB columns (schema.sql + dev DB, seeded with per-object prefix/next and the 8-event matrix); `/api/system` GET/PUT carries numbering + notif (whole-row upsert, missing-body 400); `Settings.tsx` numbering tab editable (prefix/pattern/text inputs + numeric next) with live green previews (`H21-T1-0403`, `ESC-2026-9015`), notification matrix loaded from DB + persisted via Save changes. Fresh-setup shakeout performed: `db/reset.ts` rewritten to drop ALL public tables (was a stale 9-table list missing brokers/documents/bookings/settings), then `npx tsx db/reset.ts && npx tsx db/seed.ts` on a clean DB — 26 tables dropped/35 seeded (6 projects incl. H21, 134 units, 8 buyers, 3 bookings, 6 agencies, 5 agents, 3 docs + 7 template versions, 44 receipts incl. 6 PDC + H21 recon rows, 8 collections, 4 drawdowns, 6 invoices, 3 leads, 42 payment milestones, 36 construction milestones, 12 audit rows, 1 admin with settings); test-agent@ellington.com/Test1234 re-created via /api/admins (seed admin defaults from .env: admin@gmail.com + INITIAL_ADMIN_PASSWORD). Full E2E sweep on fresh DB: 23/23 screens PASS (portfolio, project×3, sales×5, finance×4, handover×3, system×3, incl. brokers register, bookings register, documents log, PDC, invoices, settings numbering) + ⌘K opens and typing "record" + Enter navigates to /finance. Cleaned up temp harnesses; remaining temporary files only in `C:\Users\admin\AppData\Local\Temp\opencode\`. Note: git push to origin hangs on GCM credential prompt — workaround `git push "https://oauth2:<gh-token>@github.com/..."`; local Postgres died mid-T6 (0xC0000142) and was restarted by the operator — if it dies again retry start, else commit on lint-only + re-verify pending. Operator out of office — no merges to main. Merge to main only after operator approval.
-- Closed on GitHub (no merge): issue #51 (dead `lib/useApi.ts` removed) on `fix/aud-051-dead-use-api` (`f8cbbd0` + `7a0bd8b`); issue #52 (any-type cleanups) on `fix/aud-052-any-types` (`164047b`).
-- Current branch: `main` (`ad22adf`; `fix/aud-006-system`, `fix/aud-006-finance`, `fix/aud-015-analytics` merged; `fix/aud-015-analytics` branch deleted local+remote).
-- **AUD-015 (#37) CLOSED/MERGED** — `fix/aud-015-analytics` (`ad22adf`): cashflow forecast + report exports live via `/api/finance-analytics` + `/api/report-export`; branch deleted.
-- **DEPLOYED TO CLOUDFLARE** — `npx wrangler deploy` (`wrangler.jsonc`, account `49dcdcff…`): worker `ellington-worker` live at
-  **https://ellington-worker.dimple-49d.workers.dev** (VERSION 989ea1f1). Verified from this machine: login 200 (+session cookie),
-  `/api/auth/me` → `Dipin Ellington` super_admin, `/api/dashboard` ok with `projects`, home page 200. All prod secrets present
-  (ADMIN_EMAIL, ADMIN_PASSWORD, CRON_SECRET, DATABASE_URL, DIGEST_TO, JWT_SECRET, SMTP_*). Build path: `npm run build:cf`
-  (OpenNext → `.open-next/worker.js`) then `wrangler deploy`.
-- Prior merged AUD modules (branches still present locally+remote: `fix/aud-006-system`, `fix/aud-006-finance` — safe to delete on request): all on `main`.
-- **PENDING APPROVAL — `fix/aud-006-system`** → `main` (`7a2b0b4` + docs `2af5c3b..95b807c`: System module wired — `audit_log`/`app_settings` tables, `/api/system` GET+PUT, AuditLog/Settings live via fetchJSON; lint+build green, GET live-verified audit=12/settings keys; #22 comment). **PENDING APPROVAL — `fix/aud-006-finance`** → `main` (`916a1f5` + docs `3e1cf05..ab66bb8`: finance ledgers wired — `collections`/`drawdowns`/`invoices` tables + `escrow_ledger.received_at`, `/api/finance` envelope, Collections/Escrow/Invoices live with error banners; lint+build green, GET live-verified 8/6/4/6 rows; Cashflow/Reports stay static analytics; #22 comment). Both pushed. Awaiting operator Chrome review (localhost:3100) + merge approval.
-- **AUD-006 scope essentially complete** — Handover (merged), System (pending), Finance ledgers (pending). Mobile.tsx is an intentional static iPhone design prototype (no data fetches, no swallowed errors) — excluded. Remaining to wire before closing #22: none blocking.
-- **MERGED** — `fix/aud-006-handover` → `main` (`33e34b0` + `c86b7f8`: Handover module wired — pipeline_items/snag_items/deeds tables, `/api/handover`, three screens live; #22 progress comment). Pushed to `origin/main`.
-- **AUD-006 (Handover module) IN PROGRESS** on branch `fix/aud-006-handover` (`33e34b0` + docs `28827e1`): new `pipeline_items`/`snag_items`/`deeds`
-  tables (idempotent in `db/schema.sql`, seed-guarded, applied to dev DB via lib/db temp script — `db/seed.ts` fails against Neon maintenance DB),
-  `pages/api/handover.ts` (envelope, Handover:REA), Pipeline/Snagging/Deeds fetch live via `fetchJSON` with surfaced errors.
-  lint + build green; verified in operator Chrome at localhost:3100. Push section below; no-hidden-browser policy — verification in operator Chrome only.
-- **MERGED** — `chore/standardize-project` → `main` via **PR #35** (`1ed35b3`, includes `b427dda` ARCHITECTURE + `c2a0ba2` AUD safe fixes) plus doc commits `286c0a3` (AGENTS.md/TASKS.md/`.opencode/`) + `300a3da` (phase-8 status). **MERGED** — `fix/admin-email-consistency` → `main` (`2ea46bf`: default admin email now `admin@ellington.com` in seed fallback + login/forgot-password placeholders). **MERGED** — `fix/aud-009-api-envelope` → `main` (`421594a` + `8058952`: 13 routes on `{ ok, data, error }` envelope; #26 closed). **MERGED** — `fix/aud-007-use-api` → `main` (`2c3fe22` + `0a83826`: fetchJSON + surfaced errors; #24 closed). All pushed to `origin/main`. Nothing pending to push.
-- Full audit tracked on GitHub: issues #20–#34 (AUD-001…AUD-014, severity labels). Board (project) still blocked:
-  local `gh` token lacks `project` scope — operator must run `gh auth refresh -s project`, then board can be created
-  (GraphQL create-project.json already prepared).
-- Deferred (needs visual/contract change, no-visual-change rule): AUD-007 error states (#24), AUD-009 API envelope (#26).
-  AUD-005 (Jest/RTL/Playwright) requires operator approval to add dev deps. AUD-006 (role→permission-map rewiring) not started.
-  **AUD-009 (#26) CLOSED/FIXED** on branch `fix/aud-009-api-envelope` (`421594a`): all 13 routes now return `{ ok, data, error }`
-  via `lib/api.ts` (`ok`/`fail`/`methodNotAllowed`/`notFound` + `validEmail`/`missingFields`); consumers updated
-  (`useApi` unwraps `data`, `useSession` reads `data.user`, login reads `data.next`, Payments/Inventory/Sales/Users read `data.*`).
-  lint + build green; live-verified: dashboard/inventory/receipts/leads/admins/milestones/me all `ok:true` with `data`, bad login 401.
-  Merge pending operator approval.
-- **AUD-007 (#24) CLOSED/FIXED** on branch `fix/aud-007-use-api` (`2c3fe22` + docs): Payments/Inventory/Sales-Leads/Users now
-  GET through shared `fetchJSON` in `lib/api.ts` (unwraps envelope, redirects /login on 401) and render a red
-  "Live data unavailable — showing sample rows" banner on failure instead of silent `.catch(() => {})`.
-  lint + build green; live-verified all four screens show real data (258 units, leads, receipts, admin@ellington.com), no banner.
-  Merge pending operator approval.
-- Last task: merge `feat/cloudflare-hyperdrive` → `main` (Hyperdrive DB connection fix so production reads Neon, delivered 200 on `/api/auth/login` + `/api/auth/me` with admin `Dipin Ellington`/`admin@gmail.com`); pushed.
-- Admin on Neon: id 1 = `Dipin Ellington` / `admin@gmail.com` / `Admin123` (role super_admin) — verified login 200 on live worker.
+- Current branch: `fix/parity-live-data` (PLINTH parity — verified remaining gaps). Push target: this branch only.
+- Prior `fix/plinth-parity` commits (T1–T18) are historical and NOT to be treated as completion evidence.
 
-## PLINTH Parity Program (branch `fix/plinth-parity`)
-> Reference: `C:\Users\admin\Downloads\New folder\plinth-prompt-pack_1.html` (PLINTH prompt pack).
-> Goal: every screen/page functions like the reference. Wiring map verified at start:
-> **16 screens already live** (dashboard, inventory, leads, payments, collections, escrow, invoices,
-> pipeline, snagging, deeds, users, settings, audit, cashflow, reports, projects) via `fetchJSON`;
-> **5 static** (financials, unit, pricing, construction, mobile) + Sales sub-screens
-> (booking/buyer/brokers/documents) + missing write-APIs + loading states (#50). Do one at a time.
-> - [x] **T1** Wire `Financials` (`/dashboard?s=financials`) → live `/api/dashboard` project data
-> - [x] **T2** Wire `Unit Detail` (`/project?s=unit`) → `/api/inventory?unit=` + `/api/milestones?unit=`
-> - [x] **T3** Wire `Pricing & Availability` (`/project?s=pricing`) → live units from `/api/inventory`
-> - [x] **T4** `Construction Progress` → new `construction_milestones` table + `/api/construction` + wire screen
-> - [x] **T5** `Mobile` exec app → new `/api/mobile` aggregate + wire the 5 tabs
-> - [x] **T6** `Buyers` directory + Buyer 360 → new `/api/buyers` (GET) + wire Sales buyer subscreens
-> - [x] **T7** `Leads` → PUT stage to `/api/leads` (drag-persist) + agent leaderboard (live aggregate by agent)
-> - [x] **T8** `Escrow` → add `/api/finance` PUT (reconcile match / drawdown submit) + wire actions
-> - [x] **T9** `Invoices` → add `/api/invoices` POST/PUT (issue / void / bulk-issue) + wire actions
-> - [x] **T10** `Collections` → dunning action PUT (remind/log/promise) + live default calculator (construction %)
-> - [x] **T11** `Payments` → bank-statement import (CSV) + PDC register live from receipts
-> - [x] **T12** `Handover` → payment-clear hard block from collections + readiness dashboard computed
-> - [x] **T13** Loading states (closes issue #50) → spinner/skeleton on all wired screens while fetching
-> - [x] **T14** `Bookings` → `bookings` table + `/api/bookings` + wire booking wizard + bookings register
-> - [x] **T15** `Brokers & agencies` → `brokers` table + `/api/brokers` + wire screen
-> - [x] **T16** `Document generator` → `documents` + `document_templates` tables + `/api/documents` + wire log & template activation
-> - [x] **T16** `Documents vault` audit → covered by Document generator wiring above (generation log persisted, every send logged)
-> - [x] **T17** Shell audit → ⌘K completed (keyboard nav + live indexes), switcher now searchable; notification centre & alerts ticker confirmed working
-> - [x] **T18** `Settings` → persist numbering / notification-matrix tabs via `/api/system` PUT
-> - [x] **Final** Fresh DB reset (all tables) → seed → re-create test agent → full E2E sweep 23/23 PASS → cleanup temp files (all parity work complete, awaiting operator review/merge)
+## PLINTH Parity Program — verified remaining tasks
+> Re-audited from scratch against `C:\Users\admin\Downloads\New folder\plinth-prompt-pack_1.html`
+> (audit runs Apr 2026 by 4 explore agents + direct file reads). The "all 18 done, 23/23 PASS"
+> narrative in git history is NOT trusted; every item below is a CONFIRMED gap with `file:line` evidence.
 
-> Out of scope (flag as N/A): SSO/2FA, buyer portal, broker portal, Arabic/RTL, e-signature, WhatsApp/SMS channels, Mollak API.
+### P1 — Dashboard / Leads (highest user-visible value)
+- [ ] **D1 Dashboard live KPIs** — `pages/dashboard.tsx:34-68` hardcodes KPIS, SPARKS, MB_LEGEND,
+      DONUT_LEGEND, AGEING, FC forecast, ATTENTION, VELOCITY. Only the project list is live
+      (`/api/dashboard`, fallback `lib/data.ts:60-66`). Task: extend `/api/dashboard` to return
+      computed KPI set + ageing + forecast + attention from `receipts`/`collections`/`invoices`/`projects`;
+      wire the screen; remove hardcoded arrays.
+- [ ] **D2 Leads detail drawer** — clicking a lead card calls `onBookLead` → booking wizard directly
+      (`components/screens/Sales.tsx:429, :369, :210-214`). No lead detail drawer. Task: add drawer
+      (contact, notes, activity, value, convert CTA) + required-fields gate on drag-persist
+      (`Sales.tsx:419-431`, `PUT /api/leads`).
 
-## Today's Focus
-- [x] Task 1 — Scaffold project (complete md set)
-- [x] Task 2 — Set up GitHub issue/project management (repo + 8 issues created)
-- [x] Reference replication — Dashboard (Portfolio) built in reference order
-- [x] Projects grid screen built (`/dashboard?s=projects`); dashboard value-position units bug fixed
-- [x] Dashboard functionality pass — all buttons/actions wired & verified in browser (KPI → payments/collections/inventory pages, moneyBar + project rows → `/project?s=inventory&scope=<code>`, ageing → Finance·Collections, attention → Finance/Sales pages, Export PDF → `window.print()`, period + fc tabs live); scope now persists via URL `?scope=`
-- [x] Finance·Payments screen built (`/finance?s=payments`) — KPIs, Receipts tab (10 rows, Matched/Unmatched pills, escrow refs), Post-dated cheques tab (6 rows, Held/Presented/Cleared/Bounced pills), tab switching live; verified in browser
-- [x] Projects "+ New project" now functional (modal with name/location/units/GDV, creates card with auto code + red flag, updates header totals); Sort: sell-through / GDV toggle live; modal closes on outside click / Escape; verified on `/dashboard?s=projects&scope=WPK`
-- [x] Financials screen built (`/dashboard?s=financials&scope=WPK`) — 6 KPI tiles, Position by project entity table (computed from PROJECTS), Revenue by quarter bars, Commission payable table; Accounting export (CSV) + Board pack PDF (jsPDF) both work; verified in browser
-- [x] Cashflow screen built (`/dashboard?s=cashflow&scope=WPK`) — Expected collections bars + Confidence-adjusted/At-risk summary, 7d/30d/90d/180 days tabs (live recompute), Balance ladder next 30 days, By trigger type (46/41/13% split), Sep 26–Feb 27 monthly drawdown table; verified full render ×3 (0 console errors) + all 4 tab switches
-- [x] Reports screen built (`/dashboard?s=reports`) — 27 report cards in 4 groups (Sales/Finance/Compliance/Project) each with a working Run (CSV) button, Scheduled deliveries table, Custom report builder modal (report+format selector → CSV/XLSX/PDF download) + Assemble board pack (PDF); all 49 content strings verified, all 3 header actions functional
-- [x] Inventory + Unit screens built (`/project?s=inventory&scope=<code>` and `/project?s=unit&unit=<id>`) — Inventory with all 4 views (Stack plan/Floor plate/List/Cards), status filter bar (live counts+values, dims non-matching), Price/sq.ft heat toggle, Export price list (CSV); Unit screen (header + metrics/bar, Overview/Payments/Documents/Activity tabs, price-derivation ladder, instalment schedule, docs vault, activity timeline, compliance). Clicking any unit routes to the unit screen. Verified in browser: filter dims 120/84 correctly, tabs switch, unit nav works, 0 console errors
-- [x] Sales group built (`/sales?s=leads|booking|buyer|brokers|documents`) — `components/screens/Sales.tsx`: Leads kanban (8 columns, funnel, New booking → booking), Booking wizard (5 steps, deal summary, approval banner, escrow ref), Buyer 360 (header, 4 tiles + Next due, Units/Ledger/Schedule tabs, payment behaviour + relationship sidebar, Open unit record → /project?unit), Brokers (Agencies/Agents/Onboard agency/Activity tabs + 5 KPIs), Documents (13 doc types, Generate preview PDF page + Template studio with merge fields + version control). Build green, 0 console errors, all screens + interactions browser-verified
-- [x] Unit header action buttons made functional: **Generate SOA** → `exportUnitSoa` PDF (`soa-<unit>.pdf`), **Generate EOI** → `exportUnitEoi` PDF (`eoi-<unit>.pdf`), **Record payment** → `/finance?s=payments`. Verified in browser: both downloads fire + nav works, 0 console errors
-- [x] Pricing & availability screen built (`/project?s=pricing`) — `components/screens/Pricing.tsx`: Price ladder (5 typologies × 5 floor-bands heat matrix, 25 cells), Bulx/revision form (interactive Selection + Change dropdowns, preview rows, GDV impact, Submit for approval → pending), Release phases (4 rows + Phase 2 countdown banner), Discount governance (policy + 12-month leakage bars), Export price list CSV, Version history toggle. Build green, 0 console errors, CDP-verified
-- [x] Construction progress screen built (`/project?s=construction`) — `components/screens/Construction.tsx`: dark Overall completion card (46.0%, planned marker, team, handover forecast), Work packages table (8 rows with actual/planned bars + variance), Milestones & money table (6 rows), Site photo feed (5), Risk register (3); **Certify milestone** → Structure 40% → Certified + amount invoiced toast, **Upload photo set** → prepends new photo + toast. Build green, 0 console errors, CDP-verified
-- [x] Leads → New booking made fully dynamic (`components/screens/Sales.tsx`): lead kanban cards now clickable (New booking affordance per card) → opens the 5-step booking wizard **pre-filled with that lead's buyer name + unit suggestion**; top "New booking" button opens a blank booking. Booking form fields are now **editable inputs** (buyer name, mobile, discount %, amount) with live-recalculating net price + booking amount + deal summary; Confirm booking shows a confirmation banner naming the created-from lead. CDP-verified both entry paths, 0 console errors
-- [x] Buyer 360 "Send statement" + "Record payment" made dynamic (`components/screens/Sales.tsx` + `Payments.tsx` + `lib/pdf.ts` + `pages/finance.tsx`): **Send statement** → generates a real buyer Statement PDF (`statement-rajesh-menon.pdf`, via new `exportBuyerStatement` in `lib/pdf.ts`: position summary, units table, transaction ledger from the buyer's live ledger) + "Statement emailed/logged" banner; **Record payment** → navigates to `/finance?s=payments&buyer=Rajesh+Menon`, shows a "Recording payment for <buyer>" context banner, opens the Record payment form (pre-filled buyer), records → prepends new receipt row `RCP-H21-004790` + "Payment recorded" banner. CDP-verified both flows end-to-end, 0 console errors
-- [x] Documents screen made fully dynamic (`components/screens/Sales.tsx` + `lib/pdf.ts`): new `exportDocument` in `lib/pdf.ts` generates a real PDF for any doc type (unit spec table, payment plan, buyer/project metadata). **Generate tab**: Unit + Buyer dropdowns (from `ALL_UNITS`/`BUYERS` data) update the preview live (unit ref, typology, beds, area, price, psf, payment plan amounts all recalculate); media toggles are clickable (state-driven); **Generate and send** → downloads PDF (`i-h21-004412.pdf` for Invoice) + "emailed to <buyer>" banner + "Recently generated" log; **Download PDF** → same export; **Template studio** tab → blocks list, merge fields, version control; **Set as active template** → bumps to v4 Live + notice; **Save as draft** → v4 draft saved + notice. CDP-verified: page loads, doc types selectable, unit/buyer dropdowns change preview, Generate and send downloads real PDF + banner + log, 0 console errors
-- [x] Collections + Escrow screens built (`components/screens/Collections.tsx` + `Escrow.tsx`, wired into `pages/finance.tsx`). **Collections**: 6 aging buckets (Current/1-30/31-60/61-90/90+/Legal) with live selection highlight + red on danger buckets; collection worklist table (8 rows: buyer, unit, AED amount, overdue days, stage pill, action) with **Remind** (queued + banner), **Log call** (logged + banner), **Escalate** (navigates to escrow) per-row buttons; **Default calculator** sidebar (unit info, verified construction %, 3 retention tiers with active highlight, contract/paid/retention/refund summary, Generate 30-day notice button). **Escrow**: header card (project + bank + last import), 4-column identity row (escrow bank, IBAN monospace, RERA acc no.); 4 KPI tiles (collected/deposited/variance alert in red/balance); 3 gauge cards (upfront/retention/drawn-down with bar + mark + flag note); reconciliation queue (6 rows with date/desc/amount/side pill + **Match to** button that removes row + banner + **Flag** button); standing obligations (7 rows with status dots + flagged amber for expiring permits); drawdown requests table (4 rows: DDR ID/milestone/amount/engineer cert/RERA pill/status pill). **New drawdown request** button in header. CDP-verified both screens: 30/31 checks pass, 0 console errors
-- [x] Handover screens built (`components/screens/Pipeline.tsx` + `Snagging.tsx` + `Deeds.tsx`, wired into `pages/handover.tsx`). **Pipeline**: 9-column kanban (Payment cleared \u2192 OA onboarded with unit cards), blocked units list (4 with reason dots), average days in stage bar chart (7 stages, amber for >15d), handovers forecast vertical bars (W1\u2013W8); "Open snag list" navigates to snagging. **Snagging**: 4 KPI tiles (open/critical/re-inspection/closed counts), open by trade horizontal bars (6 trades), snag table (8 rows: unit, location, trade, description, severity pill [Critical/Major/Minor], contractor, status pill [Open/In progress/Closed/Re-inspect], re-inspect date, Photo + Close action buttons); **Close** toggles row to closed + banner, KPIs update live. **Deeds**: title deeds table (6 rows: unit, owner, Oqood ref, DLD 4%, deed status pill [Issued/Applied/Blocked], issued date, keys pill [Released/Held], Mollak pill [Registered/Pending]); sidebar: service charge & warranty card (6 rows), handover completion card (96/140 teal). Build green, 0 console errors, CDP-verified
-- [x] System group built (`components/screens/Users.tsx` + `Settings.tsx` + `AuditLog.tsx`, wired into `pages/system.tsx`). **Users & roles**: 7-user table (name/email/role/projects/last active/2FA/status, row-selectable role editor), permission matrix (6 modules \u00d7 6 CRUD/APR/EXP toggles, working), field-level overrides with Locked pills, approval thresholds with Auto pills, working Invite user. **Settings**: 5 tabs (Company identity/brand locale, Numbering conventions with mono prefixes, Notification matrix with toggles, Integrations grid with Connect/Manage, Other placeholder), working Save changes. **Audit log**: append-only info bar, 12-row 8-column table, live search filter, Export CSV. CDP-verified 24/24 checks, 0 console errors
-- [x] Mobile executive app built (`components/screens/Mobile.tsx`, wired into `pages/mobile.tsx`). Four interactive iPhone 15 Pro mockups via bottom tab bar \u2014 **Home** (portfolio value, collected/overdue, 30-day confidence bar), **Projects** (sold ring 71%, status legend, financial tiles, typology mix bars), **Money** (collections/forecast/ageing tabs, colour-coded ageing buckets, PII-gated buyer row), **Approvals** (2-badge inbox: discount request + drawdown request with working Approve/Reject), **More** (profile + menu). Live tab switching, per-screen description panel, tap-to-preview All screens list. Build green, 0 console errors, CDP-verified
-- [x] **Complete secure authentication flow** (`feat(auth)`, branch `kartik-gohil`, commit `80297f6`, pushed) — server-side route guard in `middleware.ts` (unauthenticated protected pages → `/login?next=...`; authenticated users on `/login`/`/forgot-password`/`/reset-password` → redirect to dashboard), client-side session guard + expiry/logout redirect in `components/Shell.tsx` via new `lib/useSession.ts`; redesigned `pages/login.tsx` (split-screen brand panel, show/hide password, validation, loading state, redirect back to attempted page); new forgot-password + reset-password pages and API routes (`lib/mail.ts`, hashed expiring tokens, password-strength validation, generic success messages); new `/api/auth/me`; `password_resets` table in `db/schema.sql`. `npm run lint` (tsc --noEmit) + `npx next build` green; runtime-verified with `next start`: `/dashboard` & `/sales` no cookie → 307 `/login?next=...`; `/api/auth/me` with cookie → 200 user JSON; `/login` with cookie → 307 `/dashboard`
-- [x] **Database-driven admin credentials + Profile page** (`feat(auth)`, branch `kartik-gohil`, commit `52b480a`, pushed) — fresh-install defaults `admin@gmail.com`/`Admin123` used only at first install/seed (`INITIAL_ADMIN_EMAIL`/`INITIAL_ADMIN_PASSWORD`); runtime auth reads the `admins` table only (env-based `ensureEnvAdmin` removed). New `/profile` page + `PUT /api/auth/profile` (name/email/password with current-password verification, email uniqueness, password strength); credential changes sign the user out so old defaults are never accepted again; session carries `full_name` (Shell avatar + identity now live). Reset-password rejects tokens whose admin email no longer exists. Seed hash bug fixed. Local DB reset to defaults (dev); production Neon admin row needs operator update. lint + build green, runtime-verified
-- [x] **Full-system verification completed (CDP, headless Chrome)** \u2014 `verify_functionality.js` **89/89** and `verify_responsive.js` **70/70** all pass (commit `524ace6`, pushed). Every screen (25) renders with zero console errors; all buttons/menus/modals/interactions exercise live state (notifications panel + dismiss/mark-all-read, profile/help menus, CmdK search, login form submit + redirect, Escrow New drawdown, Users Invite, Snagging Raise snag + Assign contractor, Reports Custom report builder + Run + Assemble board pack). Responsive across mobile/tablet/laptop/desktop with no horizontal overflow on mobile/tablet. `npm run build` green. Any previously flagged test "failures" were test-harness text-marker mismatches, not app bugs \u2014 resolved and re-verified.
-- [x] **Production audit + OpenNext build fix** (`b7d773a`, pushed) — production (`ellington.pages.dev`) had ALL `/api/*` → 500 (even logout, proving a broken Worker, not DB). Root cause: `package.json` `build` = `opennextjs-cloudflare build` recursed into itself via OpenNext's internal `npm run build`. Split to `build` = `next build` + `build:cf` = `opennextjs-cloudflare build`. Rebuilt with Node 22, ran the fixed Worker in workerd via `wrangler dev` → **20/20** (APIs + pages + middleware). Local baseline also **20/20**. Deployment to production still requires operator decision (merge `kartik-gohil` → `main` + correct deploy output dir / env on Cloudflare Pages).
-- [x] **Full audit complete** (`docs/AUDIT_COVERAGE.md`, `docs/ROUTE_INVENTORY.md`, pushed) — every route/screen/API discovered from source; no-auth (47/47 → 307), auth (31/31 → 200) matrices; browser functional audit **44/44** (25 screens render clean, 0 console errors, 0 API failures; interactions pass). Led to issues **#18** (favicon) + **#19** (no server-side RBAC).
-- [x] **Issue #18 (favicon) fixed + closed** (`4c35ac0`, pushed) — added `public/favicon.svg` + head link in `_app.tsx`; verified clean + regression. NOTE: local DB admin email had drifted again to `kartik1111gohil@gmail.com` (were `admin@gmail.com`); re-seeded to `admin@gmail.com`/`Admin123`. Root cause of drift not yet pinned — monitor.
-- [x] **Issue #19 (server-side RBAC) fixed + verified** — `role_permissions` table + seeds; `lib/permission-map.ts` (edge-safe) + `lib/permissions.ts`/`withPerm` (DB source-of-truth API 403s); `middleware.ts` route→module gate → `/403`; Shell nav filtered client-side. **18/18** RBAC + **20/20** API + **8/8** browser regression.
-- [x] **Deploy prep started for production** — removed erroneous `wrangler.toml` (its `pages_build_output_dir = ".vercel/output/static"` points to a non-existent dir and caused the broken-worker misdiagnosis); confirmed correct config is `wrangler.jsonc` (Worker `ellington-worker`, `main: .open-next/worker.js`, assets `binding: ASSETS`); `npm run build:cf` with Node 22 emits valid `.open-next/worker.js` + `.open-next/assets` (incl. favicon). **Merged `kartik-gohil` → `main`** (18 commits: RBAC, favicon, build fix, config cleanup) and pushed to `origin/main` (`d1e3999..322bcd0`). Production APIs still **all 500/404** and do NOT show new code (no favicon after 5 min) — the `main` push did **NOT** trigger a Cloudflare auto-deploy. **HARD BLOCKER: production deploy cannot be run from this machine** — no Cloudflare auth anywhere (`CLOUDFLARE_API_TOKEN`/`ACCOUNT_ID` absent, no `wrangler` config, no git hooks, no GH Actions, no Pages auto-build). Only the Cloudflare account owner (`dimple0613`) can deploy via `wrangler login`/API token + `wrangler deploy` (Worker `ellington-worker`), then re-seed Neon admin/roles.
+### P2 — Inventory / Shell
+- [ ] **D3 Inventory context** — `scopeName` hardcoded "Tower 1", CHIPS static (`Inventory.tsx:58-65`),
+      no summary strip, no building tabs. Task: derive name/tabs/summary from `/api/inventory`.
+- [ ] **D4 Shell live** — mock `NOTIFS` (`components/Shell.tsx:128-135`), hardcoded ticker
+      "ORN 21281 · H21 / Due today · AED 4.2M" (`:750`), org name (`:387`). Task: ticker + notifications
+      from real data where it exists; mark N/A explicitly otherwise.
 
-- [x] **Project standardization pass** (`chore/standardize-project`, merged via **PR #35** (`1ed35b3`) + docs commits) — Phase 1+2 audit → `docs/ARCHITECTURE.md`; 15 AUD issues filed (#20–#34) + severity labels; Phase 6+7 safe fixes applied (login error leak, JWT secret fail-closed, mail link leak, admins validation, permissions dedupe, dead deps, Stub dedupe, `any` mappers, cookie Secure/`__Host-`, `.env.example` generic, `.gitignore` backups). Phases 3/4/5/9 done (AGENTS.md, TASKS.md, `.opencode/` auditor, folder-structure doc). Phase 10 summary posted as issue **#36**. lint + prod build green. **Phase 8 round-trip browser retest PASSED** — login with `admin@ellington.com`/`Admin123` → `/dashboard` renders real data, `/api/auth/me` → 200 (super_admin). Local DB admin drifted (was `kartik1111gohil@gmail.com`) → **fixed to `admin@ellington.com`**; `db/seed.ts` fallback + login/forgot-password placeholders updated to match (`2ea46bf`). Board creation still blocked (needs `gh auth refresh -s project`).
+### P3 — Finance / Sales stats
+- [ ] **D5 Finance KPIs** — Payments `kpis`/`payRows`/`fallbackPdc` hardcoded (`Payments.tsx:112-140`);
+      Collections buckets (`Collections.tsx:29-36`). Receipt create/PDC/import are already live.
+      Task: compute KPIs from `/api/finance`.
+- [ ] **D6 Sales stats** — funnel/conversion/leaderboard fallback arrays (`Sales.tsx:14-17, :35-64`,
+      `LB_FALLBACK :58-64`). Task: compute from `leads` + `bookings` tables.
 
-## Backlog (pending)
-- [ ] Issue #1 — Task 3: CEO-Review baseline (feature spec from Ellington reference)
-- [ ] Issue #2 — Task 4: Data model: projects, units, buyers, receipts, milestones, escrow ledger
-- [ ] Issue #3 — Task 5: Inventory screen (unit board + status)
-- [ ] Issue #4 — Task 6: Sales: leads kanban + booking wizard
-- [ ] Issue #5 — Task 7: Finance: payments, collections ageing, escrow recon, cashflow
-- [ ] Issue #6 — Task 8: Executive mobile app (read-only)
-- [ ] Issue #7 — Task 9: Handover — pipeline, snagging, title deeds
-- [ ] Issue #8 — Task 10: Daily status digest (IST 10:00 / 22:00)
+### Deferred / N/A (needs operator approval — NOT started)
+- [ ] **Settings extra tabs** (Financial/Templates/Data) — `Settings.tsx:6` has 5 tabs
+      (Company/Numbering/Notifications/Integrations/Other). Visual change → AGENTS.md approval required.
+- [ ] **`lib/data.ts` mock purge** (`POS :22-29`, `BUYERS :31-44`, `PROJECTS :60-66`, `UNITS :84-122`)
+      — remains as fallback while D1–D6 wire live data.
 
-## GitHub Issues
-- #1 Task 3 / #2 Task 4 / #3 Task 5 / #4 Task 6 / #5 Task 7 / #6 Task 8 / #7 Task 9 / #8 Task 10
+## Working baseline (verified in code, NOT re-litigated)
+- Live DB-backed today: receipts (create/PDC/import), invoices (issue/void/bulk), collections, escrow,
+  pipeline/snagging/deeds, users/settings (`app_settings` numbering+notif)/audit log, brokers, bookings,
+  documents, inventory + unit detail, construction milestones, leads stage PUT.
+- Schema tables present: admins, role_permissions, documents, document_templates, escrow_ledger,
+  pipeline_items, receipts, bank_statements, collections, drawdowns, invoices, construction_milestones,
+  app_settings, leads, buyers, bookings, broker_*, audit_log, snag_items, deeds, password_resets.
+- Baseline regression harnesses: `verify_functionality.js` (89) + `verify_responsive.js` (70) — rerun
+  before each task is marked done.
 
-## In Progress
-- [~] Issue #4 - Sales: leads kanban + booking wizard
-
-## Done
-- [x] Task 1 — scaffold (TEAM, OneTask, CEO-Review, README, MILESTONES, ROADMAP, WORKFLOW, AGENTS + docs/)
-- [x] Task 2 — Git repo + remote origin + gh installed/auth + project labels + 8 issues on github.com/dimple0613/Ellington
-- [x] Task 3 — Issue #1/CEO-Review migrated; issue #2 data model + Next.js/TS scaffold done (commit 4542e8e; build + tsc pass; DB seeded with 5 Ellington projects)
-- [x] Task 4 — Issue #3 inventory screen (unit board + status tiles + filters + API) done (build + tsc pass)
-
-## Blocked
-- (none)
-
-## CEO Notes
-- Reference: Archive/UI systems design review/Ellington ERP.dc.html
-- Stack: PostgreSQL + SQL, Next.js, shadcn/ui + Tailwind, Formik + Yup, toast.
-## Active Assignment (CEO)
-- **Issue #4 — Sales: leads kanban + booking wizard**
-- Assignee: Engineering Lead + Frontend Engineer
-- Reviewer: CEO (approval before close)
-- Reporting: CEO gets status at each milestone
+## Rules reminder (AGENTS.md)
+- Inline styles only; design tokens from `lib/format.ts`; no Tailwind/shadcn/deps without approval.
+- Parameterized SQL only (`$1`…); server-side `withSession` + `withPerm` on every API route.
+- `npm run lint` (tsc) + `npm run build` green before push. Never push to main.
