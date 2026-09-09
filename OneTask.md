@@ -7,7 +7,7 @@
 > Branch-per-task rule (see AGENTS.md): never push directly to main. Update this section per task.
 
 - Current branch: `fix/parity-live-data` (PLINTH parity — verified remaining gaps). Push target: this branch only.
-- Pushed (ALL SIX): **D1** `728b479` · **D2** `bf3f350` · **D3** `0c94935` · **D4** `57adfdd` · **D5** `bc4f84f` · **D6** `31ff7aa` · tracker `79fbe32` · audit-vs-reference findings `886e757`.
+- Pushed (ALL SEVEN DONE + findings): **D1** `728b479` · **D2** `bf3f350` · **D3** `0c94935` · **D4** `57adfdd` · **D5** `bc4f84f` · **D6** `31ff7aa` · tracker `79fbe32` · audit findings `886e757`+`b1c8828` · receipts-date fix `6179180`.
 - Everything intended for this task is on this branch — NO commit on `main` from this program.
 - Prior `fix/plinth-parity` commits (T1–T18) are historical and NOT completion evidence.
 
@@ -49,9 +49,11 @@
 > Full evidence: `docs/AUDIT-VS-REFERENCE.md` (committed with this entry).
 > 62 pass / 12 fail then code+DB verification of every fail. Baseline harnesses still green.
 
-- [ ] **BUG: Payments Collected today / MTD always AED 0** even with receipts today (ids 43/44, `09 Sept 26`).
+- [x] **BUG: Payments Collected today / MTD always AED 0** even with receipts today (ids 43/44, `09 Sept 26`).
       Root cause `pages/api/receipts.ts:37,42` `en-GB` month `"Sept"` (4 letters) vs
-      `Payments.tsx:126` regex expecting 3-letter → `parseD` null → 0. Also cosmetic `"Sept"` in tables.
+      `Payments.tsx:126` regex expecting 3-letter → `parseD` null → 0. Fixed `6179180` via `fmtShortDate`
+      (`lib/format.ts`) used in receipts + statements APIs. Verified: today AED 38.02M/13 receipts,
+      MTD AED 208.40M/39 receipts. Also matches reference `24 Aug 26` date style.
 - [ ] **Gap: Settings** — 5 tabs only; reference needs Financial/Templates/Data (Data folds retention/
       export schedules/IP allow-list/SSO). Was deferred; still needs operator approval.
 - [ ] **Gap: Audit Log** — live data present but no expandable before→after diff rows and no date-range/

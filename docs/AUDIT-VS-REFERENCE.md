@@ -5,21 +5,20 @@
 > against `C:\Users\admin\Downloads\New folder\plinth-prompt-pack_1.html`.
 > Baseline harnesses remain green: responsive 70/70, functionality 86/89 (3 stale markers).
 
-## BUG — Payments Collected today / MTD always AED 0 even when receipts exist today
+## BUG — Payments Collected today / MTD always AED 0 even when receipts exist today — FIXED `6179180`
 
 - **Evidence:** `receipts` rows id 43/44 exist dated `09 Sept 26` (today, `MAX(received_at)=2026-09-09T00:07:52Z`),
-  yet the Payments screen shows `COLLECTED TODAY · AED 0 · 0 receipts issued` and `COLLECTED MTD · AED 0`.
-- **Root cause:** `pages/api/receipts.ts:37,42` format dates with `toLocaleDateString("en-GB",...)`,
+  yet the Payments screen showed `COLLECTED TODAY · AED 0 · 0 receipts issued` and `COLLECTED MTD · AED 0`.
+- **Root cause:** `pages/api/receipts.ts:37,42` formatted dates with `toLocaleDateString("en-GB",...)`,
   which emits a **4-letter** abbreviation for September (`"Sept"`).
   `components/screens/Payments.tsx:126` parses with `/^(\d{1,2}) ([A-Za-z]{3}) (\d{2})$/` —
   3-letter months only. `"09 Sept 26"` fails the regex → `parseD` returns `null` → today/MTD = 0.
-  PDC/unreconciled/bounced KPIs don't use the date, so they show correct non-zero values (they currently
-  mask the bug in KPI fallback logic — `liveKpis` is used because those are non-zero).
-- **Fix options:** (a) emit 3-letter months at the API (matches convention used in `Sales.tsx:86-87`
-  `MON` helper and reference style `24 Aug 26`), or (b) accept `Sept` in `parseD`. Same `en-GB` shortcut
-  exists in `pages/api/receipts/import.ts:68`.
-- **Also affected:** receipts table + PDC table dates display `"09 Sept 26"` style (cosmetic inconsistency
-  vs reference `24 Aug 26`).
+  PDC/unreconciled/bounced KPIs don't use the date, so they showed correct non-zero values.
+- **Fix (committed `6179180`):** added `fmtShortDate` (3-letter month, `DD Mon YY`) to `lib/format.ts`
+  and used it in `pages/api/receipts.ts` (receipt `date`, `cheque_date`) and
+  `pages/api/receipts/import.ts` (statement `date`). This also matches the reference `24 Aug 26` style.
+- **Verified:** after fix the screen shows `COLLECTED TODAY · AED 38.02M · 13 receipts issued` and
+  `COLLECTED MTD · AED 208.40M · 39 receipts · live` (was AED 0). Lint + build green.
 
 ## Gap 1 — Settings missing Financial / Templates / Data tabs
 
