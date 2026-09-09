@@ -1558,12 +1558,7 @@ function Buyer360({ btab, setBtab, goUnit }: { btab:string; setBtab:(v:any)=>voi
       : []),
   ];
 
-  const commsLog: { subj: string; when: string; chan: string; sent: boolean }[] = live
-    ? [
-        { subj: "Statement of account \u00b7 August", when: "01 Aug 2026", chan: "Email", sent: true },
-        { subj: "Payment reminder \u00b7 Excavation 20%", when: "02 Jun 2026", chan: "WhatsApp", sent: true },
-      ]
-    : [];
+  const commsLog: { subj: string; when: string; chan: string; sent: boolean }[] = [];
 
   const act: Act[] = (() => {
     if (!live) return [];

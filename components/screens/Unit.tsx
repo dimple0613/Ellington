@@ -184,7 +184,7 @@ export default function UnitScreen({
     ["View premium", su.view, "+ 0.0%", false],
     ["List price/sq.ft", "", "AED " + su.psf.toLocaleString("en-US"), true],
     ["List price", su.area.toLocaleString("en-US") + " sq.ft", money(su.price), false],
-    ["Approved discount", "A. Haddad \u00b7 14 Mar", "\u2212 " + money(su.price - net), false],
+    ["Approved discount", "applied to unit", "\u2212 " + money(su.price - net), false],
     ["Net price", "", money(net), true],
     ["DLD registration 4%", "payable by buyer", money(net * 0.04), false],
     ["Developer admin fee", "payable by buyer", "AED 4,200", false],

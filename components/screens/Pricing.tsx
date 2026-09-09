@@ -391,10 +391,10 @@ export default function PricingScreen({ scope = "ALL" }: { scope?: string }) {
             </div>
             <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginTop: 18 }}>
               <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".05em", color: "#9AA0AE", textTransform: "uppercase" }}>Discount leakage \u00b7 % of list GDV</span>
-              <span style={{ fontSize: 13, fontWeight: 800, color: "#E5484D" }}>{(leakage[leakage.length - 1] ?? 4.2).toFixed(1)}% this month</span>
+              <span style={{ fontSize: 13, fontWeight: 800, color: "#E5484D" }}>{leakage.length ? (leakage[leakage.length - 1] ?? 0).toFixed(1) + "% this month" : "\u2014 this month"}</span>
             </div>
             <div style={{ display: "flex", alignItems: "flex-end", gap: 6, height: 76, marginTop: 12 }}>
-              {(leakage.length ? leakage : [3.1, 2.8, 3.4, 4.1, 3.6, 4.8, 5.2, 4.4, 3.9, 4.6, 5.1, 4.2]).map((v, i) => (
+              {(leakage.length ? leakage : []).map((v, i) => (
                 <div key={"m" + (i + 1)} style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "flex-end", alignItems: "center", height: "100%", gap: 5 }}>
                   <span style={{ display: "block", width: "100%", maxWidth: 24, borderRadius: "6px 6px 2px 2px", background: v > 4.5 ? "#E5484D" : "#DCDAFB", height: (v / 5.2) * 100 + "%" }}></span>
                   <span style={{ fontSize: 9, fontWeight: 600, color: "#C2C6D2" }}>M{i + 1}</span>
