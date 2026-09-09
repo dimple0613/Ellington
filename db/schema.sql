@@ -212,10 +212,12 @@ CREATE TABLE IF NOT EXISTS document_templates (
   id SERIAL PRIMARY KEY,
   doc_type TEXT NOT NULL,
   version TEXT NOT NULL,
-  status TEXT DEFAULT 'archived',    -- live / archived
+  status TEXT DEFAULT 'archived',    -- live / draft / archived
+  blocks JSONB,
   changed_at TIMESTAMPTZ DEFAULT now(),
   UNIQUE (doc_type, version)
 );
+ALTER TABLE document_templates ADD COLUMN IF NOT EXISTS blocks JSONB;
 CREATE INDEX IF NOT EXISTS idx_doc_templates_live ON document_templates(doc_type) WHERE status = 'live';
 
 CREATE TABLE IF NOT EXISTS escrow_ledger (

@@ -2165,12 +2165,14 @@ function Documents({ dtab, setDtab, doc, setDoc }: { dtab:string; setDtab:(v:any
   const [sentLabel, setSentLabel] = useState("");
   const [genLog, setGenLog] = useState<{ ref: string; type: string; when: string; buyer?: string }[]>([]);
   const [version, setVersion] = useState("v3");
-  const [templates, setTemplates] = useState<Record<string, { version: string; status: string; changed_at?: string }[]>>({});
+  const [blocks, setBlocks] = useState<string[]>(DOC_BLOCKS.slice(0, DOC_BLOCKS.length - 1));
+  const [dragB, setDragB] = useState<number | null>(null);
+  const [templates, setTemplates] = useState<Record<string, { version: string; status: string; changed_at?: string; blocks?: string[] }[]>>({});
   const [notice, setNotice] = useState("");
 
   useEffect(() => {
     let alive = true;
-    fetchJSON<{ docs: { ref: string; type: string; buyer: string; when: string }[]; templates: { doc_type: string; version: string; status: string; changed_at: string }[] }>("/api/documents")
+    fetchJSON<{ docs: { ref: string; type: string; buyer: string; when: string }[]; templates: { doc_type: string; version: string; status: string; changed_at: string; blocks?: string[] }[] }>("/api/documents")
       .then((d) => {
         if (!alive) return;
         setGenLog(d.docs.slice(0, 5).map((x) => ({
@@ -2179,11 +2181,14 @@ function Documents({ dtab, setDtab, doc, setDoc }: { dtab:string; setDtab:(v:any
           buyer: x.buyer,
           when: new Date(x.when).toLocaleDateString("en-GB", { day: "2-digit", month: "short" }),
         })));
-        const grouped: Record<string, { version: string; status: string; changed_at?: string }[]> = {};
-        for (const t of d.templates) (grouped[t.doc_type] = grouped[t.doc_type] || []).push({ version: t.version, status: t.status, changed_at: t.changed_at });
+        const grouped: Record<string, { version: string; status: string; changed_at?: string; blocks?: string[] }[]> = {};
+        for (const t of d.templates) (grouped[t.doc_type] = grouped[t.doc_type] || []).push({ version: t.version, status: t.status, changed_at: t.changed_at, blocks: t.blocks || undefined });
         setTemplates(grouped);
         const live = (grouped[doc] || []).find((v) => v.status === "live");
-        if (live) setVersion(live.version);
+        if (live) {
+          setVersion(live.version);
+          if (live.blocks && live.blocks.length > 0) setBlocks(live.blocks.filter((b) => b !== "Locked compliance footer"));
+        }
       })
       .catch(() => { /* offline fallback: keep empty local log */ });
     return () => { alive = false; };
@@ -2218,10 +2223,10 @@ function Documents({ dtab, setDtab, doc, setDoc }: { dtab:string; setDtab:(v:any
     }
   };
 
-  const setActive = () => {
-    fetchJSON<{ version: string; templates: { version: string; status: string; changed_at: string }[] }>(
-      "/api/documents?doc_type=" + encodeURIComponent(doc) + "&action=activate",
-      { method: "PUT" }
+const setActive = () => {
+    fetchJSON<{ version: string; templates: { version: string; status: string; changed_at: string; blocks?: string[] }[] }>(
+      "/api/documents?doc_type=" + encodeURIComponent(doc) + "&action=activate&status=live",
+      { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ blocks: [...blocks, "Locked compliance footer"] }) }
     )
 .then((d) => {
         setVersion(d.version);
@@ -2235,9 +2240,20 @@ function Documents({ dtab, setDtab, doc, setDoc }: { dtab:string; setDtab:(v:any
       });
   };
   const saveDraft = () => {
-    setVersion("v4");
-    setNotice("v4 draft saved for " + doc + " \u00b7 pending review");
-    setTimeout(() => setNotice(""), 4000);
+    fetchJSON<{ version: string; templates: { version: string; status: string; changed_at: string; blocks?: string[] }[] }>(
+      "/api/documents?doc_type=" + encodeURIComponent(doc) + "&action=activate&status=draft",
+      { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ blocks: [...blocks, "Locked compliance footer"] }) }
+    )
+      .then((d) => {
+        setVersion(d.version);
+        setTemplates((prev) => ({ ...prev, [doc]: d.templates }));
+        setNotice(d.version + " draft saved for " + doc + " \u00b7 pending review");
+        setTimeout(() => setNotice(""), 4000);
+      })
+      .catch(() => {
+        setNotice("Could not save draft \u2014 running offline");
+        setTimeout(() => setNotice(""), 4000);
+      });
   };
 
   return (
@@ -2391,17 +2407,26 @@ function Documents({ dtab, setDtab, doc, setDoc }: { dtab:string; setDtab:(v:any
             <div style={{background:"#fff",borderRadius:20,padding:"22px 24px",boxShadow:"0 1px 3px rgba(20,22,31,.04)"}}>
               <div style={{fontSize:15,fontWeight:700,letterSpacing:"-.015em"}}>Template blocks \u00b7 {doc}</div>
               <div style={{fontSize:11.5,color:"#9AA0AE",fontWeight:500,marginTop:3}}>Drag to reorder. The compliance footer cannot be removed by any role.</div>
-              <div style={{display:"flex",flexDirection:"column",gap:8,marginTop:16}}>
-                {DOC_BLOCKS.map((b,i) => (
-                  <div key={b} style={{display:"flex",alignItems:"center",gap:10,padding:"11px 13px",borderRadius:12,border:i===8?"1px solid #E2A33C":"1px solid #EDEEF3",background:i===8?"#FDF4E5":"#fff"}}>
-                    <span style={{color:"#C2C6D2",fontSize:13,fontWeight:700,cursor:"grab"}}>\u2807</span>
+<div style={{display:"flex",flexDirection:"column",gap:8,marginTop:16}}>
+                {blocks.map((b, i) => (
+                  <div key={b} draggable
+                    onDragStart={() => setDragB(i)}
+                    onDragOver={(e) => { e.preventDefault(); if (dragB !== null && dragB !== i) setBlocks((cur) => { const next = cur.slice(); const [m] = next.splice(dragB, 1); next.splice(i, 0, m); return next; }); }}
+                    onDragEnd={() => setDragB(null)}
+                    style={{display:"flex",alignItems:"center",gap:10,padding:"11px 13px",borderRadius:12,border:"1px solid #EDEEF3",background:dragB===i?"#F0EFFE":"#fff",cursor:"grab"}}>
+                    <span style={{color:"#C2C6D2",fontSize:13,fontWeight:700,cursor:"grab"}}>{"\u2807"}</span>
                     <span style={{flex:1,fontSize:12.5,fontWeight:600}}>{b}</span>
-                    {i===8 && <span style={{fontSize:9.5,fontWeight:800,letterSpacing:".06em",color:"#B07B14"}}>Locked</span>}
+                    <span style={{fontSize:9.5,fontWeight:700,color:"#C2C6D2"}}>{i === 0 ? "Top" : i === blocks.length - 1 ? "Bottom" : ""}</span>
                   </div>
                 ))}
+                <div style={{display:"flex",alignItems:"center",gap:10,padding:"11px 13px",borderRadius:12,border:"1px solid #E2A33C",background:"#FDF4E5"}}>
+                  <span style={{color:"#B07B14",fontSize:13,fontWeight:700}}>{"\u2807"}</span>
+                  <span style={{flex:1,fontSize:12.5,fontWeight:600}}>Locked compliance footer</span>
+                  <span style={{fontSize:9.5,fontWeight:800,letterSpacing:".06em",color:"#B07B14"}}>Locked</span>
+</div>
               </div>
               <div style={{display:"flex",gap:10,marginTop:20,paddingTop:16,borderTop:"1px solid #F1F2F7"}}>
-                <button onClick={saveDraft} style={{height:38,borderRadius:12,border:"1px solid #EDEEF3",background:"#fff",padding:"0 15px",fontFamily:"inherit",fontSize:12,fontWeight:700,color:"#4A5060",cursor:"pointer"}}>Save as {version} draft</button>
+                <button onClick={saveDraft} style={{height:38,borderRadius:12,border:"1px solid #EDEEF3",background:"#fff",padding:"0 15px",fontFamily:"inherit",fontSize:12,fontWeight:700,color:"#4A5060",cursor:"pointer"}}>Save as draft</button>
                 <button onClick={setActive} style={{height:38,borderRadius:12,background:AC,color:"#fff",border:0,padding:"0 16px",fontFamily:"inherit",fontSize:12,fontWeight:700,cursor:"pointer"}}>Set as active template</button>
               </div>
             </div>
@@ -2418,10 +2443,11 @@ function Documents({ dtab, setDtab, doc, setDoc }: { dtab:string; setDtab:(v:any
                   <div style={{fontSize:11,fontWeight:700,letterSpacing:".05em",color:"#9AA0AE",textTransform:"uppercase",marginBottom:9}}>Version control</div>
                   {vers.map((v) => {
                     const live = v.status === "live";
+                    const draft = v.status === "draft";
                     return (
                       <div key={v.version} style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:live?undefined:"1px solid #F6F7FA"}}>
                         <span style={{fontSize:11.5,color:"#6B7180",fontWeight:600}}>{v.version}{v.changed_at ? " \u00b7 " + new Date(v.changed_at).toLocaleDateString("en-GB", { day:"2-digit", month:"short", year:"numeric" }) : ""}</span>
-                        <span style={{fontSize:11,fontWeight:live?700:600,color:live?"#1F9D6B":"#9AA0AE"}}>{live ? "Live" : "Archived"}</span>
+                        <span style={{fontSize:11,fontWeight:live||draft?700:600,color:live?"#1F9D6B":draft?"#B07B14":"#9AA0AE"}}>{live ? "Live" : draft ? "Draft" : "Archived"}</span>
                       </div>
                     );
                   })}

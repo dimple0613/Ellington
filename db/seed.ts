@@ -200,9 +200,9 @@ async function main() {
   for (const t of DOC_TEMPLATES) {
     for (const [v, status] of t.versions) {
       await c.query(
-        `INSERT INTO document_templates (doc_type, version, status, changed_at)
-         VALUES ($1,$2,$3, now() - interval '30 days') ON CONFLICT (doc_type, version) DO NOTHING`,
-        [t.doc_type, v, status]
+        `INSERT INTO document_templates (doc_type, version, status, blocks, changed_at)
+         VALUES ($1,$2,$3,$4, now() - interval '30 days') ON CONFLICT (doc_type, version) DO NOTHING`,
+        [t.doc_type, v, status, JSON.stringify(["Cover","Project intro","Unit specification","Floor plan","Amenities","Payment plan table","Terms","Signature","Locked compliance footer"])]
       );
     }
   }
