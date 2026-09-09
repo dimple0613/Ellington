@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/router";
 import { AC } from "../../lib/format";
 import { exportCollectionNotice } from "../../lib/pdf";
@@ -26,7 +26,7 @@ export default function CollectionsScreen() {
   const [promiseAmount, setPromiseAmount] = useState("");
   const [promiseErr, setPromiseErr] = useState("");
 
-  const buckets = [
+  const STATIC_BUCKETS = [
     { label: "Current", value: "AED 439.6M", note: "428 buyers", idx: 0 },
     { label: "1\u201330", value: "AED 18.4M", note: "21 buyers", idx: 1 },
     { label: "31\u201360", value: "AED 7.1M", note: "12 buyers", idx: 2 },
@@ -85,6 +85,28 @@ export default function CollectionsScreen() {
   };
 
   const rows = liveRows.length ? liveRows : MOCK_ROWS;
+
+  const buckets = useMemo(() => {
+    if (!liveRows.length) return STATIC_BUCKETS;
+    const fmt = (v: number) => (v >= 1e6 ? "AED " + (v / 1e6).toFixed(1).replace(/\.0$/, "") + "M" : v >= 1e3 ? "AED " + Math.round(v / 1e3) + "k" : "AED " + v);
+    const build = (label: string, idx: number, pred: (r: CollRow) => boolean) => {
+      const sel = rows.filter(pred);
+      const v = sel.reduce((a, r) => a + (Number(String(r.amount).replace(/,/g, "")) || 0), 0);
+      return { label, value: fmt(v), note: sel.length + (sel.length === 1 ? " buyer" : " buyers"), idx };
+    };
+    return [
+      build("Current", 0, (r) => r.days <= 0),
+      build("1\u201330", 1, (r) => r.days >= 1 && r.days <= 30),
+      build("31\u201360", 2, (r) => r.days >= 31 && r.days <= 60),
+      build("61\u201390", 3, (r) => r.days >= 61 && r.days <= 90),
+      build("90+", 4, (r) => r.days > 90),
+      build("Legal", 5, (r) => /notice/i.test(r.stage || "")),
+    ];
+  }, [rows, liveRows.length]);
+
+  const overdueRows = rows.filter((r) => r.days > 0);
+  const overdueSum = overdueRows.reduce((a, r) => a + (Number(String(r.amount).replace(/,/g, "")) || 0), 0);
+  const overdueFmt = (v: number) => (v >= 1e6 ? "AED " + (v / 1e6).toFixed(1).replace(/\.0$/, "") + "M" : "AED " + Math.round(v / 1e3) + "k");
 
   const tiers: [string, string, boolean][] = [
     ["Construction < 60%", "up to 25%", true],
@@ -179,7 +201,7 @@ export default function CollectionsScreen() {
       <div style={{ display: "flex", alignItems: "flex-end", gap: 16, marginBottom: 18 }}>
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: "-.03em", lineHeight: 1.15 }}>Collections</div>
-          <div style={{ fontSize: 13, color: "#6B7180", fontWeight: 500, marginTop: 5 }}>31 overdue instalments \u00b7 AED 31.4M \u00b7 sorted by priority score</div>
+          <div style={{ fontSize: 13, color: "#6B7180", fontWeight: 500, marginTop: 5 }}>{overdueRows.length} overdue instalments \u00b7 {overdueFmt(overdueSum)} \u00b7 sorted by priority score</div>
         </div>
         <button onClick={() => setLadderOpen(true)} style={{ height: 38, borderRadius: 12, border: "1px solid #EDEEF3", background: "#fff", padding: "0 14px", fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, color: "#4A5060", cursor: "pointer" }}>Dunning ladder</button>
       </div>

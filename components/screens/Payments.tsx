@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { AC } from "../../lib/format";
 import { fetchJSON } from "../../lib/api";
 import { KpiSkeleton, PanelSkeleton } from "../Loading";
@@ -69,6 +69,7 @@ export default function PaymentsScreen({ buyer }: { buyer?: string }) {
   const [imported, setImported] = useState<{ imported: number; matched: number } | null>(null);
   const [extraRows, setExtraRows] = useState<ReceiptRow[]>([]);
   const [dbRows, setDbRows] = useState<ReceiptRow[]>([]);
+  const [rawReceipts, setRawReceipts] = useState<ApiReceipt[]>([]);
   const [stmtRows, setStmtRows] = useState<StmtRow[]>([]);
   const [apiError, setApiError] = useState("");
   const [loaded, setLoaded] = useState(false);
@@ -77,6 +78,7 @@ export default function PaymentsScreen({ buyer }: { buyer?: string }) {
     fetchJSON<{ receipts: ApiReceipt[] }>("/api/receipts")
       .then((j) => {
         if (!Array.isArray(j.receipts)) return;
+        setRawReceipts(j.receipts);
         setDbRows(
           j.receipts.map((x: ApiReceipt) => ({
             id: x.id,
@@ -109,13 +111,44 @@ export default function PaymentsScreen({ buyer }: { buyer?: string }) {
     return () => { active = false; };
   }, []);
 
-  const kpis: { label: string; value: string; note: string; bad?: boolean }[] = [
+  const KPI_FALLBACK: { label: string; value: string; note: string; bad?: boolean }[] = [
     { label: "Collected today", value: "AED 4.24M", note: "9 receipts issued" },
     { label: "Collected MTD", value: "AED 61.2M", note: "+4.2% vs last month" },
     { label: "Cheques pending", value: "AED 12.8M", note: "18 PDCs held" },
     { label: "Unreconciled", value: "AED 340k", note: "12 items · escrow", bad: true },
     { label: "Bounced this month", value: "2", note: "AED 512k · fees raised", bad: true },
   ];
+
+  const liveKpis = useMemo(() => {
+    if (!rawReceipts.length) return null;
+    const today = new Date();
+    const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const parseD = (s: string) => { const m = /^(\d{1,2}) ([A-Za-z]{3}) (\d{2})$/.exec(s || ""); if (!m) return null; return new Date(2000 + Number(m[3]), MON.indexOf(m[2]), Number(m[1])); };
+    const sameMonth = (d: Date | null) => !!d && d.getMonth() === today.getMonth() && d.getFullYear() === today.getFullYear();
+    const sameDay = (d: Date | null) => !!d && sameMonth(d) && d.getDate() === today.getDate();
+    const fmt = (v: number) => (v >= 1e6 ? "AED " + (v / 1e6).toFixed(2).replace(/\.0+$/, "") + "M" : v >= 1e3 ? "AED " + Math.round(v / 1e3) + "k" : "AED " + Math.round(v));
+    const out = { today: 0, todayN: 0, mtd: 0, mtdN: 0, chq: 0, chqN: 0, unr: 0, unrN: 0, bounced: 0 };
+    rawReceipts.forEach((r) => {
+      const amt = Number(r.amount) || 0;
+      const d = parseD(r.date || "");
+      const isChq = String(r.method || "").toLowerCase().includes("cheque") || !!r.pdc_status;
+      if (sameDay(d)) { out.today += amt; out.todayN++; }
+      if (sameMonth(d)) { out.mtd += amt; out.mtdN++; }
+      if (isChq && (r.pdc_status === "Held" || r.pdc_status === "Presented")) { out.chq += amt; out.chqN++; }
+      if (!r.matched) { out.unr += amt; out.unrN++; }
+      if (r.pdc_status === "Bounced") out.bounced++;
+    });
+    if (!out.today && !out.mtd && !out.chq && !out.unr && !out.bounced) return null;
+    return [
+      { label: "Collected today", value: fmt(out.today), note: out.todayN + " receipts issued" },
+      { label: "Collected MTD", value: fmt(out.mtd), note: out.mtdN + " receipts · live" },
+      { label: "Cheques pending", value: fmt(out.chq), note: out.chqN + " PDCs held/pending" },
+      { label: "Unreconciled", value: fmt(out.unr), note: out.unrN + " items · escrow", bad: true },
+      { label: "Bounced this month", value: String(out.bounced), note: "fees raised on bounce", bad: true },
+    ];
+  }, [rawReceipts]);
+
+  const kpiList = liveKpis || KPI_FALLBACK;
 
   const payRows: ReceiptRow[] = [
     ["RCP-H21-004712", "24 Aug 26", "Rajesh Menon", "H21-T1-3302", "367,875", "Bank transfer", "ESC-2026-9014", "Matched"],
@@ -280,7 +313,7 @@ export default function PaymentsScreen({ buyer }: { buyer?: string }) {
         <button onClick={() => setShowForm(true)} style={{ height: 38, borderRadius: 12, background: AC, color: "#fff", border: 0, padding: "0 16px", fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}>Record payment</button>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 14 }}>
-        {kpis.map((k) => (
+        {kpiList.map((k) => (
           <div key={k.label} style={{ background: "#fff", borderRadius: 20, padding: "18px 20px", boxShadow: "0 1px 3px rgba(20,22,31,.04)" }}>
             <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".06em", color: "#9AA0AE", textTransform: "uppercase" }}>{k.label}</div>
             <div style={{ fontSize: 20, fontWeight: 800, letterSpacing: "-.03em", marginTop: 11, color: k.bad ? "#E5484D" : "#14161F" }}>{k.value}</div>
