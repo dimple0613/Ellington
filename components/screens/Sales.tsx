@@ -17,7 +17,7 @@ const FUNNEL: [string,string,string][] = [
 const CONV = ["","52%","65%","60%","71%"];
 
 /* ── kanban columns ─────────────────────────────────────────────── */
-type Card = { name:string; flag:string; src:string; budget:string; chips:string[]; agent:string; age:string; live:boolean; id?:number; disc?:number; days?:number };
+type Card = { name:string; flag:string; src:string; budget:string; chips:string[]; agent:string; age:string; live:boolean; id?:number; disc?:number; days?:number; phone?:string; projectCode?:string };
 type Col = { label:string; count:number; val:string; color:string; cards:Card[] };
 
 type ApiLead = {
@@ -31,6 +31,8 @@ type ApiLead = {
   live?: boolean;
   discountPct?: number;
   daysToClose?: number;
+  phone?: string;
+  projectCode?: string;
 };
 const LEADS_COLS: Col[] = [
   { label:"New",count:8,val:"AED 14.2M",color:"#8B7CF6",cards:[
@@ -272,6 +274,8 @@ function Leads({ onNewBooking, onBookLead, goRegister }: { onNewBooking: () => v
             live: l.live !== false,
             disc: l.discountPct != null ? l.discountPct : undefined,
             days: l.daysToClose != null ? l.daysToClose : undefined,
+            phone: l.phone || "",
+            projectCode: l.projectCode || "",
           });
         });
         const cols = order.map((st) => {
@@ -293,6 +297,9 @@ function Leads({ onNewBooking, onBookLead, goRegister }: { onNewBooking: () => v
   const cols = dbCols && dbCols.some((c) => c.cards.length > 0) ? dbCols : LEADS_COLS;
 
   const [dragId, setDragId] = useState<number | null>(null);
+  const [sel, setSel] = useState<Card | null>(null);
+  const [notice, setNotice] = useState("");
+  const warn = (m: string) => { setNotice(m); setTimeout(() => setNotice(""), 4000); };
 
   const moveLead = (targetLabel: string) => {
     if (dragId == null || !dbCols) return;
@@ -303,6 +310,11 @@ function Leads({ onNewBooking, onBookLead, goRegister }: { onNewBooking: () => v
     if (!fromCol) return;
     const card = fromCol.cards.find((k) => k.id === dragId);
     if (!card) return;
+    const nameOk = !!card.name && card.name.trim() !== "" && card.name !== "Unnamed lead";
+    const budgetNum = parseFloat(String(card.budget).replace(/[^\d.]/g, ""));
+    const forward = ["new", "contacted", "qualified", "viewing", "negotiation", "eoi", "booked", "lost"].indexOf(to) >= 2;
+    if (!nameOk) { setDragId(null); warn("Lead is missing a name \u2014 add one before moving it."); return; }
+    if (forward && !(budgetNum > 0)) { setDragId(null); warn("Lead lacks a budget \u2014 add a budget range before it can qualify."); return; }
     const next = dbCols.map((c) => {
       if (c.label === fromCol.label) return { ...c, count: c.cards.length - 1, cards: c.cards.filter((k) => k.id !== dragId) };
       if (c.label === targetLabel) return { ...c, count: c.cards.length + 1, cards: [...c.cards, { ...card, age: "just moved" }] };
@@ -359,6 +371,11 @@ function Leads({ onNewBooking, onBookLead, goRegister }: { onNewBooking: () => v
       {apiError && (
         <div style={{ background: "#FDECEC", color: "#E5484D", borderRadius: 12, padding: "11px 16px", fontSize: 12, fontWeight: 700, marginBottom: 16 }}>
           Live data unavailable ({apiError}) — showing sample columns
+        </div>
+      )}
+      {notice && (
+        <div style={{ background: "#FDF4E5", color: "#8A6410", borderRadius: 12, padding: "11px 16px", fontSize: 12, fontWeight: 700, marginBottom: 16 }}>
+          {notice}
         </div>
       )}
       <div style={{display:"flex",alignItems:"flex-end",gap:16,marginBottom:18}}>
@@ -426,10 +443,10 @@ function Leads({ onNewBooking, onBookLead, goRegister }: { onNewBooking: () => v
             <div style={{fontSize:10.5,fontWeight:700,color:"#9AA0AE",padding:"0 6px 10px"}}>{col.val} potential</div>
             <div style={{display:"flex",flexDirection:"column",gap:8}}>
               {col.cards.map(k => (
-                <div key={k.id ?? k.name} onClick={() => onBookLead(k)} draggable={k.id != null}
+                <div key={k.id ?? k.name} onClick={() => setSel(k)} draggable={k.id != null}
                      onDragStart={() => setDragId(k.id ?? null)}
                      onDragEnd={() => setDragId(null)}
-                     title={k.id != null ? "Drag to move stage \u00b7 click for new booking" : "New booking for this lead"}
+                     title={k.id != null ? "Drag to move stage \u00b7 click for lead details" : "View lead details"}
                      style={{background:"#fff",borderRadius:14,padding:"13px 14px",boxShadow:"0 1px 2px rgba(20,22,31,.05)",cursor:"pointer",transition:"box-shadow .15s,border-color .15s",border:"1px solid transparent"}}>
                   <div style={{display:"flex",alignItems:"center",gap:7}}>
                     <span style={{flex:1,fontSize:12.5,fontWeight:700,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{k.name}</span>
@@ -447,15 +464,91 @@ function Leads({ onNewBooking, onBookLead, goRegister }: { onNewBooking: () => v
                     <span style={{flex:1,fontSize:10,color:"#9AA0AE",fontWeight:600}}>{k.age}</span>
                     <span style={{width:7,height:7,borderRadius:5,background:k.live?"#34C08A":"#E2A33C"}} />
                   </div>
-                  <div style={{marginTop:9,paddingTop:9,borderTop:"1px dashed #EDEEF3",display:"flex",alignItems:"center",gap:6}}>
-                    <span style={{fontSize:10.5,fontWeight:800,color:AC}}>New booking</span>
-                    <span style={{fontSize:11,color:"#9AA0AE",fontWeight:600}}>\u2192</span>
+<div style={{marginTop:9,paddingTop:9,borderTop:"1px dashed #EDEEF3",display:"flex",alignItems:"center",gap:6}}>
+                    <span style={{fontSize:10.5,fontWeight:800,color:AC}}>View details</span>
+                    <span style={{fontSize:11,color:"#9AA0AE",fontWeight:600}}>{"\u2192"}</span>
                   </div>
                 </div>
               ))}
             </div>
           </div>
         ))}
+      </div>
+      {sel && (() => {
+        const col = cols.find((c) => c.cards.some((k) => k === sel));
+        return (
+          <LeadDrawer lead={sel} stage={col ? col.label : ""} color={col ? col.color : AC}
+            onClose={() => setSel(null)}
+            onBook={() => { const k = sel; setSel(null); if (k) onBookLead(k); }} />
+        );
+      })()}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   LEAD DRAWER
+   ═══════════════════════════════════════════════════════════════════ */
+function LeadDrawer({ lead, stage, color, onClose, onBook }: { lead: Card; stage: string; color: string; onClose: () => void; onBook: () => void }) {
+  const disc = lead.disc != null ? lead.disc + "%" : "\u2014";
+  const days = lead.days != null ? lead.days + " days" : "\u2014";
+  const row = (l: string, v: string, mono = false) => (
+    <div style={{ display: "flex", justifyContent: "space-between", gap: 16, padding: "10px 0", borderBottom: "1px solid #F3F4F8" }}>
+      <span style={{ fontSize: 11.5, color: "#9AA0AE", fontWeight: 600 }}>{l}</span>
+      <span style={{ fontSize: 12, fontWeight: 700, textAlign: "right", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontFamily: mono ? "'JetBrains Mono',monospace" : "inherit" }}>{v}</span>
+    </div>
+  );
+  return (
+    <div onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+         style={{ position: "fixed", inset: 0, background: "rgba(20,22,31,.38)", zIndex: 120, display: "flex", justifyContent: "flex-end" }}>
+      <div style={{ width: 400, maxWidth: "92vw", height: "100%", background: "#fff", boxShadow: "-14px 0 44px rgba(20,22,31,.18)", display: "flex", flexDirection: "column" }}>
+        <div style={{ padding: "22px 24px", borderBottom: "1px solid #F1F2F7", display: "flex", alignItems: "flex-start", gap: 12 }}>
+          <span style={{ width: 40, height: 40, flex: "none", borderRadius: 12, background: "#EDECFE", display: "grid", placeItems: "center", fontSize: 13, fontWeight: 800, color: AC }}>{lead.agent}</span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 16, fontWeight: 800, letterSpacing: "-.02em", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{lead.name}</div>
+            <div style={{ fontSize: 12, color: "#6B7180", fontWeight: 600, marginTop: 3 }}>{lead.src}</div>
+          </div>
+          <button onClick={onClose} aria-label="Close" style={{ width: 30, height: 30, borderRadius: 9, border: 0, background: "#F1F2F7", color: "#4A5060", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>{"\u00d7"}</button>
+        </div>
+        <div style={{ flex: 1, overflowY: "auto", padding: "18px 24px", boxSizing: "border-box" }}>
+          <div style={{ display: "inline-flex", alignItems: "center", gap: 7, borderRadius: 8, padding: "4px 10px", background: "#F0EFFE", fontSize: 10.5, fontWeight: 800, letterSpacing: ".03em" }}>
+            <span style={{ width: 7, height: 7, flex: "none", borderRadius: 4, background: color }} />
+            <span style={{ color: AC }}>{stage || "Lead"}</span>
+          </div>
+          <div style={{ marginTop: 18 }}>
+            <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".05em", color: "#9AA0AE", textTransform: "uppercase", marginBottom: 6 }}>Contact</div>
+            {row("Phone", lead.phone || "\u2014", true)}
+            {row("Project", lead.projectCode || "\u2014")}
+          </div>
+          <div style={{ marginTop: 16 }}>
+            <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".05em", color: "#9AA0AE", textTransform: "uppercase", marginBottom: 6 }}>Deal</div>
+            {row("Budget", lead.budget || "\u2014", true)}
+            {row("Discount", disc)}
+            {row("Days to close", days)}
+          </div>
+          <div style={{ marginTop: 16 }}>
+            <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".05em", color: "#9AA0AE", textTransform: "uppercase", marginBottom: 6 }}>Activity</div>
+            <div style={{ padding: "12px 2px" }}>
+              <div style={{ display: "flex", gap: 10 }}>
+                <span style={{ width: 9, height: 9, flex: "none", borderRadius: 5, background: color, marginTop: 4 }} />
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 700 }}>Captured in pipeline</div>
+                  <div style={{ fontSize: 11, color: "#9AA0AE", fontWeight: 600, marginTop: 2 }}>Source: {lead.src} \u00b7 agent {lead.agent}</div>
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
+                <span style={{ width: 9, height: 9, flex: "none", borderRadius: 5, background: "#E4E6EE", marginTop: 4 }} />
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 700 }}>Stage: {stage || "Lead"}</div>
+                  <div style={{ fontSize: 11, color: "#9AA0AE", fontWeight: 600, marginTop: 2 }}>{lead.live ? "Lead is active in the pipeline" : "Lead inactive \u2014 review before follow-up"}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div style={{ padding: "18px 24px", borderTop: "1px solid #F1F2F7" }}>
+          <button onClick={onBook} style={{ width: "100%", height: 42, borderRadius: 12, background: AC, color: "#fff", border: 0, fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}>Convert to booking {"\u2192"}</button>
+        </div>
       </div>
     </div>
   );
