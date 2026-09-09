@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/router";
 import { AC, money } from "../../lib/format";
 import { ALL_UNITS } from "../../lib/data";
@@ -296,6 +296,34 @@ function Leads({ onNewBooking, onBookLead, goRegister }: { onNewBooking: () => v
 
   const cols = dbCols && dbCols.some((c) => c.cards.length > 0) ? dbCols : LEADS_COLS;
 
+  const live = liveLeads || [];
+  const openLeads = live.filter((l) => l.live !== false && (l.stage || "new").toLowerCase() !== "lost");
+  const agentsN = Array.from(new Set(live.map((l) => (l.agent || "").trim()).filter(Boolean))).length;
+  const potVal = live.reduce((a, l) => a + (l.budgetMax || l.budgetMin || 0), 0);
+
+  const funnel = useMemo(() => {
+    if (!live.length) return null;
+    const by = (stages: string[]) => live.filter((l) => stages.includes((l.stage || "new").toLowerCase()));
+    const avgDays = (ls: ApiLead[]) => { const arr = ls.filter((l) => l.daysToClose != null); return arr.length ? Math.round(arr.reduce((a, l) => a + (l.daysToClose || 0), 0) / arr.length) : 0; };
+    const days = (n: number) => (n ? n + " days" : "\u2014");
+    const leadsN = by(["new", "contacted"]).length;
+    const q = by(["qualified"]), v = by(["viewing"]), e = by(["eoi"]), b = by(["booked"]);
+    const pct = (num: number, den: number) => (den ? Math.round((num / den) * 100) + "%" : "");
+    return {
+      rows: [
+        ["Leads", String(leadsN), days(avgDays(by(["new", "contacted"])))],
+        ["Qualified", String(q.length), days(avgDays(q))],
+        ["Viewing", String(v.length), days(avgDays(v))],
+        ["EOI signed", String(e.length), days(avgDays(e))],
+        ["Booked", String(b.length), days(avgDays(b))],
+      ] as [string, string, string][],
+      conv: ["", pct(q.length, leadsN), pct(v.length, q.length), pct(e.length, v.length), pct(b.length, e.length)],
+    };
+  }, [live]);
+
+  const funnelRows = funnel ? funnel.rows : FUNNEL;
+  const conv = funnel ? funnel.conv : CONV;
+
   const [dragId, setDragId] = useState<number | null>(null);
   const [sel, setSel] = useState<Card | null>(null);
   const [notice, setNotice] = useState("");
@@ -381,7 +409,7 @@ function Leads({ onNewBooking, onBookLead, goRegister }: { onNewBooking: () => v
       <div style={{display:"flex",alignItems:"flex-end",gap:16,marginBottom:18}}>
         <div style={{flex:1}}>
           <div style={{fontSize:26,fontWeight:800,letterSpacing:"-.03em",lineHeight:1.15}}>Leads</div>
-          <div style={{fontSize:13,color:"#6B7180",fontWeight:500,marginTop:5}}>34 open \u00b7 AED 62.4M potential value \u00b7 8 agents</div>
+          <div style={{fontSize:13,color:"#6B7180",fontWeight:500,marginTop:5}}>{openLeads.length} open \u00b7 {moneyM(potVal)} potential value \u00b7 {agentsN || 8} agents</div>
         </div>
         <button onClick={onNewBooking} style={{height:38,borderRadius:12,background:AC,color:"#fff",border:0,padding:"0 16px",fontFamily:"inherit",fontSize:12.5,fontWeight:700,cursor:"pointer"}}>New booking</button>
         <button onClick={goRegister} style={{height:38,borderRadius:12,border:"1px solid #EDEEF3",background:"#fff",padding:"0 16px",fontFamily:"inherit",fontSize:12.5,fontWeight:700,color:"#4A5060",cursor:"pointer"}}>Bookings register</button>
@@ -390,7 +418,7 @@ function Leads({ onNewBooking, onBookLead, goRegister }: { onNewBooking: () => v
       {/* funnel */}
       <div style={{background:"#fff",borderRadius:20,padding:"20px 24px",boxShadow:"0 1px 3px rgba(20,22,31,.04)",marginBottom:16}}>
         <div style={{display:"flex",alignItems:"flex-end",gap:6}}>
-          {FUNNEL.map(([label,val,days],i) => (
+          {funnelRows.map(([label,val,days],i) => (
             <div key={label} style={{flex:1,display:"flex",alignItems:"flex-end",gap:6}}>
               <div style={{flex:1}}>
                 <div style={{fontSize:10,fontWeight:700,letterSpacing:".06em",color:"#9AA0AE",textTransform:"uppercase"}}>{label}</div>
