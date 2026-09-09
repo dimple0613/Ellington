@@ -7,9 +7,9 @@
 > Branch-per-task rule (see AGENTS.md): never push directly to main. Update this section per task.
 
 - Current branch: `fix/parity-live-data` (PLINTH parity — verified remaining gaps). Push target: this branch only.
-- Pushed so far: **D1** `728b479` (dashboard live KPIs), **D2** `bf3f350` (leads drawer + drag gate).
-  Next to push: **D3** once committed.
-- Prior `fix/plinth-parity` commits (T1–T18) are historical and NOT to be treated as completion evidence.
+- Pushed (ALL SIX): **D1** `728b479` · **D2** `bf3f350` · **D3** `0c94935` · **D4** `57adfdd` · **D5** `bc4f84f` · **D6** `31ff7aa` · tracker `79fbe32`.
+- Everything intended for this task is on this branch — NO commit on `main` from this program.
+- Prior `fix/plinth-parity` commits (T1–T18) are historical and NOT completion evidence.
 
 ## PLINTH Parity Program — verified remaining tasks
 > Re-audited from scratch against `C:\Users\admin\Downloads\New folder\plinth-prompt-pack_1.html`
@@ -26,24 +26,24 @@
       name/budget for qualifying stages with amber notice. Committed `bf3f350`.
 
 ### P2 — Inventory / Shell
-- [ ] **D3 Inventory context** — `scopeName` hardcoded "Tower 1", CHIPS static (`Inventory.tsx:58-65`),
-      no summary strip, no building tabs. Task: derive name/tabs/summary from `/api/inventory`.
-- [ ] **D4 Shell live** — mock `NOTIFS` (`components/Shell.tsx:128-135`), hardcoded ticker
-      "ORN 21281 · H21 / Due today · AED 4.2M" (`:750`), org name (`:387`). Task: ticker + notifications
-      from real data where it exists; mark N/A explicitly otherwise.
+- [x] **D3 Inventory context** — scopeName derived from `/api/inventory` projects list; building tab pills
+      switch `?scope=`; summary strip (units/available/total value/avg psf) and filter chips computed from
+      loaded units instead of static CHIPS. Committed `0c94935`.
+- [x] **D4 Shell live** — "Due today" ticker + notification tray rebuilt from `/api/finance`
+      (overdue >90d collections, unmatched escrow, drawdowns awaiting trustee, worklist count); ORN
+      subtitle reflects current scope. Committed `57adfdd`.
 
 ### P3 — Finance / Sales stats
-- [ ] **D5 Finance KPIs** — Payments `kpis`/`payRows`/`fallbackPdc` hardcoded (`Payments.tsx:112-140`);
-      Collections buckets (`Collections.tsx:29-36`). Receipt create/PDC/import are already live.
-      Task: compute KPIs from `/api/finance`.
-- [ ] **D6 Sales stats** — funnel/conversion/leaderboard fallback arrays (`Sales.tsx:14-17, :35-64`,
-      `LB_FALLBACK :58-64`). Task: compute from `leads` + `bookings` tables.
+- [x] **D5 Finance KPIs** — Payments KPIs (today/MTD/cheques pending/unreconciled/bounced) computed from
+      receipts already loaded; Collections age buckets + subtitle derived from live rows. Committed `bc4f84f`.
+- [x] **D6 Sales stats** — funnel counts + avg days-to-close + per-stage conversion + header
+      (open/potential/agents) computed from live leads; leaderboard was already live. Committed `31ff7aa`.
 
 ### Deferred / N/A (needs operator approval — NOT started)
 - [ ] **Settings extra tabs** (Financial/Templates/Data) — `Settings.tsx:6` has 5 tabs
       (Company/Numbering/Notifications/Integrations/Other). Visual change → AGENTS.md approval required.
 - [ ] **`lib/data.ts` mock purge** (`POS :22-29`, `BUYERS :31-44`, `PROJECTS :60-66`, `UNITS :84-122`)
-      — remains as fallback while D1–D6 wire live data.
+      — retained as offline fallback; every screen above is API-first.
 
 ## Working baseline (verified in code, NOT re-litigated)
 - Live DB-backed today: receipts (create/PDC/import), invoices (issue/void/bulk), collections, escrow,
@@ -52,8 +52,11 @@
 - Schema tables present: admins, role_permissions, documents, document_templates, escrow_ledger,
   pipeline_items, receipts, bank_statements, collections, drawdowns, invoices, construction_milestones,
   app_settings, leads, buyers, bookings, broker_*, audit_log, snag_items, deeds, password_resets.
-- Baseline regression harnesses: `verify_functionality.js` (89) + `verify_responsive.js` (70) — rerun
-  before each task is marked done.
+- Baseline regression harnesses: `verify_functionality.js` (89) + `verify_responsive.js` (70) — NOT
+  present on this machine; per-change verification used `npm run lint` (tsc green), `npm run build`
+  (green on this branch), HTTP 200 smoke on every touched route, and direct SQL smoke tests.
+- Local dev data caveats (honest, live): H21 has 0 confirmed bookings in 84d (velocity bars zero);
+  receipts MTD-driven KPIs reflect actual seed dates; collections buckets reflect 8 seeded rows.
 
 ## Rules reminder (AGENTS.md)
 - Inline styles only; design tokens from `lib/format.ts`; no Tailwind/shadcn/deps without approval.
