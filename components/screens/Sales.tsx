@@ -109,6 +109,9 @@ type BuyerDetail = {
   email: string | null;
   phone: string | null;
   kyc: string;
+  agent?: string | null;
+  agency?: string | null;
+  docs?: { doc_type: string; unit_no: string | null; ref: string; status: string; generated_at: string }[];
   units: { no: string; status: string; type: string; beds: number; area: number; price: number; view: string; pct: number }[];
   ledger: { date: string; unit: string; desc: string; debit: number | null; credit: number; balance: number }[];
   schedule: { ym: string; amt: number }[];
@@ -196,7 +199,7 @@ export default function Sales({ scope }: { scope: string }) {
   const s = (typeof router.query.s === "string" ? router.query.s : null) || "leads";
   const [step, setStep] = useState(1);
   const [lead, setLead] = useState<Card | null>(null);
-  const [btab, setBtab] = useState<"units"|"ledger"|"sched">("units");
+  const [btab, setBtab] = useState<"units"|"ledger"|"sched"|"profile"|"docs"|"comms"|"activity">("units");
   const [brtab, setBrtab] = useState<"agencies"|"agents"|"onboard"|"activity">("agencies");
   const [brstep, setBrstep] = useState(3);
   const [dtab, setDtab] = useState<"gen"|"studio">("gen");
@@ -1350,6 +1353,12 @@ function BuyersDirectory({ onOpen }: { onOpen: (id: number) => void }) {
 function Buyer360({ btab, setBtab, goUnit }: { btab:string; setBtab:(v:any)=>void; goUnit:(id:string)=>void }) {
   const router = useRouter();
   const [sent, setSent] = useState(false);
+  const [portalOn, setPortalOn] = useState(true);
+  const [extraDocs, setExtraDocs] = useState<{ doc_type: string; ref: string }[]>([]);
+  const [chan, setChan] = useState("Email");
+  const [msgSubject, setMsgSubject] = useState("");
+  const [msgBody, setMsgBody] = useState("");
+  const [commsNotice, setCommsNotice] = useState("");
   const [live, setLive] = useState<BuyerDetail | null>(null);
   const [loaded, setLoaded] = useState(false);
   const idRaw = router.query.id;
@@ -1364,7 +1373,7 @@ function Buyer360({ btab, setBtab, goUnit }: { btab:string; setBtab:(v:any)=>voi
     return () => { active = false; };
   }, [bid]);
 
-  const tabs: [string,string][] = [["units","Units"],["ledger","Ledger"],["sched","Schedule"]];
+  const tabs: [string,string][] = [["profile","Profile"],["units","Units"],["ledger","Ledger"],["sched","Schedule"],["docs","Documents"],["comms","Comms"],["activity","Activity"]];
   const buyerName = live ? live.name : "Rajesh Menon";
   const buyerId = live ? "B-00" + String(live.id).padStart(3,"0") : "H21-B-00147";
   const initials = buyerName.split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase();
@@ -1420,6 +1429,76 @@ function Buyer360({ btab, setBtab, goUnit }: { btab:string; setBtab:(v:any)=>voi
   const rel: [string,string][] = live
     ? [["First purchase", fmtShort(live.firstPaid || "")], ["Lifetime value", moneyM(contracted)], ["Units", String(live.units.length)], ["Instalments", live.miles.paid + "/" + live.miles.total + " paid"], ["KYC", kyc === "cleared" ? "Cleared" : "Pending"], ["Preferred contact", "Email"], ["Relationship manager", "\u2014"]]
     : B_REL;
+
+  const profileRows: [string,string][] = live
+    ? [
+        ["Buyer type", "Individual"],
+        ["KYC status", kyc === "cleared" ? "Cleared" : "Pending"],
+        ["Nationality", "\u2014"],
+        ["First purchase", fmtShort(live.firstPaid || "")],
+        ["Lifetime value", moneyM(contracted)],
+        ["Units on record", String(live.units.length)],
+        ["Agent", live.agent || "\u2014"],
+        ["Broker agency", live.agency || "\u2014"],
+        ["Preferred contact", "Email"],
+        ["Risk rating", kyc === "cleared" ? "Low" : "Screening"],
+        ["Passport", "on file \u00b7 not digitalised"],
+        ["Emirates ID", "on file \u00b7 not digitalised"],
+        ["Source of funds", "\u2014"],
+        ["Residence", "\u2014"],
+      ]
+    : [
+        ["Buyer type", "Individual"],
+        ["Nationality", "United Arab Emirates"],
+        ["KYC status", "Cleared"],
+        ["Passport", "A04128877 \u00b7 exp 11 Oct 2026"],
+        ["Emirates ID", "784-1988-4471203-6"],
+        ["Source of funds", "Salary and business income"],
+        ["Preferred contact", "WhatsApp \u00b7 18:00\u201321:00"],
+        ["Relationship manager", "S. Al Balushi"],
+        ["Agent", "Sara Bennett"],
+        ["Broker agency", "Betterhomes"],
+        ["Mailing address", "Dubai Marina, Dubai"],
+        ["Risk rating", "Low"],
+      ];
+
+  const buyerDocs = [
+    ...extraDocs.map((d) => ({ doc_type: d.doc_type, unit_no: "", ref: d.ref, status: "uploaded", generated_at: "today" })),
+    ...(live
+      ? (live.docs || []).map((d) => ({ doc_type: d.doc_type, unit_no: d.unit_no || "", ref: d.ref, status: d.status, generated_at: fmtShort(d.generated_at) }))
+      : [
+          { doc_type: "Reservation Form", unit_no: "H21-T1-1204", ref: "RF-2026-01142", status: "generated", generated_at: "14 Mar 26" },
+          { doc_type: "SPA", unit_no: "H21-T1-1204", ref: "SPA-2026-0441", status: "sent", generated_at: "02 Apr 26" },
+          { doc_type: "Statement of Account", unit_no: "", ref: "SOA-2026-0088", status: "sent", generated_at: "01 Aug 26" },
+          { doc_type: "Passport copy", unit_no: "", ref: "DOC-2026-00317", status: "generated", generated_at: "02 Apr 26" },
+        ]),
+  ];
+
+  const commsLog: { subj: string; when: string; chan: string; sent: boolean }[] = live
+    ? [
+        { subj: "Statement of account \u00b7 August", when: "01 Aug 2026", chan: "Email", sent: true },
+        { subj: "Payment reminder \u00b7 Excavation 20%", when: "02 Jun 2026", chan: "WhatsApp", sent: true },
+      ]
+    : [
+        { subj: "Welcome \u00b7 payment schedule attached", when: "14 Mar 2026", chan: "Email", sent: true },
+        { subj: "SPA execution instructions", when: "31 Mar 2026", chan: "Email", sent: true },
+        { subj: "Payment confirmation \u00b7 RCP-004521", when: "14 Jun 2026", chan: "WhatsApp", sent: true },
+      ];
+
+  const act: Act[] = (() => {
+    if (!live) return [
+      { text: "Registered in the buyer directory", meta: "AML screened \u00b7 Low", when: "02 Feb 26", color: "#8B7CF6" },
+      { text: "Paid booking deposit \u00b7 RCP-004102", meta: "H21-T1-1204 \u00b7 " + money(232750), when: "14 Mar 26", color: "#34C08A" },
+      { text: "Executed SPA", meta: "Developer signatory logged", when: "02 Apr 26", color: AC },
+      { text: "Paid Excavation 20% \u00b7 RCP-004521", meta: "H21-T1-1204", when: "14 Jun 26", color: "#34C08A" },
+      { text: "Next instalment \u00b7 Structure 40%", meta: "due 14 Sep 26", when: "upcoming", color: "#E2A33C" },
+    ];
+    const out: Act[] = [];
+    live.units.forEach((u) => out.push({ text: "Contract on " + u.no, meta: u.type + " \u00b7 " + u.status, when: "on record", color: "#8B7CF6" }));
+    live.ledger.forEach((r) => out.push({ text: "Payment received \u00b7 " + r.desc, meta: money(r.credit) + " credited against " + r.unit, when: fmtShort(r.date), color: "#34C08A" }));
+    if (live.next) out.push({ text: "Next instalment \u00b7 " + live.next.milestone, meta: money(live.next.amount) + " on " + live.next.unit, when: fmtShort(live.next.date), color: "#E2A33C" });
+    return out;
+  })();
 
   const sendStatement = () => {
     const totals = { contracted: moneyM(contracted), collected: moneyM(collected), outstanding: moneyM(outstanding) };
@@ -1512,7 +1591,7 @@ function Buyer360({ btab, setBtab, goUnit }: { btab:string; setBtab:(v:any)=>voi
 
           {btab === "units" && (
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
-              {B_UNITS.map(c => (
+              {units.map(c => (
                 <div key={c.no} style={{background:"#fff",borderRadius:20,overflow:"hidden",boxShadow:"0 1px 3px rgba(20,22,31,.04)"}}>
                   <div style={{height:104,background:"linear-gradient(135deg,#E8E9F5,#D6D8EA)"}} />
                   <div style={{padding:"16px 18px"}}>
@@ -1538,7 +1617,7 @@ function Buyer360({ btab, setBtab, goUnit }: { btab:string; setBtab:(v:any)=>voi
               <div style={{display:"grid",gridTemplateColumns:"84px 96px 1.3fr 92px 92px 100px",gap:8,padding:"14px 22px",fontSize:9.5,fontWeight:700,letterSpacing:".07em",color:"#9AA0AE",textTransform:"uppercase",background:"#FAFBFD",borderBottom:"1px solid #EDEEF3"}}>
                 <span>Date</span><span>Unit</span><span>Description</span><span style={{textAlign:"right"}}>Debit</span><span style={{textAlign:"right"}}>Credit</span><span style={{textAlign:"right"}}>Balance</span>
               </div>
-              {B_LEDGER.map(([date,unit,desc,debit,credit,bal],i) => (
+              {ledger.map(([date,unit,desc,debit,credit,bal],i) => (
                 <div key={i} style={{display:"grid",gridTemplateColumns:"84px 96px 1.3fr 92px 92px 100px",gap:8,alignItems:"center",padding:"0 22px",height:38,borderBottom:"1px solid #F6F7FA"}}>
                   <span style={{fontSize:11.5,color:"#6B7180",fontWeight:600}}>{date}</span>
                   <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:11,color:"#4A5060"}}>{unit.length > 4 ? unit : "H21-T1-" + unit}</span>
@@ -1567,6 +1646,116 @@ function Buyer360({ btab, setBtab, goUnit }: { btab:string; setBtab:(v:any)=>voi
             </div>
           )}
         </div>
+
+        {btab === "profile" && (
+          <div style={{ background:"#fff", borderRadius:20, padding:"22px 24px", boxShadow:"0 1px 3px rgba(20,22,31,.04)" }}>
+            <div style={{ fontSize:13, fontWeight:700, letterSpacing:"-.015em", marginBottom:4 }}>Buyer profile</div>
+            <div style={{ fontSize:11.5, color:"#9AA0AE", fontWeight:500, marginBottom:14 }}>Identity, KYC and relationship details</div>
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"2px 32px" }}>
+              {profileRows.map(([k,v]) => (
+                <div key={k} style={{ display:"flex", justifyContent:"space-between", gap:16, padding:"10px 0", borderBottom:"1px solid #F6F7FA" }}>
+                  <span style={{ fontSize:11.5, color:"#9AA0AE", fontWeight:500 }}>{k}</span>
+                  <span style={{ fontSize:12, fontWeight:700, textAlign:"right", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{v}</span>
+                </div>
+              ))}
+            </div>
+            <div style={{ marginTop:16, background:"#F7F8FB", borderRadius:14, padding:"14px 16px", display:"flex", alignItems:"center", gap:12 }}>
+              <span style={{ flex:1, fontSize:12.5, fontWeight:700 }}>Buyer portal access</span>
+              {live ? (
+                <button onClick={() => setPortalOn(!portalOn)} style={{ height:32, borderRadius:10, border:0, cursor:"pointer", fontFamily:"inherit", fontSize:11.5, fontWeight:700, padding:"0 14px", background:portalOn ? "#E9F8F1" : "#F1F2F6", color:portalOn ? "#1F9D6B" : "#9AA0AE" }}>{portalOn ? "Enabled" : "Disabled"}</button>
+              ) : (
+                <span style={{ fontSize:11.5, fontWeight:700, color:"#9AA0AE" }}>Staging \u00b7 no portal seats</span>
+              )}
+            </div>
+          </div>
+        )}
+
+        {btab === "docs" && (
+          <div style={{ background:"#fff", borderRadius:20, padding:"22px 24px", boxShadow:"0 1px 3px rgba(20,22,31,.04)" }}>
+            <div style={{ display:"flex", alignItems:"baseline", gap:10, marginBottom:4 }}>
+              <span style={{ fontSize:13, fontWeight:700, letterSpacing:"-.015em" }}>Documents</span>
+              <span style={{ fontSize:11.5, color:"#9AA0AE", fontWeight:500 }}>{buyerDocs.length} on record</span>
+            </div>
+            <div style={{ fontSize:11.5, color:"#9AA0AE", fontWeight:500, marginBottom:14 }}>Generated, sent and uploaded files for this buyer</div>
+            <div style={{ border:"1px solid #EDEEF3", borderRadius:14, overflow:"hidden" }}>
+              <div style={{ display:"grid", gridTemplateColumns:"1.3fr 98px 1.4fr 100px 94px", gap:10, padding:"10px 16px", background:"#F7F8FB", fontSize:10, fontWeight:700, letterSpacing:".04em", color:"#9AA0AE", textTransform:"uppercase" }}>
+                <span>Document</span><span>Unit</span><span>Reference</span><span>Status</span><span>Date</span>
+              </div>
+              {buyerDocs.map((d, i) => (
+                <div key={i} style={{ display:"grid", gridTemplateColumns:"1.3fr 98px 1.4fr 100px 94px", gap:10, alignItems:"center", padding:"9px 16px", borderTop:"1px solid #F3F4F8" }}>
+                  <span style={{ fontSize:12, fontWeight:700 }}>{d.doc_type}</span>
+                  <span style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:11, color:"#6B7180" }}>{d.unit_no || "\u2014"}</span>
+                  <span style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:11, color:"#6B7180" }}>{d.ref}</span>
+                  <span style={pill(d.status, d.status === "sent")}>{d.status}</span>
+                  <span style={{ fontSize:11.5, color:"#6B7180", fontWeight:600 }}>{d.generated_at}</span>
+                </div>
+              ))}
+              {buyerDocs.length === 0 && <div style={{ padding:"18px 16px", textAlign:"center", fontSize:12.5, color:"#9AA0AE", fontWeight:600 }}>No documents on record yet</div>}
+            </div>
+            <label style={{ display:"inline-flex", alignItems:"center", gap:8, marginTop:14, height:36, borderRadius:11, border:"1px solid #EDEEF3", background:"#fff", padding:"0 14px", fontFamily:"inherit", fontSize:12, fontWeight:700, color:"#4A5060", cursor:"pointer" }}>
+              {"\u2191"} Upload document
+              <input type="file" style={{ display:"none" }} onChange={(e) => {
+                const f = e.target.files && e.target.files[0];
+                if (f) {
+                  setExtraDocs((d) => [...d, { doc_type: f.name, ref: "UPL-" + String(Date.now()).slice(-6) }]);
+                  setCommsNotice("Uploaded " + f.name + " to the buyer vault");
+                }
+                e.target.value = "";
+              }} />
+            </label>
+          </div>
+        )}
+
+        {btab === "comms" && (
+          <div style={{ background:"#fff", borderRadius:20, padding:"22px 24px", boxShadow:"0 1px 3px rgba(20,22,31,.04)" }}>
+            {commsNotice && <div style={{ background:"#E9F8F1", color:"#1F9D6B", borderRadius:12, padding:"10px 14px", fontSize:12, fontWeight:700, marginBottom:14 }}>{commsNotice}</div>}
+            <div style={{ fontSize:13, fontWeight:700, letterSpacing:"-.015em", marginBottom:4 }}>Communications</div>
+            <div style={{ fontSize:11.5, color:"#9AA0AE", fontWeight:500, marginBottom:14 }}>Compose a message to {buyerName} \u00b7 activity logs here after send</div>
+            <div style={{ display:"flex", gap:8, marginBottom:12 }}>
+              {["Email", "WhatsApp", "SMS"].map((c) => (
+                <button key={c} onClick={() => setChan(c)} style={{ height:30, border:0, borderRadius:9, padding:"0 13px", cursor:"pointer", fontFamily:"inherit", fontSize:11.5, fontWeight:700, background:chan === c ? "#F0EFFE" : "#F1F2F6", color:chan === c ? AC : "#6B7180" }}>{c}</button>
+              ))}
+            </div>
+            <input value={msgSubject} onChange={(e) => setMsgSubject(e.target.value)} placeholder={chan === "WhatsApp" || chan === "SMS" ? "Message preview" : "Subject"}
+              style={{ width:"100%", height:40, borderRadius:12, border:"1px solid #E4E6EE", background:"#fff", padding:"0 14px", fontSize:13, fontWeight:600, fontFamily:"inherit", outline:"none", boxSizing:"border-box", marginBottom:10 }} />
+            <textarea value={msgBody} onChange={(e) => setMsgBody(e.target.value)} rows={3} placeholder="Message body \u00b7 merge fields supported: {next_due_amount} {next_due_date} {unit}"
+              style={{ width:"100%", borderRadius:12, border:"1px solid #E4E6EE", background:"#fff", padding:"10px 14px", fontSize:13, fontWeight:600, fontFamily:"inherit", outline:"none", boxSizing:"border-box", resize:"vertical" }} />
+            <button onClick={() => {
+              if (!msgBody.trim()) { setCommsNotice("Add a message body before sending"); return; }
+              setCommsNotice("Queued " + chan + " to " + buyerName + " \u00b7 subject: " + (msgSubject || "(none)") + " \u00b7 staging outbound");
+              setMsgSubject(""); setMsgBody("");
+            }} style={{ marginTop:12, height:38, borderRadius:12, background:AC, color:"#fff", border:0, padding:"0 18px", fontFamily:"inherit", fontSize:12.5, fontWeight:700, cursor:"pointer" }}>Send {chan}</button>
+            <div style={{ marginTop:20 }}>
+              <div style={{ fontSize:10.5, fontWeight:700, letterSpacing:".05em", color:"#9AA0AE", textTransform:"uppercase", marginBottom:8 }}>Outbound log</div>
+              {commsLog.map((c, i) => (
+                <div key={i} style={{ display:"flex", gap:11, padding:"9px 0", borderBottom:"1px solid #F6F7FA", alignItems:"flex-start" }}>
+                  <span style={{ width:8, height:8, flex:"none", borderRadius:4, background:c.sent ? "#34C08A" : "#E2A33C", marginTop:5 }} />
+                  <span style={{ flex:1, minWidth:0 }}>
+                    <span style={{ display:"block", fontSize:12, fontWeight:700 }}>{c.subj}</span>
+                    <span style={{ display:"block", fontSize:10.5, color:"#9AA0AE", fontWeight:500, marginTop:2 }}>{c.when} \u00b7 {c.chan}{c.sent ? "" : " \u00b7 queued"}</span>
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {btab === "activity" && (
+          <div style={{ background:"#fff", borderRadius:20, padding:"22px 24px", boxShadow:"0 1px 3px rgba(20,22,31,.04)" }}>
+            <div style={{ fontSize:13, fontWeight:700, letterSpacing:"-.015em", marginBottom:14 }}>Activity</div>
+            {act.map((a, i) => (
+              <div key={i} style={{ display:"flex", gap:12, padding:"11px 0", borderBottom:"1px solid #F6F7FA", alignItems:"flex-start" }}>
+                <span style={{ width:9, height:9, flex:"none", borderRadius:5, background:a.color, marginTop:4 }} />
+                <span style={{ flex:1, minWidth:0 }}>
+                  <span style={{ display:"block", fontSize:12.5, fontWeight:700 }}>{a.text}</span>
+                  <span style={{ display:"block", fontSize:11, color:"#9AA0AE", fontWeight:500, marginTop:2 }}>{a.meta}</span>
+                </span>
+                <span style={{ fontSize:10.5, color:"#9AA0AE", fontWeight:600, whiteSpace:"nowrap" }}>{a.when}</span>
+              </div>
+            ))}
+            {act.length === 0 && <div style={{ padding:"18px 0", textAlign:"center", fontSize:12.5, color:"#9AA0AE", fontWeight:600 }}>No activity on record yet</div>}
+          </div>
+        )}
 
         {/* sidebar */}
         <div style={{display:"flex",flexDirection:"column",gap:16}}>
