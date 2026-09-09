@@ -2,37 +2,6 @@ import { useEffect, useState } from "react";
 import { AC } from "../../lib/format";
 import { fetchJSON } from "../../lib/api";
 
-const FC: Record<string, [string, number][]> = {
-  "7": [["Mon", 8.4], ["Tue", 12.1], ["Wed", 6.2], ["Thu", 14.8], ["Fri", 3.1], ["Sat", 1.2], ["Sun", 0.6]],
-  "30": [["W1", 21.4], ["W2", 34.8], ["W3", 18.2], ["W4", 26.6]],
-  "90": [["Mar", 96.4], ["Apr", 74.1], ["May", 112.8]],
-  "180": [["Mar", 96.4], ["Apr", 74.1], ["May", 112.8], ["Jun", 88.2], ["Jul", 141.6], ["Aug", 67.4]],
-};
-
-const CF_LADDER: [string, string, number][] = [
-  ["Opening escrow balance", "AED 188.4M", 0],
-  ["Expected collections", "+ AED 101.0M", 1],
-  ["Confidence adjustment", "\u2212 AED 8.7M", 2],
-  ["Drawdown requests approved", "\u2212 AED 62.4M", 2],
-  ["Refunds and cancellations", "\u2212 AED 3.1M", 2],
-  ["Projected closing balance", "AED 215.2M", 0],
-];
-
-const CF_SPLIT: [string, number, string][] = [
-  ["Date-driven instalments", 46, AC],
-  ["Construction-milestone", 41, "#8B7CF6"],
-  ["Handover payments", 13, "#B9B4FA"],
-];
-
-const CF_ROWS: [string, string, string, string, string][] = [
-  ["Sep 26", "AED 101.0M", "AED 62.4M", "AED 38.6M", "AED 227.0M"],
-  ["Oct 26", "AED 74.1M", "AED 0", "AED 74.1M", "AED 301.1M"],
-  ["Nov 26", "AED 112.8M", "AED 48.0M", "AED 64.8M", "AED 365.9M"],
-  ["Dec 26", "AED 88.2M", "AED 0", "AED 88.2M", "AED 454.1M"],
-  ["Jan 27", "AED 141.6M", "AED 92.0M", "AED 49.6M", "AED 503.7M"],
-  ["Feb 27", "AED 67.4M", "AED 0", "AED 67.4M", "AED 571.1M"],
-];
-
 export default function CashflowScreen() {
   const [fc, setFc] = useState("30");
   const [live, setLive] = useState<{ buckets: Record<string, [string, number][]>; window: { d30: number; d180: number }; ladder: [string, number, number][]; split: [string, number, string][]; rows: [string, number, number, number, number][] } | null>(null);
@@ -46,15 +15,15 @@ export default function CashflowScreen() {
     return () => { active = false; };
   }, []);
 
-  const LADDER = live ? live.ladder : CF_LADDER;
-  const SPLIT: [string, number, string][] = live ? live.split.filter((s) => s[1] > 0.5) : CF_SPLIT;
-  const MONTHLY: { [k: number]: string }[] = (live ? live.rows : CF_ROWS) as unknown as { [k: number]: string }[];
+  const LADDER = live ? live.ladder : [];
+  const SPLIT: [string, number, string][] = live ? live.split.filter((s) => s[1] > 0.5) : [];
+  const MONTHLY: { [k: number]: string }[] = live ? (live.rows as unknown as { [k: number]: string }[]) : [];
   const mfmt = (n: number | string) => typeof n === "string" ? n : "AED " + n.toFixed(1) + "M";
   const barRow = (x: { [k: number]: string }) => {
     return { m: x[0], inflow: mfmt(x[1]), draw: mfmt(x[2]), net: mfmt(x[3]), close: mfmt(x[4]) };
   };
 
-  const bars = live ? (live.buckets[fc] || []) : FC[fc];
+  const bars = live ? (live.buckets[fc] || []) : [];
   const mx = Math.max(1, ...bars.map((b) => b[1]));
   const total = bars.reduce((a, b) => a + b[1], 0);
 
@@ -62,7 +31,7 @@ export default function CashflowScreen() {
     <div>
       {apiError && (
         <div style={{ background: "#FDECEC", color: "#E5484D", borderRadius: 12, padding: "11px 16px", fontSize: 12, fontWeight: 700, marginBottom: 16 }}>
-          Live data unavailable ({apiError}) — showing sample forecast
+          Live data unavailable ({apiError}) — cashflow charts are empty until data loads
         </div>
       )}
       <div style={{ display: "flex", alignItems: "flex-end", gap: 16, marginBottom: 18 }}>

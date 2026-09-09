@@ -10,23 +10,7 @@ const DEED_PILL: Record<string, { bg: string; color: string }> = { Issued: { bg:
 const KEYS_PILL: Record<string, { bg: string; color: string }> = { Released: { bg: "#E4F6F6", color: "#0B8A8A" }, Held: { bg: "#F1F2F6", color: "#6B7180" } };
 const OA_PILL: Record<string, { bg: string; color: string }> = { Registered: { bg: "#E9F8F1", color: "#1F9D6B" }, Pending: { bg: "#F1F2F6", color: "#6B7180" } };
 
-const ROWS: DeedRow[] = [
-  { unit: "WPK-T1-0402", buyer: "Nadia Khoury", oqood: "OQD-3312", dld: "AED 118,000", deed: "Issued", issued: "04 Aug 26", keys: "Released", oa: "Registered" },
-  { unit: "WPK-T1-0405", buyer: "Mariam Haddad", oqood: "OQD-3318", dld: "AED 124,400", deed: "Issued", issued: "08 Aug 26", keys: "Released", oa: "Registered" },
-  { unit: "WPK-T1-0607", buyer: "Omar Al Suwaidi", oqood: "OQD-3341", dld: "AED 96,800", deed: "Applied", issued: "\u2014", keys: "Held", oa: "Pending" },
-  { unit: "WPK-T1-0703", buyer: "Elena Petrova", oqood: "OQD-3350", dld: "AED 142,000", deed: "Issued", issued: "18 Aug 26", keys: "Released", oa: "Registered" },
-  { unit: "WPK-T1-0801", buyer: "Fatima Al Hashimi", oqood: "OQD-3362", dld: "AED 88,400", deed: "Issued", issued: "22 Aug 26", keys: "Released", oa: "Pending" },
-  { unit: "WPK-T1-0210", buyer: "Vikram Shetty", oqood: "OQD-3370", dld: "AED 104,200", deed: "Blocked", issued: "\u2014", keys: "Held", oa: "Pending" },
-];
-
-const MOLLAK: [string, string][] = [
-  ["Service charge rate", "AED 16.40 / sq.ft"],
-  ["Annual charge \u00b7 1,180 sq.ft", "AED 19,352"],
-  ["OA registration", "Mollak \u00b7 registered 12 Jul 2026"],
-  ["First invoice", "01 Oct 2026"],
-  ["Warranty \u00b7 general", "1 year to 04 Aug 2027"],
-  ["Warranty \u00b7 structural", "10 years to 04 Aug 2036"],
-];
+const MOLLAK: [string, string][] = [];
 
 const pill = (v: string, map: Record<string, { bg: string; color: string }>) => {
   const s = map[v] || { bg: "#F1F2F6", color: "#6B7180" };
@@ -36,8 +20,8 @@ const pill = (v: string, map: Record<string, { bg: string; color: string }>) => 
 export default function DeedsScreen() {
   const [notice, setNotice] = useState("");
   const [certOpen, setCertOpen] = useState(false);
-  const [certUnit, setCertUnit] = useState("WPK-T1-0402");
-  const [rows, setRows] = useState<DeedRow[]>(ROWS);
+  const [certUnit, setCertUnit] = useState("");
+  const [rows, setRows] = useState<DeedRow[]>([]);
   const [apiError, setApiError] = useState("");
   const [loaded, setLoaded] = useState(false);
 
@@ -73,6 +57,7 @@ export default function DeedsScreen() {
   };
 
   const doIssue = () => {
+    if (!rows.length) return;
     const row = rows.find((r) => r.unit === certUnit) || rows[0];
     exportHandoverCert(row.unit, row.buyer, row.oqood, row.dld);
     setCertOpen(false);
@@ -91,7 +76,7 @@ export default function DeedsScreen() {
     <div>
       {apiError && (
         <div style={{ background: "#FDECEC", color: "#E5484D", borderRadius: 12, padding: "11px 16px", fontSize: 12, fontWeight: 700, marginBottom: 16 }}>
-          Live data unavailable ({apiError}) — showing sample rows
+          Live data unavailable ({apiError}) — rows stay empty until data loads
         </div>
       )}
       {notice && <div style={{ background: "#E9F8F1", color: "#1F9D6B", borderRadius: 12, padding: "11px 16px", fontSize: 12, fontWeight: 700, marginBottom: 16 }}>{notice}</div>}
@@ -127,19 +112,23 @@ export default function DeedsScreen() {
           <div style={{ background: "#fff", borderRadius: 20, padding: "22px 24px", boxShadow: "0 1px 3px rgba(20,22,31,.04)" }}>
             <div style={{ fontSize: 15, fontWeight: 700, letterSpacing: "-.015em" }}>Service charge &amp; warranty</div>
             <div style={{ marginTop: 12 }}>
-              {MOLLAK.map(([k, v]) => (
-                <div key={k} style={{ display: "flex", justifyContent: "space-between", gap: 12, padding: "9px 0", borderBottom: "1px solid #F6F7FA" }}>
-                  <span style={{ fontSize: 11.5, color: "#6B7180", fontWeight: 600 }}>{k}</span>
-                  <span style={{ fontSize: 11.5, fontWeight: 700, textAlign: "right", color: "#14161F" }}>{v}</span>
-                </div>
-              ))}
+              {MOLLAK.length ? (
+                MOLLAK.map(([k, v]) => (
+                  <div key={k} style={{ display: "flex", justifyContent: "space-between", gap: 12, padding: "9px 0", borderBottom: "1px solid #F6F7FA" }}>
+                    <span style={{ fontSize: 11.5, color: "#6B7180", fontWeight: 600 }}>{k}</span>
+                    <span style={{ fontSize: 11.5, fontWeight: 700, textAlign: "right", color: "#14161F" }}>{v}</span>
+                  </div>
+                ))
+              ) : (
+                <div style={{ fontSize: 12, fontWeight: 600, color: "#9AA0AE", padding: "4px 0" }}>Service charge details appear once units reach handover.</div>
+              )}
             </div>
           </div>
 
           <div style={{ background: "#E4F6F6", borderRadius: 20, padding: "18px 20px" }}>
             <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".06em", color: "#0B8A8A", textTransform: "uppercase" }}>Handover completion</div>
-            <div style={{ fontSize: 30, fontWeight: 800, letterSpacing: "-.04em", color: "#0B8A8A", marginTop: 10 }}>96 of 140</div>
-            <div style={{ fontSize: 12, color: "#0B8A8A", fontWeight: 600, marginTop: 5, lineHeight: 1.5 }}>Keys released. 4 units blocked, 40 in progress across the pipeline.</div>
+            <div style={{ fontSize: 30, fontWeight: 800, letterSpacing: "-.04em", color: "#0B8A8A", marginTop: 10 }}>{rows.length ? (rows.filter((r) => r.keys === "Released").length) + " of " + rows.length : "\u2014"}</div>
+            <div style={{ fontSize: 12, color: "#0B8A8A", fontWeight: 600, marginTop: 5, lineHeight: 1.5 }}>{rows.length ? (rows.filter((r) => r.keys === "Released").length + " keys released \u00b7 " + rows.filter((r) => r.deed === "Blocked").length + " blocked \u00b7 computed from the live deed register.") : "Computed live once deeds load."}</div>
           </div>
         </div>
       </div>
@@ -159,7 +148,7 @@ export default function DeedsScreen() {
                 </div>
               </div>
               <div style={{ background: "#FAFBFD", borderRadius: 12, padding: "12px 14px", fontSize: 11.5, color: "#4A5060", fontWeight: 600, lineHeight: 1.6 }}>
-                {(rows.find((r) => r.unit === certUnit) || rows[0]).buyer}
+                {rows.length ? (rows.find((r) => r.unit === certUnit) || rows[0]).buyer : "No units loaded yet"}
               </div>
             </div>
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 22 }}>

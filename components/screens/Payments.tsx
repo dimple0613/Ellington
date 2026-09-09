@@ -111,14 +111,6 @@ export default function PaymentsScreen({ buyer }: { buyer?: string }) {
     return () => { active = false; };
   }, []);
 
-  const KPI_FALLBACK: { label: string; value: string; note: string; bad?: boolean }[] = [
-    { label: "Collected today", value: "AED 4.24M", note: "9 receipts issued" },
-    { label: "Collected MTD", value: "AED 61.2M", note: "+4.2% vs last month" },
-    { label: "Cheques pending", value: "AED 12.8M", note: "18 PDCs held" },
-    { label: "Unreconciled", value: "AED 340k", note: "12 items · escrow", bad: true },
-    { label: "Bounced this month", value: "2", note: "AED 512k · fees raised", bad: true },
-  ];
-
   const liveKpis = useMemo(() => {
     if (!rawReceipts.length) return null;
     const today = new Date();
@@ -148,29 +140,7 @@ export default function PaymentsScreen({ buyer }: { buyer?: string }) {
     ];
   }, [rawReceipts]);
 
-  const kpiList = liveKpis || KPI_FALLBACK;
-
-  const payRows: ReceiptRow[] = [
-    ["RCP-H21-004712", "24 Aug 26", "Rajesh Menon", "H21-T1-3302", "367,875", "Bank transfer", "ESC-2026-9014", "Matched"],
-    ["RCP-H21-004711", "24 Aug 26", "Aisha Al Marri", "H21-T1-2801", "512,000", "Bank transfer", "ESC-2026-9013", "Matched"],
-    ["RCP-H21-004710", "23 Aug 26", "Daniel Whitfield", "H21-T1-1905", "842,500", "Cheque", "ESC-2026-9008", "Matched"],
-    ["RCP-H21-004709", "23 Aug 26", "Elena Petrova", "H21-T1-4102", "1,204,000", "Bank transfer", "—", "Unmatched"],
-    ["RCP-H21-004708", "22 Aug 26", "Omar Al Suwaidi", "H21-T1-3601", "298,400", "Card", "ESC-2026-8997", "Matched"],
-    ["RCP-H21-004707", "22 Aug 26", "Grace Okonkwo", "H21-T1-1103", "186,250", "Bank transfer", "ESC-2026-8994", "Matched"],
-    ["RCP-H21-004706", "21 Aug 26", "Marcus Lindqvist", "H21-T1-2404", "640,000", "Cheque", "—", "Unmatched"],
-    ["RCP-H21-004705", "21 Aug 26", "Fatima Al Hashimi", "H21-T1-3005", "415,750", "Bank transfer", "ESC-2026-8988", "Matched"],
-    ["RCP-H21-004704", "20 Aug 26", "Wei Chen", "H21-T1-1602", "722,000", "Bank transfer", "ESC-2026-8981", "Matched"],
-    ["RCP-H21-004703", "20 Aug 26", "Priya Nair", "H21-T1-0904", "234,500", "Card", "ESC-2026-8979", "Matched"],
-  ].map((r): ReceiptRow => ({ rcp: r[0], date: r[1], buyer: r[2], unit: r[3], amount: r[4], method: r[5], esc: r[6], recon: r[7] as ReceiptRow["recon"], isCheque: r[5] === "Cheque", chequeNo: "", chequeDate: "", bank: "", pdc: "" }));
-
-  const fallbackPdc: PdcRow[] = [
-    ["CHQ-884102", "01 Sep 26", "Daniel Whitfield", "H21-T1-1905", "842,500", "Emirates NBD", "Held"],
-    ["CHQ-884118", "05 Sep 26", "Marcus Lindqvist", "H21-T1-2404", "640,000", "ADCB", "Held"],
-    ["CHQ-884120", "14 Sep 26", "Sunil Rathore", "H21-T1-3703", "415,000", "Mashreq", "Presented"],
-    ["CHQ-883991", "18 Aug 26", "Nadia Khoury", "H21-T1-2202", "312,000", "ADIB", "Cleared"],
-    ["CHQ-883964", "12 Aug 26", "Wei Chen", "H21-T1-1602", "268,000", "HSBC", "Bounced"],
-    ["CHQ-884131", "22 Sep 26", "Priya Nair", "H21-T1-0904", "234,500", "Emirates NBD", "Held"],
-  ].map((r): PdcRow => ({ no: r[0], date: r[1], buyer: r[2], unit: r[3], amount: r[4], bank: r[5], status: r[6] }));
+  const kpiList = liveKpis || [];
 
   const livePdc: PdcRow[] = [...dbRows, ...extraRows]
     .filter((r) => r.isCheque)
@@ -184,7 +154,7 @@ export default function PaymentsScreen({ buyer }: { buyer?: string }) {
       status: r.pdc || "Held",
     }));
 
-  const pdcList = livePdc.length ? livePdc : fallbackPdc;
+  const pdcList = livePdc;
 
   const pillStyle = (m: string): React.CSSProperties => {
     let bg: string, col: string;
@@ -196,39 +166,44 @@ export default function PaymentsScreen({ buyer }: { buyer?: string }) {
     return { display: "block", fontSize: 10, fontWeight: 700, borderRadius: 7, padding: "3px 8px", textAlign: "center", background: bg, color: col };
   };
 
-  const record = () => {
+  const record = async () => {
     const amt = parseFloat(formAmount) || 0;
     if (!formBuyer || !amt) return;
     const row: ReceiptRow = {
-      rcp: "RCP-H21-" + String(4790 + extraRows.length).padStart(6, "0"),
+      rcp: "RCP-…",
       date: new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "2-digit" }),
       buyer: formBuyer,
-      unit: "H21-T1-1204",
+      unit: "—",
       amount: amt.toLocaleString("en-US"),
       method: formMethod,
-      esc: "ESC-2026-" + (9014 + extraRows.length),
-      recon: "Matched",
+      esc: "—",
+      recon: "Unmatched",
       isCheque: formMethod === "Cheque",
-      chequeNo: formMethod === "Cheque" ? "CHQ-" + (884200 + extraRows.length) : "",
-      chequeDate: formMethod === "Cheque" ? new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "2-digit" }) : "",
-      bank: formMethod === "Cheque" ? "—" : "",
-      pdc: formMethod === "Cheque" ? "Held" : "",
+      chequeNo: "",
+      chequeDate: "",
+      bank: "",
+      pdc: "",
     };
     setExtraRows((r) => [row, ...r]);
     setSaved(true);
     setShowForm(false);
     setTimeout(() => setSaved(false), 4000);
-    fetch("/api/receipts", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        project_code: (row.unit || "BLG").split("-")[0] || "BLG",
-        buyer_name: formBuyer,
-        amount: amt,
-        method: formMethod.toLowerCase().replace(" ", "_"),
-        ...(formMethod === "Cheque" ? { cheque_no: row.chequeNo, bank_name: "—", pdc_status: "Held" } : {}),
-      }),
-    }).catch(() => {});
+    try {
+      await fetchJSON<{ ok?: boolean }>("/api/receipts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          project_code: "BLG",
+          buyer_name: formBuyer,
+          amount: amt,
+          method: formMethod.toLowerCase().replace(" ", "_"),
+          ...(formMethod === "Cheque" ? { bank_name: "—", pdc_status: "Held" } : {}),
+        }),
+      });
+      loadReceipts();
+    } catch {
+      /* keep local preview row */
+    }
   };
 
   const setPdcStatus = (r: PdcRow, status: string) => {
@@ -286,7 +261,7 @@ export default function PaymentsScreen({ buyer }: { buyer?: string }) {
     <div>
       {apiError && (
         <div style={{ background: "#FDECEC", color: "#E5484D", borderRadius: 12, padding: "11px 16px", fontSize: 12, fontWeight: 700, marginBottom: 16 }}>
-          Live data unavailable ({apiError}) — showing sample rows
+          Live data unavailable ({apiError}) — payments are empty until data loads
         </div>
       )}
       {buyer && (
@@ -296,7 +271,7 @@ export default function PaymentsScreen({ buyer }: { buyer?: string }) {
       )}
       {saved && (
         <div style={{ background: "#E9F8F1", color: "#1F9D6B", borderRadius: 12, padding: "11px 16px", fontSize: 12, fontWeight: 700, marginBottom: 16 }}>
-          Payment recorded · {formBuyer} · AED {parseFloat(formAmount).toLocaleString("en-US")} · {formMethod} · receipt issued · escrow matched
+          Payment recorded · {formBuyer} · AED {parseFloat(formAmount).toLocaleString("en-US")} · {formMethod} · receipt issued
         </div>
       )}
       {imported && (
@@ -334,7 +309,7 @@ export default function PaymentsScreen({ buyer }: { buyer?: string }) {
             <div style={{ display: "grid", gridTemplateColumns: "118px 86px 1.1fr 92px 96px 96px 104px 88px", gap: 8, padding: "14px 22px", fontSize: 9.5, fontWeight: 700, letterSpacing: ".07em", color: "#9AA0AE", textTransform: "uppercase", background: "#FAFBFD", borderBottom: "1px solid #EDEEF3" }}>
               <span>Receipt</span><span>Date</span><span>Buyer</span><span>Unit</span><span style={{ textAlign: "right" }}>Amount</span><span>Method</span><span>Escrow ref</span><span>Recon</span>
             </div>
-            {[...dbRows, ...extraRows, ...payRows].map((r, i) => (
+            {[...dbRows, ...extraRows].map((r, i) => (
               <div key={i} style={{ display: "grid", gridTemplateColumns: "118px 86px 1.1fr 92px 96px 96px 104px 88px", gap: 8, alignItems: "center", padding: "0 22px", height: 40, borderBottom: "1px solid #F6F7FA" }}>
                 <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, fontWeight: 600 }}>{r.rcp}</span>
                 <span style={{ fontSize: 11.5, color: "#6B7180", fontWeight: 600 }}>{r.date}</span>

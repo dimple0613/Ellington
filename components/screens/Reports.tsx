@@ -8,12 +8,7 @@ const GROUPS: [string, string[]][] = [
   ["Project", ["Construction progress", "Milestone variance", "Handover readiness", "Snagging summary"]],
 ];
 
-const SCHEDULED = [
-  ["Portfolio summary", "K. Al Fahim, board@", "Weekly · Mon 08:00", "PDF board pack", "31 Aug 2026"],
-  ["Ageing analysis", "Finance team", "Weekly · Fri 17:00", "XLSX", "28 Aug 2026"],
-  ["Oqood pending", "Legal", "Daily · 09:00", "CSV", "26 Aug 2026"],
-  ["Broker performance", "Sales director", "Monthly · 1st", "PDF", "01 Sep 2026"],
-];
+const SCHEDULED: [string, string, string, string, string][] = [];
 
 const ALL_REPORTS = GROUPS.flatMap((g) => g[1]);
 
@@ -112,7 +107,7 @@ export default function ReportsScreen() {
         label: g[0],
         items: g[1].map((n, i) => ({
           name: n,
-          last: i % 3 === 0 ? "Run 2 days ago" : i % 3 === 1 ? "Run yesterday" : "Never run",
+          last: "Live export ready",
           star: i < 2 ? "#E2A33C" : "#DDE0E8",
         })),
       })),
@@ -194,7 +189,7 @@ export default function ReportsScreen() {
           <div style={{ fontSize: 13, color: "#6B7180", fontWeight: 500, marginTop: 5 }}>27 standard reports · XLSX, CSV, branded PDF, board pack</div>
         </div>
         <button onClick={() => { setErr(""); setOpen(true); }} style={{ height: 38, borderRadius: 12, border: "1px solid #EDEEF3", background: "#fff", padding: "0 14px", fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, color: "#4A5060", cursor: "pointer" }}>Custom report builder</button>
-        <button onClick={() => pdfFor("Board pack", "Board pack", "Generated 25 Aug 2026 · All projects")} style={{ height: 38, borderRadius: 12, background: "#14161F", color: "#fff", border: 0, padding: "0 16px", fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}>Assemble board pack</button>
+        <button onClick={() => pdfFor("Board pack", "Board pack", "Generated " + new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) + " · All projects")} style={{ height: 38, borderRadius: 12, background: "#14161F", color: "#fff", border: 0, padding: "0 16px", fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}>Assemble board pack</button>
       </div>
 
       {groups.map((g) => (
@@ -223,15 +218,19 @@ export default function ReportsScreen() {
         <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1.2fr 1fr 140px 110px", gap: 12, padding: "14px 24px", fontSize: 9.5, fontWeight: 700, letterSpacing: ".07em", color: "#9AA0AE", textTransform: "uppercase", borderBottom: "1px solid #EDEEF3" }}>
           <span>Report</span><span>Recipients</span><span>Frequency</span><span>Format</span><span>Next run</span>
         </div>
-        {sched.map((r) => (
-          <div key={r[0] + r[4]} style={{ display: "grid", gridTemplateColumns: "1.2fr 1.2fr 1fr 140px 110px", gap: 12, alignItems: "center", padding: "0 24px", height: 44, borderBottom: "1px solid #F6F7FA" }}>
-            <span style={{ fontSize: 12, fontWeight: 700 }}>{r[0]}</span>
-            <span style={{ fontSize: 11.5, color: "#6B7180", fontWeight: 600 }}>{r[1]}</span>
-            <span style={{ fontSize: 11.5, color: "#6B7180", fontWeight: 600 }}>{r[2]}</span>
-            <span style={{ fontSize: 11.5, color: "#6B7180", fontWeight: 600 }}>{r[3]}</span>
-            <span style={{ fontSize: 11.5, fontWeight: 700 }}>{r[4]}</span>
-          </div>
-        ))}
+        {sched.length ? (
+          sched.map((r) => (
+            <div key={r[0] + r[4]} style={{ display: "grid", gridTemplateColumns: "1.2fr 1.2fr 1fr 140px 110px", gap: 12, alignItems: "center", padding: "0 24px", height: 44, borderBottom: "1px solid #F6F7FA" }}>
+              <span style={{ fontSize: 12, fontWeight: 700 }}>{r[0]}</span>
+              <span style={{ fontSize: 11.5, color: "#6B7180", fontWeight: 600 }}>{r[1]}</span>
+              <span style={{ fontSize: 11.5, color: "#6B7180", fontWeight: 600 }}>{r[2]}</span>
+              <span style={{ fontSize: 11.5, color: "#6B7180", fontWeight: 600 }}>{r[3]}</span>
+              <span style={{ fontSize: 11.5, fontWeight: 700 }}>{r[4]}</span>
+            </div>
+          ))
+        ) : (
+          <div style={{ padding: "24px", fontSize: 12, fontWeight: 600, color: "#9AA0AE" }}>No scheduled deliveries yet — create one to auto-deliver reports.</div>
+        )}
       </div>
 
       {schedOpen && (

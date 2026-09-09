@@ -13,20 +13,6 @@ const fmtTs = (iso: string): string => {
 };
 
 type Row = { ts: string; raw: string; actor: string; role: string; action: string; object: string; field: string; before: string; after: string; sens?: boolean };
-const ROWS: Row[] = [
-  { ts: "03 Sep, 09:14", raw: "2026-09-03T09:14:00Z", actor: "Khalid Al Fahim", role: "CEO", action: "Approved", object: "BLG III \u00b7 Discount request", field: "Discount %", before: "\u2014", after: "5%" },
-  { ts: "03 Sep, 08:47", raw: "2026-09-03T08:47:00Z", actor: "Sarah Mitchell", role: "Sales Dir", action: "Created", object: "BLG III \u00b7 Lead", field: "\u2014", before: "\u2014", after: "Rajesh Menon" },
-  { ts: "02 Sep, 17:33", raw: "2026-09-02T17:33:00Z", actor: "Ravi Kumar", role: "Finance Mgr", action: "Updated", object: "H21 \u00b7 Receipt RCP-H21-004789", field: "Status", before: "Unmatched", after: "Matched" },
-  { ts: "02 Sep, 16:10", raw: "2026-09-02T16:10:00Z", actor: "Ravi Kumar", role: "Finance Mgr", action: "Created", object: "DDR-0004", field: "\u2014", before: "\u2014", after: "Structure 60%" },
-  { ts: "02 Sep, 14:52", raw: "2026-09-02T14:52:00Z", actor: "Khalid Al Fahim", role: "CEO", action: "Approved", object: "WPK \u00b7 Phase 2 release", field: "\u2014", before: "\u2014", after: "12 units" },
-  { ts: "01 Sep, 11:08", raw: "2026-09-01T11:08:00Z", actor: "Sarah Mitchell", role: "Sales Dir", action: "Updated", object: "BLG III \u00b7 Price list", field: "Price/psf", before: "AED 2,140", after: "AED 2,200", sens: true },
-  { ts: "01 Sep, 10:41", raw: "2026-09-01T10:41:00Z", actor: "Omar Saeed", role: "Project Mgr", action: "Created", object: "BLG III \u00b7 Snag SNG-0412", field: "\u2014", before: "\u2014", after: "Paint crack" },
-  { ts: "31 Aug, 16:22", raw: "2026-08-31T16:22:00Z", actor: "Ravi Kumar", role: "Finance Mgr", action: "Exported", object: "Finance \u00b7 Statement", field: "\u2014", before: "\u2014", after: "47 rows CSV", sens: true },
-  { ts: "31 Aug, 14:05", raw: "2026-08-31T14:05:00Z", actor: "Khalid Al Fahim", role: "CEO", action: "Updated", object: "System \u00b7 User", field: "Status", before: "Active", after: "Suspended", sens: true },
-  { ts: "30 Aug, 09:58", raw: "2026-08-30T09:58:00Z", actor: "Sarah Mitchell", role: "Sales Dir", action: "Created", object: "BLG III \u00b7 Booking BK-9042", field: "\u2014", before: "\u2014", after: "Unit 0402" },
-  { ts: "29 Aug, 15:30", raw: "2026-08-29T15:30:00Z", actor: "Ravi Kumar", role: "Finance Mgr", action: "Updated", object: "Escrow \u00b7 Reconciliation", field: "Variance", before: "AED 14,200", after: "AED 0" },
-  { ts: "28 Aug, 11:15", raw: "2026-08-28T11:15:00Z", actor: "Omar Saeed", role: "Project Mgr", action: "Updated", object: "WPK \u00b7 Milestone", field: "Status", before: "Pending", after: "Certified" },
-];
 
 const PROJECT = (o: string): string => {
   if (o.startsWith("BLG III")) return "BLG III";
@@ -52,7 +38,7 @@ export default function AuditLogScreen() {
   const [action, setAction] = useState("All");
   const [expanded, setExpanded] = useState<number | null>(null);
   const [notice, setNotice] = useState("");
-  const [rows, setRows] = useState<Row[]>(ROWS);
+  const [rows, setRows] = useState<Row[]>([]);
   const [apiError, setApiError] = useState("");
 
   useEffect(() => {
@@ -120,7 +106,7 @@ export default function AuditLogScreen() {
     <div>
       {apiError && (
         <div style={{ background: "#FDECEC", color: "#E5484D", borderRadius: 12, padding: "11px 16px", fontSize: 12, fontWeight: 700, marginBottom: 16 }}>
-          Live data unavailable ({apiError}) — showing sample rows
+          Live data unavailable ({apiError}) — audit trail stays empty until data loads
         </div>
       )}
       {notice && <div style={{ background: "#E9F8F1", color: "#1F9D6B", borderRadius: 12, padding: "11px 16px", fontSize: 12, fontWeight: 700, marginBottom: 16 }}>{notice}</div>}

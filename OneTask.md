@@ -6,15 +6,31 @@
 ## Push (current branch + what to push)
 > Branch-per-task rule (see AGENTS.md): never push directly to main. Update this section per task.
 
-- Current branch: `feat/audit-halfdone-completion` (complete amber "Half-finished" audit items). Push target: this branch only.
-- PUSH THIS:
-  - **`c4fa370`** "feat(audit): buyer + broker portals (external, invite/enable from Sales)" (11 files: lib/portal.ts, lib/session.ts, lib/mail.ts, pages/api/portal/{buyer,broker}.ts, pages/portal/{buyer,broker}.tsx, components/portal/{PortalChrome,BuyerPortalInvite,BrokerPortalEnable}.tsx, components/screens/Sales.tsx).
-  - **`d2abe81`** "feat(audit): new project wizard + bulk unit builder + pricing manager" (11 files: components/app/ProjectWizard.tsx, components/screens/{Projects,UnitBuilder,Pricing}.tsx, components/Shell.tsx, pages/api/{projects,unit-builder,pricing}.ts, pages/project.tsx, lib/screens.ts, db/schema.sql).
-  - Prior **`0c36607`** (amber items: Reports/notif/approvals/mobile/tokens) already recorded; all on this branch.
-- Lint (`npx tsc --noEmit`) + `next build` green (build run with dev server stopped, then restarted). Smoke-tested live: unit-builder generate (inserted 4), pricing preview→submit→approve (6 units, revision applied), buyer portal login + data (units/schedule/docs), broker login + reserve (reservation created). Demo portal logins seeded in dev DB: `buyer@example.com` / `broker@example.com`, password `Portal123!`.
-- Audit HTML updated: `C:\Users\admin\Downloads\New folder\ELLINGTON-AUDIT-REPORT.html` — **all 5 remaining MISSING cards flipped to DONE** (New Project wizard, Unit Builder, Pricing &amp; availability manager, Buyer portal, Broker portal); only 24 DONE cards remain (release-phases + compliance checkboxes also ticked).
-- Everything intended for this task is on this branch — NO commit on `main` from this program.
-- Prior `fix/plinth-parity` and `fix/parity-live-data` commits (T1–T18, D1–D6) are historical and NOT completion evidence for this task.
+- Current branch: **`refactor/purge-static-data`** (made from `feat/audit-halfdone-completion`). Push target: this branch only.
+- PUSH THIS (next commit, purge batch 1):
+  - **All UI screen static/mock row purges** (14 screens): `components/screens/{AuditLog,Cashflow,Collections,Construction,Deeds,Escrow,Financials,Invoices,Payments,Pipeline,Reports,Sales,Snagging,Users}.tsx`.
+- NOT in commit (never): `docs/ARCHITECTURE.md`, `auto-push.ps1`, `test-*.mjs`, `dev.log`.
+- Status: `npm run lint` (tsc --noEmit) **green**; `next build` **green** (dev server stopped during build, restarted, up on :3000).
+- Prior task `feat/audit-halfdone-completion` (portals/unit-builder/pricing) is fully shipped on its own branch — historical, NOT in this commit. Demo portal logins: `buyer@example.com` / `broker@example.com`, `Portal123!`.
+
+## Static data purge (purge-static-data)
+> Goal: remove ALL UI mock/fallback rows so the operator can test every screen manually against the live DB.
+> Rule applied: purge mock/fallback ROWS; KEEP option/config lists (status pills, enums, STAGE config,
+> GROUPS report catalog, Settings defaults, Inventory VIEWS/CHIPS, Pricing option lists), empty-array
+> fallbacks, and `pages/api/report-export.ts` FALLBACK (SQL config map). `db/seed.ts` seed data kept.
+
+- [x] **Cashflow / Escrow / Collections / Invoices** — API-first; static rows emptied; empty states; Invoices duplicate `SOA_FIELDS` (fake values) removed.
+- [x] **Payments** — `KPI_FALLBACK`/`payRows`/`fallbackPdc` removed; `record()` async (posts `project_code`, calls `loadReceipts()` after POST; local row uses honest placeholders); table = live rows + local POST echo only.
+- [x] **Financials** — `REV_BARS`/`COMM_ROWS` emptied; header "position live"; empty states for chart + commissions table.
+- [x] **Construction** — `PKG`/`MILES`/static `PHOTOS`/static `RISKS` removed; live-only pct/certs; empty states; `TEAM` kept as vendor config; toasts genericized.
+- [x] **Pipeline** — `PIPE` cards/counts emptied (labels/colors kept), `BLOCKED`/`STAGE_DAYS`/`FORECAST` emptied; defaults blank; modal chips → text inputs; empty states.
+- [x] **Reports** — `SCHEDULED` emptied; report cards "Live export ready"; board-pack date dynamic; `GROUPS` catalog kept.
+- [x] **Deeds** — `ROWS` removed, `MOLLAK` emptied, `certUnit` blank; `doIssue` guarded; handover tile computed from rows.
+- [x] **Snagging** — static `TRADES`/`ROWS` removed; `TRADES`/`maxTrade` computed live; KPIs live; `raiseSnag` guarded; unit chips → input.
+- [x] **AuditLog** — static `ROWS` removed; count/filters live; error text fixed.
+- [x] **Users** — static `USERS` fallback emptied; header count computed; empty-state; `ROLE_PERMS`/`THRESHOLDS_BASE`/`PLAIN` kept as role config.
+- [x] **Sales** — dead `DEAL`/`refOf` removed; `BROK_FALLBACK` left (already all-empty, harmless).
+- [~] **Sales booking wizard** — STILL hardwired (SFIELDS step data, `listPrice=2450000`, `escrow="ESC-2026-9021"`, `payBank/payRef` defaults, `unit_no:"H21-T1-1204"` baked into `saveDraft`/`doConfirm` POST bodies at ~712/741). **Decision needed from operator** — gutting it changes the POST contract + wizard UI (AGENTS.md: stop-and-ask). Default position: keep wizard as-is until operator rules on it.
 
 ## PLINTH Parity Program — verified remaining tasks
 > Re-audited from scratch against `C:\Users\admin\Downloads\New folder\plinth-prompt-pack_1.html`

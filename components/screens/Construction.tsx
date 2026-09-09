@@ -2,40 +2,15 @@ import { useEffect, useMemo, useState } from "react";
 import { AC, MONTHS_ABBR } from "../../lib/format";
 import { fetchJSON } from "../../lib/api";
 
-const PKG = [
-  { name: "Enabling works", weight: 6, planned: 100, actual: 100 },
-  { name: "Substructure", weight: 14, planned: 100, actual: 100 },
-  { name: "Superstructure", weight: 32, planned: 62, actual: 54 },
-  { name: "MEP", weight: 18, planned: 24, actual: 18 },
-  { name: "Facade", weight: 14, planned: 8, actual: 4 },
-  { name: "Fit-out", weight: 10, planned: 0, actual: 0 },
-  { name: "External works", weight: 4, planned: 0, actual: 0 },
-  { name: "Testing & commissioning", weight: 2, planned: 0, actual: 0 },
-];
+const PHOTOS: string[] = [];
 
-const MILES = [
-  { name: "Excavation complete", planned: "14 Feb 26", forecast: "11 Feb 26", actual: "11 Feb 26", variance: "\u22123 d", status: "Certified", triggers: "AED 34.2M \u00b7 96 buyers" },
-  { name: "Substructure complete", planned: "18 May 26", forecast: "12 May 26", actual: "12 May 26", variance: "\u22126 d", status: "Certified", triggers: "AED 48.2M \u00b7 124 buyers" },
-  { name: "Structure 40%", planned: "12 Apr 26", forecast: "18 Apr 26", actual: "\u2014", variance: "+6 d", status: "Pending", triggers: "AED 62.4M \u00b7 148 buyers" },
-  { name: "Structure 70%", planned: "20 Nov 26", forecast: "28 Nov 26", actual: "\u2014", variance: "+8 d", status: "Forecast", triggers: "AED 58.1M \u00b7 148 buyers" },
-  { name: "Facade complete", planned: "14 Jun 27", forecast: "02 Jul 27", actual: "\u2014", variance: "+18 d", status: "Forecast", triggers: "AED 44.6M \u00b7 152 buyers" },
-  { name: "Handover", planned: "Q4 2027", forecast: "Q4 2027", actual: "\u2014", variance: "On track", status: "Forecast", triggers: "AED 88.4M \u00b7 176 buyers" },
-];
-
-const PHOTOS = ["04 Aug 2026", "21 Jul 2026", "30 Jun 2026", "12 Jun 2026", "28 May 2026"];
-
-const TEAM = [
+const TEAM: [string, string][] = [
   ["Main contractor", "ALEC Engineering"],
   ["Consultant", "WSP Middle East"],
   ["Project manager", "Currie & Brown"],
-  ["Certified valuation", "AED 132.4M"],
 ];
 
-const RISKS = [
-  { name: "Facade panel lead time", likelihood: "High", impact: "High", mitigation: "Dual-source supplier \u00b7 order placed", owner: "A. Faruqi", effect: "+18 d" },
-  { name: "MEP subcontractor mobilisation", likelihood: "Medium", impact: "Medium", mitigation: "Weekly look-ahead review", owner: "S. Menon", effect: "+6 d" },
-  { name: "Chilled water connection", likelihood: "Low", impact: "High", mitigation: "Empower application submitted", owner: "L. Ferreira", effect: "0 d" },
-];
+const RISKS: { name: string; likelihood: string; impact: string; mitigation: string; owner: string; effect: string }[] = [];
 
 const varColor = (v: string) =>
   v.indexOf("+") === 0 ? "#E5484D" : v.indexOf("\u2212") === 0 ? "#1F9D6B" : "#6B7180";
@@ -157,7 +132,7 @@ export default function ConstructionScreen({ scope = "ALL" }: { scope?: string }
   const live = rows.length > 0;
 
   const miles: MileView[] = useMemo(
-    () => (live ? rows.map(toMileView) : (MILES.map((m) => ({ ...m })) as MileView[])),
+    () => (live ? rows.map(toMileView) : []),
     [rows, live]
   );
 
@@ -165,18 +140,18 @@ export default function ConstructionScreen({ scope = "ALL" }: { scope?: string }
     () =>
       live
         ? rows.map((m) => ({ name: m.milestone, weight: m.weight, planned: m.planned_pct, actual: m.actual_pct }))
-        : PKG,
+        : ([] as { name: string; weight: number; planned: number; actual: number }[]),
     [rows, live]
   );
 
   const totalW = rows.reduce((a, m) => a + m.weight, 0) || 1;
   const ovActual = rows.reduce((a, m) => a + m.weight * m.actual_pct, 0) / totalW;
   const ovPlanned = rows.reduce((a, m) => a + m.weight * m.planned_pct, 0) / totalW;
-  const pctActual = live ? ovActual : 46;
-  const pctPlanned = live ? ovPlanned : 52;
+  const pctActual = live ? ovActual : 0;
+  const pctPlanned = live ? ovPlanned : 0;
 
   const certIdx = () => {
-    if (!live) return 2;
+    if (!live) return -1;
     const i = miles.findIndex((m) => m.status === "Pending");
     return i >= 0 ? i : -1;
   };
@@ -184,21 +159,14 @@ export default function ConstructionScreen({ scope = "ALL" }: { scope?: string }
   const cert = (i: number) => {
     const m = miles[i];
     if (!m || m.status !== "Pending") return;
-    if (live) {
-      const id = rows[i].id;
-      setRows((prev) => prev.map((r) => (r.id === id ? { ...r, status: "certified", actual: r.forecast, actual_pct: r.planned_pct } : r)));
-      setCertified(true);
-      fetchJSON("/api/construction", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id }),
-      }).catch(() => {});
-    } else {
-      const copy = CONSTRUCTION_MILES.slice();
-      copy[i] = { ...copy[i], status: "Certified", actual: copy[i].forecast, variance: "0 d" };
-      CONSTRUCTION_MILES.splice(0, CONSTRUCTION_MILES.length, ...copy);
-      setCertified(true);
-    }
+    const id = rows[i].id;
+    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, status: "certified", actual: r.forecast, actual_pct: r.planned_pct } : r)));
+    setCertified(true);
+    fetchJSON("/api/construction", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id }),
+    }).catch(() => {});
   };
 
   return (
@@ -214,12 +182,12 @@ export default function ConstructionScreen({ scope = "ALL" }: { scope?: string }
 
       {certified && (
         <div style={{ background: "#E9F8F1", color: "#1F9D6B", borderRadius: 12, padding: "11px 16px", fontSize: 12, fontWeight: 700, marginBottom: 16 }}>
-          Structure 40% certified \u00b7 AED 62.4M invoiced to 148 buyers \u00b7 Oqood payment notices sent
+          Milestone certified \u00b7 payment notices generated for the released milestone
         </div>
       )}
       {uploaded && (
         <div style={{ background: "#F0EFFE", color: AC, borderRadius: 12, padding: "11px 16px", fontSize: 12, fontWeight: 700, marginBottom: 16 }}>
-          Photo set uploaded \u00b7 24 photos queued for review \u00b7 visible to buyers once approved
+          Photo set uploaded \u00b7 queued for review \u00b7 visible to buyers once approved
         </div>
       )}
 
@@ -240,10 +208,17 @@ export default function ConstructionScreen({ scope = "ALL" }: { scope?: string }
               </div>
             ))}
           </div>
-          <div style={{ marginTop: 22, background: "rgba(226,163,60,.16)", borderRadius: 14, padding: "14px 15px" }}>
-            <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: ".05em", color: "#E2A33C", textTransform: "uppercase" }}>Handover forecast</div>
-            <div style={{ fontSize: 15, fontWeight: 800, marginTop: 7 }}>Q4 2027 \u00b7 18 days slippage</div>
-          </div>
+          {live ? (
+            <div style={{ marginTop: 22, background: "rgba(226,163,60,.16)", borderRadius: 14, padding: "14px 15px" }}>
+              <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: ".05em", color: "#E2A33C", textTransform: "uppercase" }}>Handover forecast</div>
+              <div style={{ fontSize: 15, fontWeight: 800, marginTop: 7 }}>From live project schedule</div>
+            </div>
+          ) : (
+            <div style={{ marginTop: 22, background: "rgba(255,255,255,.06)", borderRadius: 14, padding: "14px 15px" }}>
+              <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: ".05em", color: "rgba(255,255,255,.55)", textTransform: "uppercase" }}>Handover forecast</div>
+              <div style={{ fontSize: 15, fontWeight: 800, marginTop: 7, color: "rgba(255,255,255,.66)" }}>Awaiting live data</div>
+            </div>
+          )}
         </div>
 
         <div style={{ background: "#fff", borderRadius: 20, padding: "22px 24px", boxShadow: "0 1px 3px rgba(20,22,31,.04)" }}>
@@ -306,17 +281,22 @@ export default function ConstructionScreen({ scope = "ALL" }: { scope?: string }
             <span style={{ fontSize: 10.5, fontWeight: 700, color: AC }}>Visible to buyers</span>
           </div>
           <div style={{ display: "flex", gap: 12, overflowX: "auto", paddingBottom: 6 }}>
-            {photoDates.map((d) => (
-              <div key={d} style={{ width: 180, flex: "none" }}>
-                <div style={{ height: 120, borderRadius: 14, background: "linear-gradient(135deg,#E8E9F5,#D3D6EA)", display: "grid", placeItems: "center", fontSize: 10, fontWeight: 700, letterSpacing: ".06em", color: "#9AA0AE", textTransform: "uppercase" }}>Site photo</div>
-                <div style={{ fontSize: 11, fontWeight: 700, marginTop: 8 }}>{d}</div>
-              </div>
-            ))}
+            {photoDates.length ? (
+              photoDates.map((d) => (
+                <div key={d} style={{ width: 180, flex: "none" }}>
+                  <div style={{ height: 120, borderRadius: 14, background: "linear-gradient(135deg,#E8E9F5,#D3D6EA)", display: "grid", placeItems: "center", fontSize: 10, fontWeight: 700, letterSpacing: ".06em", color: "#9AA0AE", textTransform: "uppercase" }}>Site photo</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, marginTop: 8 }}>{d}</div>
+                </div>
+              ))
+            ) : (
+              <div style={{ fontSize: 12, fontWeight: 600, color: "#9AA0AE", padding: "24px 0" }}>No photo sets uploaded yet</div>
+            )}
           </div>
         </div>
         <div style={{ background: "#fff", borderRadius: 20, padding: "22px 24px", boxShadow: "0 1px 3px rgba(20,22,31,.04)" }}>
           <div style={{ fontSize: 15, fontWeight: 700, letterSpacing: "-.015em", marginBottom: 12 }}>Risk register</div>
-          {RISKS.map((r) => (
+          {RISKS.length ? (
+            RISKS.map((r) => (
             <div key={r.name} style={{ padding: "12px 0", borderBottom: "1px solid #F6F7FA" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <span style={{ flex: 1, fontSize: 12.5, fontWeight: 700 }}>{r.name}</span>
@@ -329,11 +309,12 @@ export default function ConstructionScreen({ scope = "ALL" }: { scope?: string }
                 <span style={{ fontSize: 10.5, fontWeight: 800, color: "#E5484D" }}>{r.effect} on handover</span>
               </div>
             </div>
-          ))}
+          ))
+          ) : (
+            <div style={{ fontSize: 12, fontWeight: 600, color: "#9AA0AE", padding: "4px 0" }}>No live risks recorded</div>
+          )}
         </div>
       </div>
     </div>
   );
 }
-
-const CONSTRUCTION_MILES = MILES.map((m) => ({ ...m }));

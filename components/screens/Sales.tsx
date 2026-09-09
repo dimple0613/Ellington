@@ -51,7 +51,7 @@ const SFIELDS: Record<number,Field[]> = {
   4:[["Reservation form","Generated \u00b7 v1","ready"],["Expression of interest","Generated \u00b7 4 pages","ready"],["Unit sales offer","Generated \u00b7 valid to 08 Sep 2026","ready"],["SPA draft","Awaiting legal review","pending"],["Signature routing","Buyer \u2192 Developer signatory",""],["Reminder cadence","Day 2, 5, 9",""]],
   5:[["Amount","AED 226,688",""],["Date","25 Aug 2026",""],["Method","Bank transfer",""],["Bank","Emirates NBD",""],["Transaction reference","TT-2026-441882",""],["Escrow deposit reference","ESC-2026-9021","mandatory"],["Receipt","RCP-H21-004713","auto"],["Upload","transfer-advice.pdf","attached"]],
 };
-const DEAL = [["Unit","H21-T1-1204"],["Typology","2BR-B \u00b7 1,180 sq.ft"],["List price","AED 2,450,000"],["Discount","\u22127.5%"],["Net price","AED 2,266,250"],["Price/sq.ft","AED 1,920"],["Plan","20/40/40"],["Buyer","Hassan Al Rayes"],["Broker","Betterhomes \u00b7 2.0%"]];
+
 
 /* ── buyer 360 ──────────────────────────────────────────────────── */
 const moneyM = (v: number) =>
@@ -120,7 +120,7 @@ const hint = (v:string) => {
 };
 const tabBtn = (on:boolean) => ({ height:32,border:0,borderRadius:10,padding:"0 15px",cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:700, background:on?"#F0EFFE":"transparent", color:on?AC:"#9AA0AE" });
 const leadChip = (lead: Card | null) => (lead && lead.chips.find((c) => /^\d/.test(c))) || (lead && lead.chips[0]) || "2BR";
-const refOf = (_step?: number) => "ESC-2026-9021";
+
 
 export default function Sales({ scope }: { scope: string }) {
   const router = useRouter();

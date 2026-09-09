@@ -11,15 +11,7 @@ type AdminRow = {
 };
 
 const PERMS = ["CRE", "REA", "UPD", "DEL", "APR", "EXP"];
-const USERS: UserRow[] = [
-  { name: "Khalid Al Fahim", email: "k.fahim@ellington.ae", role: "CEO", projects: "All", lastActive: "Just now", tfa: "Enabled", status: "Active" },
-  { name: "Sarah Mitchell", email: "s.mitchell@ellington.ae", role: "Sales Director", projects: "BLG III, WPK", lastActive: "2 h ago", tfa: "Enabled", status: "Active" },
-  { name: "Ravi Kumar", email: "r.kumar@ellington.ae", role: "Finance Manager", projects: "All", lastActive: "4 h ago", tfa: "Enabled", status: "Active" },
-  { name: "Aisha Nasser", email: "a.nasser@ellington.ae", role: "Sales Agent", projects: "BLG III", lastActive: "1 d ago", tfa: "Disabled", status: "Active" },
-  { name: "Omar Saeed", email: "o.saeed@ellington.ae", role: "Project Manager", projects: "WPK", lastActive: "3 d ago", tfa: "Enabled", status: "Active" },
-  { name: "Layla Habib", email: "l.habib@ellington.ae", role: "Legal Counsel", projects: "All", lastActive: "5 d ago", tfa: "Enabled", status: "Suspended" },
-  { name: "James Park", email: "j.park@ellington.ae", role: "Sales Agent", projects: "BLG III, WPK", lastActive: "1 w ago", tfa: "Disabled", status: "Active" },
-];
+const USERS: UserRow[] = [];
 
 type PermRow = { module: string; perm: Record<string, boolean> };
 const ROLE_PERMS: PermRow[] = [
@@ -59,8 +51,8 @@ const PLAIN: Record<string, string> = {
 };
 
 export default function UsersScreen() {
-  const [sel, setSel] = useState(1);
-  const [role, setRole] = useState(USERS[1].role);
+  const [sel, setSel] = useState(0);
+  const [role, setRole] = useState("CEO");
   const [notice, setNotice] = useState("");
   const [users, setUsers] = useState<UserRow[]>(USERS);
   const [inviteOpen, setInviteOpen] = useState(false);
@@ -152,7 +144,7 @@ export default function UsersScreen() {
       <div style={{ display: "flex", alignItems: "flex-end", gap: 16, marginBottom: 18 }}>
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: "-.03em", lineHeight: 1.15 }}>Users &amp; roles</div>
-          <div style={{ fontSize: 13, color: "#6B7180", fontWeight: 500, marginTop: 5 }}>Role-based with per-project scoping \u00b7 7 active users \u00b7 2FA enforced on production</div>
+          <div style={{ fontSize: 13, color: "#6B7180", fontWeight: 500, marginTop: 5 }}>Role-based with per-project scoping \u00b7 {effectiveUsers.length} users loaded</div>
         </div>
         <button onClick={() => setInviteOpen(true)} style={{ height: 38, borderRadius: 12, background: AC, color: "#fff", border: 0, padding: "0 16px", fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}>Invite user</button>
       </div>
@@ -162,6 +154,7 @@ export default function UsersScreen() {
           <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1.4fr 96px 1.1fr 82px 72px 72px", gap: 8, padding: "13px 20px", fontSize: 9.5, fontWeight: 700, letterSpacing: ".07em", color: "#9AA0AE", textTransform: "uppercase", background: "#FAFBFD", borderBottom: "1px solid #EDEEF3" }}>
             <span>Name</span><span>Email</span><span>Role</span><span>Projects</span><span>Last active</span><span>2FA</span><span>Status</span>
           </div>
+          {effectiveUsers.length === 0 && <div style={{ padding: 32, textAlign: "center", fontSize: 13, color: "#9AA0AE", fontWeight: 600 }}>No users loaded yet — invite one or wait for the user list.</div>}
           {effectiveUsers.map((u, i) => (
             <div key={i} onClick={() => { setSel(i); setRole(u.role); }} style={{ display: "grid", gridTemplateColumns: "1.2fr 1.4fr 96px 1.1fr 82px 72px 72px", gap: 8, alignItems: "center", padding: "0 20px", height: 46, borderBottom: "1px solid #F6F7FA", cursor: "pointer", background: i === sel ? "#F0EFFE" : undefined }}>
               <span style={{ fontSize: 12, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{u.name}</span>

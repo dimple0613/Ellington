@@ -26,32 +26,12 @@ export default function CollectionsScreen() {
   const [promiseAmount, setPromiseAmount] = useState("");
   const [promiseErr, setPromiseErr] = useState("");
 
-  const STATIC_BUCKETS = [
-    { label: "Current", value: "AED 439.6M", note: "428 buyers", idx: 0 },
-    { label: "1\u201330", value: "AED 18.4M", note: "21 buyers", idx: 1 },
-    { label: "31\u201360", value: "AED 7.1M", note: "12 buyers", idx: 2 },
-    { label: "61\u201390", value: "AED 3.7M", note: "8 buyers", idx: 3 },
-    { label: "90+", value: "AED 33.6M", note: "31 buyers", idx: 4 },
-    { label: "Legal", value: "AED 4.1M", note: "3 buyers", idx: 5 },
-  ];
-
-  const MOCK_ROWS: CollRow[] = [
-    { id: 1, buyer: "Sunil Rathore", unit: "H21-T1-2705", amount: "4,120,000", days: 118, stage: "Final notice", action: "Legal review \u00b7 28 Aug" },
-    { id: 2, buyer: "Elena Petrova", unit: "H21-T1-4102", amount: "2,860,000", days: 104, stage: "30-day notice", action: "Notice issued 12 Aug" },
-    { id: 3, buyer: "Marcus Lindqvist", unit: "H21-T1-2404", amount: "1,940,000", days: 96, stage: "Reminder 2", action: "Promise to pay 02 Sep" },
-    { id: 4, buyer: "Wei Chen", unit: "H21-T1-1602", amount: "1,210,000", days: 92, stage: "Reminder 2", action: "Cheque bounced \u00b7 re-present" },
-    { id: 5, buyer: "Nadia Khoury", unit: "H21-T1-2202", amount: "864,000", days: 61, stage: "Reminder 1", action: "Call scheduled 26 Aug" },
-    { id: 6, buyer: "Omar Al Suwaidi", unit: "H21-T1-3601", amount: "640,000", days: 44, stage: "Reminder 1", action: "Awaiting bank confirmation" },
-    { id: 7, buyer: "Grace Okonkwo", unit: "H21-T1-1103", amount: "412,000", days: 31, stage: "Reminder 1", action: "Email sent 22 Aug" },
-    { id: 8, buyer: "Priya Nair", unit: "H21-T1-0904", amount: "208,000", days: 18, stage: "Upcoming", action: "Auto-reminder 27 Aug" },
-  ];
-
   const [liveRows, setLiveRows] = useState<CollRow[]>([]);
   const [apiError, setApiError] = useState("");
   const [loaded, setLoaded] = useState(false);
   const [calc, setCalc] = useState<any>(null);
   const [calcErr, setCalcErr] = useState("");
-  const [calcUnit, setCalcUnit] = useState("H21-T1-2705");
+  const [calcUnit, setCalcUnit] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -84,10 +64,10 @@ export default function CollectionsScreen() {
       .catch((e) => setCalcErr(e?.message || "Failed to load calculator"));
   };
 
-  const rows = liveRows.length ? liveRows : MOCK_ROWS;
+  const rows = liveRows;
 
   const buckets = useMemo(() => {
-    if (!liveRows.length) return STATIC_BUCKETS;
+    if (!liveRows.length) return [];
     const fmt = (v: number) => (v >= 1e6 ? "AED " + (v / 1e6).toFixed(1).replace(/\.0$/, "") + "M" : v >= 1e3 ? "AED " + Math.round(v / 1e3) + "k" : "AED " + v);
     const build = (label: string, idx: number, pred: (r: CollRow) => boolean) => {
       const sel = rows.filter(pred);
@@ -115,11 +95,11 @@ export default function CollectionsScreen() {
   ];
 
   const ladder: { stage: string; trigger: string; action: string; count: number; color: string }[] = [
-    { stage: "Upcoming", trigger: "14\u201330 days before due", action: "Auto-reminder \u00b7 email + SMS", count: 1, color: "#6B7180" },
-    { stage: "Reminder 1", trigger: "0\u201330 days overdue", action: "Email + SMS \u00b7 soft reminder", count: 3, color: "#B07B14" },
-    { stage: "Reminder 2", trigger: "31\u201360 days overdue", action: "Promise-to-pay + cheque follow-up", count: 2, color: "#B07B14" },
-    { stage: "30-day notice", trigger: "61\u201390 days overdue", action: "Formal notice \u00b7 legal review", count: 1, color: "#E5484D" },
-    { stage: "Final notice", trigger: "90+ days overdue", action: "Cancellation + retention per Law 19", count: 1, color: "#E5484D" },
+    { stage: "Upcoming", trigger: "14\u201330 days before due", action: "Auto-reminder \u00b7 email + SMS", count: rows.filter((r) => r.days <= 0).length, color: "#6B7180" },
+    { stage: "Reminder 1", trigger: "0\u201330 days overdue", action: "Email + SMS \u00b7 soft reminder", count: rows.filter((r) => r.days > 0 && r.days <= 30).length, color: "#B07B14" },
+    { stage: "Reminder 2", trigger: "31\u201360 days overdue", action: "Promise-to-pay + cheque follow-up", count: rows.filter((r) => r.days > 30 && r.days <= 60).length, color: "#B07B14" },
+    { stage: "30-day notice", trigger: "61\u201390 days overdue", action: "Formal notice \u00b7 legal review", count: rows.filter((r) => r.days > 60 && r.days <= 90).length, color: "#E5484D" },
+    { stage: "Final notice", trigger: "90+ days overdue", action: "Cancellation + retention per Law 19", count: rows.filter((r) => r.days > 90).length, color: "#E5484D" },
   ];
 
   const remind = async (row: CollRow) => {
@@ -155,14 +135,17 @@ export default function CollectionsScreen() {
   const escalate = (row: CollRow) => { router.push({ pathname: "/finance", query: { s: "escrow" } }, undefined, { shallow: true }); };
   const genNotice = () => {
     const c = calc;
+    const first = rows.find((r) => r.days > 0) || rows[0];
+    const amt = first ? Number(String(first.amount).replace(/,/g, "")) : 0;
     exportCollectionNotice(
-      "Sunil Rathore", "H21-T1-2705",
-      c ? Number(c.contract).toLocaleString("en-US") : "4,120,000",
-      118,
-      c ? Number(c.retentionAmount).toLocaleString("en-US") : "1,030,000",
-      c ? Number(c.refund).toLocaleString("en-US") : "206,000"
+      first?.buyer || "Buyer",
+      first?.unit || "",
+      first ? amt.toLocaleString("en-US") : "0",
+      first?.days || 0,
+      c ? Number(c.retentionAmount).toLocaleString("en-US") : String(Math.round(amt * 0.25)),
+      c ? Number(c.refund).toLocaleString("en-US") : String(Math.round(amt * 0.05))
     );
-    setNotice("30-day notice generated for Sunil Rathore \u00b7 sent to legal review");
+    setNotice("30-day notice generated for " + (first?.buyer || "buyer") + " \u00b7 sent to legal review");
     setTimeout(() => setNotice(""), 3000);
   };
 
@@ -193,7 +176,7 @@ export default function CollectionsScreen() {
     <div>
       {apiError && (
         <div style={{ background: "#FDECEC", color: "#E5484D", borderRadius: 12, padding: "11px 16px", fontSize: 12, fontWeight: 700, marginBottom: 16 }}>
-          Live data unavailable ({apiError}) — showing sample rows
+          Live data unavailable ({apiError}) — collections are empty until data loads
         </div>
       )}
       {notice && <div style={{ background: "#E9F8F1", color: "#1F9D6B", borderRadius: 12, padding: "11px 16px", fontSize: 12, fontWeight: 700, marginBottom: 16 }}>{notice}</div>}
