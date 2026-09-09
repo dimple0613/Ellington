@@ -221,6 +221,23 @@ export default function Shell({
   }, [cmdk]);
 
   const loadNotifs = useCallback(() => {
+    const key = "ellington_notif_" + (user?.userId ?? "guest");
+    const loadState = (): { read: string[]; dismissed: string[] } => {
+      try {
+        const raw = window.localStorage.getItem(key);
+        if (!raw) return { read: [], dismissed: [] };
+        const p = JSON.parse(raw);
+        return {
+          read: Array.isArray(p.read) ? (p.read.filter((x: unknown) => typeof x === "string") as string[]) : [],
+          dismissed: Array.isArray(p.dismissed) ? (p.dismissed.filter((x: unknown) => typeof x === "string") as string[]) : [],
+        };
+      } catch {
+        return { read: [], dismissed: [] };
+      }
+    };
+    const saveState = (read: string[], dismissed: string[]) => {
+      try { window.localStorage.setItem(key, JSON.stringify({ read, dismissed })); } catch { /* private mode */ }
+    };
     fetch("/api/finance")
       .then((r) => (r.ok ? r.json() : null))
       .then((j) => {
@@ -237,15 +254,21 @@ export default function Shell({
         if (due > 0) setTicker(fmtM(due));
         else setTicker("");
         const ns: Notif[] = [];
-        const note = (who: string, what: string, unread: boolean) => { ns.push({ id: "n" + (ns.length + 1), who, what, time: unread ? "now" : "today", unread }); };
-        if (over90.length) note("Collections", over90.length + " units overdue >90 days \u2014 " + fmtM(over90.reduce((a: number, c: any) => a + (Number(c.amount) || 0), 0)), true);
-        if (escrow.length) note("Escrow", escrow.length + " escrow entries unmatched \u2014 " + fmtM(variance), true);
-        if (awaiting) note("Drawdowns", awaiting + " drawdowns awaiting trustee approval", false);
-        if (collections.length) note("Collections", collections.length + " items on the collections worklist", false);
-        setNotifs(ns);
+        const note = (id: string, who: string, what: string, unread: boolean) => { ns.push({ id, who, what, time: unread ? "now" : "today", unread }); };
+        if (over90.length) note("collections-overdue", "Collections", over90.length + " units overdue >90 days \u2014 " + fmtM(over90.reduce((a: number, c: any) => a + (Number(c.amount) || 0), 0)), true);
+        if (escrow.length) note("escrow-unmatched", "Escrow", escrow.length + " escrow entries unmatched \u2014 " + fmtM(variance), true);
+        if (awaiting) note("drawdowns-awaiting", "Drawdowns", awaiting + " drawdowns awaiting trustee approval", false);
+        if (collections.length) note("collections-worklist", "Collections", collections.length + " items on the collections worklist", false);
+        const st = loadState();
+        const present = new Set(ns.map((n) => n.id));
+        const read = st.read.filter((id) => present.has(id));
+        const dismissed = st.dismissed.filter((id) => present.has(id));
+        const view = ns.filter((n) => !dismissed.includes(n.id)).map((n) => ({ ...n, unread: n.unread && !read.includes(n.id) }));
+        saveState(read, dismissed);
+        setNotifs(view);
       })
       .catch(() => {});
-  }, []);
+  }, [user?.userId]);
 
   useEffect(() => {
     loadNotifs();
@@ -260,6 +283,32 @@ export default function Shell({
     if (toastTimer.current) clearTimeout(toastTimer.current);
     toastTimer.current = setTimeout(() => setToast(null), 2600);
   }, []);
+
+  const markAllRead = () => {
+    const key = "ellington_notif_" + (user?.userId ?? "guest");
+    let prev: { read: string[]; dismissed: string[] } = { read: [], dismissed: [] };
+    try {
+      const raw = window.localStorage.getItem(key);
+      if (raw) { const p = JSON.parse(raw); prev = { read: Array.isArray(p.read) ? p.read : [], dismissed: Array.isArray(p.dismissed) ? p.dismissed : [] }; }
+    } catch { /* ignore */ }
+    const read = [...new Set([...prev.read, ...notifs.map((n) => n.id)])];
+    try { window.localStorage.setItem(key, JSON.stringify({ read, dismissed: prev.dismissed })); } catch { /* ignore */ }
+    setNotifs((ns) => ns.map((n) => ({ ...n, unread: false })));
+  };
+
+  const dismissNotif = (id: string) => {
+    const key = "ellington_notif_" + (user?.userId ?? "guest");
+    let prev: { read: string[]; dismissed: string[] } = { read: [], dismissed: [] };
+    try {
+      const raw = window.localStorage.getItem(key);
+      if (raw) { const p = JSON.parse(raw); prev = { read: Array.isArray(p.read) ? p.read : [], dismissed: Array.isArray(p.dismissed) ? p.dismissed : [] }; }
+    } catch { /* ignore */ }
+    const remaining = notifs.filter((n) => n.id !== id);
+    const presentIds = new Set(remaining.map((n) => n.id));
+    const dismissed = [...new Set([...prev.dismissed, id])];
+    try { window.localStorage.setItem(key, JSON.stringify({ read: prev.read.filter((i) => presentIds.has(i)), dismissed })); } catch { /* ignore */ }
+    setNotifs((ns) => ns.filter((n) => n.id !== id));
+  };
 
   const unread = notifs.filter((n) => n.unread).length;
 
@@ -588,8 +637,8 @@ export default function Shell({
         notifOpen={notif}
         unread={unread}
         notifs={notifs}
-        onMarkAll={() => setNotifs((ns) => ns.map((n) => ({ ...n, unread: false })))}
-        onDismiss={(id) => setNotifs((ns) => ns.filter((n) => n.id !== id))}
+        onMarkAll={markAllRead}
+        onDismiss={dismissNotif}
         onClose={() => setNotif(false)}
         helpOpen={help}
         onCloseHelp={() => setHelp(false)}
