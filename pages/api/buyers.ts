@@ -20,7 +20,9 @@ export default withPerm("Sales", "REA", async function (req: NextApiRequest, res
                 COALESCE(u.c, 0)::numeric AS contracted,
                 COALESCE(rc.c, 0)::numeric AS collected,
                 COALESCE(od.c, 0)::numeric AS overdue,
-                nd.amount AS next_amount, nd.due_date AS next_date, nd.unit_no AS next_unit, nd.milestone AS next_milestone
+                nd.amount AS next_amount, nd.due_date AS next_date, nd.unit_no AS next_unit, nd.milestone AS next_milestone,
+                bk.agency AS agency, bk.agent AS agent,
+                COALESCE(d.n, 0)::int AS docs
          FROM buyers b
          LEFT JOIN (
            SELECT buyer_id, COUNT(*)::int AS n, SUM(price) AS c FROM units WHERE buyer_id IS NOT NULL GROUP BY buyer_id
@@ -40,6 +42,17 @@ export default withPerm("Sales", "REA", async function (req: NextApiRequest, res
            WHERE u.buyer_id = b.id AND m.status <> 'paid' AND m.due_date >= CURRENT_DATE
            ORDER BY m.due_date LIMIT 1
          ) nd ON true
+         LEFT JOIN LATERAL (
+           SELECT bk.agency, bk.agent
+           FROM bookings bk
+           WHERE (bk.buyer_id = b.id OR bk.buyer_name = b.name) AND bk.status = 'confirmed'
+           ORDER BY bk.confirmed_at DESC NULLS LAST, bk.id DESC LIMIT 1
+         ) bk ON true
+         LEFT JOIN LATERAL (
+           SELECT COUNT(*)::int AS n
+           FROM documents d
+           WHERE d.buyer = b.name
+         ) d ON true
          ORDER BY contracted DESC NULLS LAST, b.name`
       );
       return ok(res, {
@@ -56,6 +69,9 @@ export default withPerm("Sales", "REA", async function (req: NextApiRequest, res
             collected: num(x.collected),
             outstanding: Math.max(0, contracted - num(x.collected)),
             overdue: num(x.overdue),
+            agent: x.agent || null,
+            agency: x.agency || null,
+            docCount: x.docs || 0,
             next: x.next_amount != null
               ? { amount: num(x.next_amount), date: ymd(x.next_date), unit: x.next_unit, milestone: x.next_milestone }
               : null,

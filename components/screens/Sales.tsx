@@ -98,6 +98,9 @@ type BuyerRow = {
   collected: number;
   outstanding: number;
   overdue: number;
+  agent?: string | null;
+  agency?: string | null;
+  docCount?: number;
   next: { amount: number; date: string; unit: string; milestone: string } | null;
 };
 type BuyerDetail = {
@@ -1186,6 +1189,48 @@ function BuyersDirectory({ onOpen }: { onOpen: (id: number) => void }) {
   const collected = show.reduce((a, b) => a + b.collected, 0);
   const outstanding = show.reduce((a, b) => a + b.outstanding, 0);
 
+  const [q, setQ] = useState("");
+  const [kycF, setKycF] = useState<"all" | "cleared" | "pending">("all");
+  const [docsF, setDocsF] = useState<"all" | "has" | "none">("all");
+  const [overdueOnly, setOverdueOnly] = useState(false);
+  const [sel, setSel] = useState<Set<number>>(new Set());
+  const [notice, setNotice] = useState("");
+
+  const queryText = q.trim().toLowerCase();
+  const filtered = show.filter((r) => {
+    if (kycF !== "all" && (r.kyc || "pending") !== kycF) return false;
+    if (docsF === "has" && !(r.docCount || 0)) return false;
+    if (docsF === "none" && (r.docCount || 0) > 0) return false;
+    if (overdueOnly && !(r.overdue > 0)) return false;
+    if (queryText && !(r.name.toLowerCase().includes(queryText) || (r.email || "").toLowerCase().includes(queryText) || (r.phone || "").includes(queryText) || String(r.id).includes(queryText))) return false;
+    return true;
+  });
+  const toggle = (id: number) => {
+    setSel((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  };
+  const exportSelected = () => {
+    const chosen = filtered.filter((r) => r.id && sel.has(r.id));
+    if (!chosen.length) { setNotice("Select at least one buyer to export"); return; }
+    const esc = (v: unknown) => '"' + String(v === null || v === undefined ? "" : v).replace(/"/g, '""') + '"';
+    const head = "Buyer ID,Name,Email,Phone,KYC,Units,Contracted,Collected,Outstanding,Overdue,Documents,Agent,Agency,Next due date,Next amount";
+    const csv = [head].concat(chosen.map((r) => [
+      "B-" + String(r.id).padStart(5, "0"), r.name, r.email || "", r.phone || "", r.kyc || "pending", r.units,
+      r.contracted, r.collected, r.outstanding, r.overdue, r.docCount || 0, r.agent || "", r.agency || "",
+      r.next ? r.next.date : "", r.next ? r.next.amount : "",
+    ].map(esc).join(",")));
+    const blob = new Blob(["\ufeff" + csv.join("\r\n")], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = "buyers-directory.csv"; a.click();
+    URL.revokeObjectURL(url);
+    setNotice("Exported " + chosen.length + " selected buyers");
+  };
+  const emailSelected = () => {
+    const chosen = filtered.filter((r) => r.id && sel.has(r.id));
+    if (!chosen.length) { setNotice("Select at least one buyer to email"); return; }
+    setNotice("Queued " + chosen.length + " buyer emails \u00b7 staging outbound");
+  };
+
   const open = (r: BuyerRow) => () => {
     if (avail) onOpen(r.id);
     else setError("Directory is in read-only sample mode \u2014 reload to view live records");
@@ -1207,13 +1252,16 @@ function BuyersDirectory({ onOpen }: { onOpen: (id: number) => void }) {
       {error && (
         <div style={{ background: "#FDECEC", color: "#B33745", borderRadius: 12, padding: "11px 16px", fontSize: 12, fontWeight: 700, marginBottom: 16 }}>{error}</div>
       )}
+      {notice && <div style={{ background: "#E9F8F1", color: "#1F9D6B", borderRadius: 12, padding: "11px 16px", fontSize: 12, fontWeight: 700, marginBottom: 16 }}>{notice}</div>}
       <div style={{ display: "flex", alignItems: "flex-end", gap: 16, marginBottom: 18 }}>
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: "-.03em", lineHeight: 1.15 }}>Buyers directory</div>
           <div style={{ fontSize: 13, color: "#6B7180", fontWeight: 500, marginTop: 5 }}>
-            {avail ? show.length + " buyers on record" : "Sample of on-record buyers"} \u00b7 click a row for the full 360 view
+            {avail ? show.length + " buyers on record" : "Sample of on-record buyers"} \u00b7 {filtered.length} shown \u00b7 click a row for the full 360 view
           </div>
         </div>
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name, email, phone, ID"
+          style={{ width: 240, height: 38, borderRadius: 12, border: "1px solid #E4E6EE", background: "#fff", padding: "0 14px", fontSize: 12.5, fontWeight: 600, fontFamily: "inherit", outline: "none" }} />
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 14, marginBottom: 16 }}>
@@ -1226,31 +1274,71 @@ function BuyersDirectory({ onOpen }: { onOpen: (id: number) => void }) {
         ))}
       </div>
 
-      <div style={{ background: "#fff", borderRadius: 20, boxShadow: "0 1px 3px rgba(20,22,31,.04)", overflow: "hidden" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr 56px 1fr 1fr 1fr 1fr 32px", gap: 10, padding: "14px 22px", fontSize: 9.5, fontWeight: 700, letterSpacing: ".07em", color: "#9AA0AE", textTransform: "uppercase", background: "#FAFBFD", borderBottom: "1px solid #EDEEF3" }}>
-          <span>Buyer</span><span>Contact</span><span>KYC</span><span style={{ textAlign: "right" }}>Units</span><span style={{ textAlign: "right" }}>Contracted</span><span style={{ textAlign: "right" }}>Collected</span><span style={{ textAlign: "right" }}>Overdue</span><span />
-        </div>
-        {show.map((r) => (
-          <div key={r.id} onClick={open(r)} style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr 56px 1fr 1fr 1fr 1fr 32px", gap: 10, alignItems: "center", padding: "0 22px", height: 64, borderBottom: "1px solid #F6F7FA", cursor: avail ? "pointer" : "default", background: avail ? "transparent" : "#FAFBFC" }}>
-            <span style={{ display: "flex", alignItems: "center", gap: 11, minWidth: 0 }}>
-              <span style={{ width: 36, height: 36, flex: "none", borderRadius: 12, background: "#EDECFE", display: "grid", placeItems: "center", fontSize: 12.5, fontWeight: 800, color: AC }}>{r.name.split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase()}</span>
-              <span style={{ minWidth: 0 }}>
-                <span style={{ display: "block", fontSize: 13, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.name}</span>
-                <span style={{ display: "block", fontSize: 10.5, color: "#9AA0AE", fontWeight: 500, marginTop: 2 }}>{r.next ? "Next due " + money(r.next.amount) + " \u00b7 " + fmtShort(r.next.date) : "No upcoming instalments"}</span>
-              </span>
-            </span>
-            <span style={{ minWidth: 0 }}>
-              <span style={{ display: "block", fontSize: 11, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.phone || "\u2014"}</span>
-              <span style={{ display: "block", fontSize: 10.5, color: "#9AA0AE", fontWeight: 500, marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.email || "\u2014"}</span>
-            </span>
-            <span style={{ fontSize: 10, fontWeight: 700, borderRadius: 7, padding: "3px 0", textAlign: "center", background: r.kyc === "cleared" ? "#E9F8F1" : "#FDF4E5", color: r.kyc === "cleared" ? "#1F9D6B" : "#B07B14" }}>{r.kyc === "cleared" ? "Cleared" : "Pending"}</span>
-            <span style={{ textAlign: "right", fontFamily: "'JetBrains Mono',monospace", fontSize: 11.5, fontWeight: 600 }}>{r.units}</span>
-            <span style={{ textAlign: "right", fontSize: 12.5, fontWeight: 700 }}>{moneyM(r.contracted)}</span>
-            <span style={{ textAlign: "right", fontSize: 12.5, fontWeight: 700, color: "#1F9D6B" }}>{moneyM(r.collected)}</span>
-            <span style={{ textAlign: "right", fontSize: 12.5, fontWeight: 700, color: r.overdue > 0 ? "#E5484D" : "#9AA0AE" }}>{r.overdue > 0 ? moneyM(r.overdue) : "\u2014"}</span>
-            <span style={{ fontSize: 13, color: "#B9BDC9", fontWeight: 700 }}>{"\u203A"}</span>
-          </div>
+      <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap", alignItems: "center" }}>
+        {([["all", "All KYC"], ["cleared", "Cleared"], ["pending", "Pending"]] as const).map(([k, l]) => (
+          <button key={k} onClick={() => setKycF(k)} style={{ height: 30, border: 0, borderRadius: 9, padding: "0 13px", cursor: "pointer", fontFamily: "inherit", fontSize: 11.5, fontWeight: 700, background: kycF === k ? "#F0EFFE" : "#F1F2F6", color: kycF === k ? AC : "#6B7180" }}>{l}</button>
         ))}
+        <span style={{ width: 1, height: 18, background: "#E4E6EE" }} />
+        {([["all", "All docs"], ["has", "Has documents"], ["none", "No documents"]] as const).map(([k, l]) => (
+          <button key={k} onClick={() => setDocsF(k)} style={{ height: 30, border: 0, borderRadius: 9, padding: "0 13px", cursor: "pointer", fontFamily: "inherit", fontSize: 11.5, fontWeight: 700, background: docsF === k ? "#F0EFFE" : "#F1F2F6", color: docsF === k ? AC : "#6B7180" }}>{l}</button>
+        ))}
+        <button onClick={() => setOverdueOnly(!overdueOnly)} style={{ height: 30, border: 0, borderRadius: 9, padding: "0 13px", cursor: "pointer", fontFamily: "inherit", fontSize: 11.5, fontWeight: 700, background: overdueOnly ? "#FDECEC" : "#F1F2F6", color: overdueOnly ? "#E5484D" : "#6B7180" }}>{"\u26a0"} Overdue only</button>
+        {sel.size > 0 && (
+          <span style={{ display: "flex", gap: 8, alignItems: "center", marginLeft: "auto" }}>
+            <span style={{ fontSize: 11.5, fontWeight: 700, color: AC }}>{sel.size} selected</span>
+            <button onClick={exportSelected} style={{ height: 30, borderRadius: 9, border: "1px solid #EDEEF3", background: "#fff", padding: "0 13px", fontFamily: "inherit", fontSize: 11.5, fontWeight: 700, color: "#4A5060", cursor: "pointer" }}>Export selected</button>
+            <button onClick={emailSelected} style={{ height: 30, borderRadius: 9, border: "1px solid #EDEEF3", background: "#fff", padding: "0 13px", fontFamily: "inherit", fontSize: 11.5, fontWeight: 700, color: "#4A5060", cursor: "pointer" }}>Email selected</button>
+            <button onClick={() => setSel(new Set())} style={{ height: 30, borderRadius: 9, border: 0, background: "transparent", padding: "0 8px", fontFamily: "inherit", fontSize: 11.5, fontWeight: 700, color: "#6B7180", cursor: "pointer" }}>Clear</button>
+          </span>
+        )}
+      </div>
+
+      <div style={{ background: "#fff", borderRadius: 20, boxShadow: "0 1px 3px rgba(20,22,31,.04)", overflowX: "auto" }}>
+        <div style={{ minWidth: 1240 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "40px 1.5fr 1.1fr 74px 58px 1fr 1fr 1fr 1fr 1.2fr 1fr 1fr", gap: 10, padding: "14px 22px", fontSize: 9.5, fontWeight: 700, letterSpacing: ".07em", color: "#9AA0AE", textTransform: "uppercase", background: "#FAFBFD", borderBottom: "1px solid #EDEEF3" }}>
+            <span />
+            <span>Buyer</span><span>Contact</span><span>KYC</span><span style={{ textAlign: "right" }}>Units</span><span style={{ textAlign: "right" }}>Contracted</span><span style={{ textAlign: "right" }}>Collected</span><span style={{ textAlign: "right" }}>Outstanding</span><span style={{ textAlign: "right" }}>Overdue</span><span>Docs</span><span>Agent</span><span>Broker</span>
+          </div>
+          {filtered.map((r) => {
+            const picked = r.id != null && sel.has(r.id);
+            const docs = r.docCount || 0;
+            return (
+              <div key={r.id} style={{ display: "grid", gridTemplateColumns: "40px 1.5fr 1.1fr 74px 58px 1fr 1fr 1fr 1fr 1.2fr 1fr 1fr", gap: 10, alignItems: "center", padding: "0 22px", height: 64, borderBottom: "1px solid #F6F7FA", cursor: avail ? "pointer" : "default", background: avail ? (picked ? "#F7F9FF" : "transparent") : "#FAFBFC" }}>
+                <span onClick={(e) => e.stopPropagation()}>
+                  <input type="checkbox" checked={picked} onChange={() => r.id && toggle(r.id)} style={{ width: 15, height: 15, accentColor: AC, cursor: "pointer" }} />
+                </span>
+                <span onClick={open(r)} style={{ display: "flex", alignItems: "center", gap: 11, minWidth: 0 }}>
+                  <span style={{ width: 36, height: 36, flex: "none", borderRadius: 12, background: "#EDECFE", display: "grid", placeItems: "center", fontSize: 12.5, fontWeight: 800, color: AC }}>{r.name.split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase()}</span>
+                  <span style={{ minWidth: 0 }}>
+                    <span style={{ display: "block", fontSize: 13, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.name}</span>
+                    <span style={{ display: "block", fontSize: 10.5, color: "#9AA0AE", fontWeight: 500, marginTop: 2 }}>B-{String(r.id).padStart(5, "0")}{r.next ? " \u00b7 next " + money(r.next.amount) + " \u00b7 " + fmtShort(r.next.date) : " \u00b7 no upcoming instalments"}</span>
+                  </span>
+                </span>
+                <span style={{ minWidth: 0 }}>
+                  <span style={{ display: "block", fontSize: 11, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.phone || "\u2014"}</span>
+                  <span style={{ display: "block", fontSize: 10.5, color: "#9AA0AE", fontWeight: 500, marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.email || "\u2014"}</span>
+                </span>
+                <span style={{ fontSize: 10, fontWeight: 700, borderRadius: 7, padding: "3px 0", textAlign: "center", background: r.kyc === "cleared" ? "#E9F8F1" : "#FDF4E5", color: r.kyc === "cleared" ? "#1F9D6B" : "#B07B14" }}>{r.kyc === "cleared" ? "Cleared" : "Pending"}</span>
+                <span style={{ textAlign: "right", fontFamily: "'JetBrains Mono',monospace", fontSize: 11.5, fontWeight: 600 }}>{r.units}</span>
+                <span style={{ textAlign: "right", fontSize: 12.5, fontWeight: 700 }}>{moneyM(r.contracted)}</span>
+                <span style={{ textAlign: "right", fontSize: 12.5, fontWeight: 700, color: "#1F9D6B" }}>{moneyM(r.collected)}</span>
+                <span style={{ textAlign: "right", fontSize: 12.5, fontWeight: 700, color: "#B07B14" }}>{moneyM(r.outstanding)}</span>
+                <span style={{ textAlign: "right", fontSize: 12.5, fontWeight: 700, color: r.overdue > 0 ? "#E5484D" : "#9AA0AE" }}>{r.overdue > 0 ? moneyM(r.overdue) : "\u2014"}</span>
+                <span>
+                  <div style={{ display: "flex", gap: 3, alignItems: "center" }}>
+                    <div style={{ flex: 1, height: 5, borderRadius: 3, background: "#F1F2F7", overflow: "hidden", minWidth: 34 }}>
+                      <div style={{ height: "100%", borderRadius: 3, background: docs ? AC : "#E4E6EE", width: Math.min(100, (docs / 4) * 100) + "%" }} />
+                    </div>
+                    <span style={{ fontSize: 10.5, fontWeight: 800, color: docs ? AC : "#9AA0AE" }}>{docs}</span>
+                  </div>
+                </span>
+                <span style={{ fontSize: 11.5, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.agent || "\u2014"}</span>
+                <span style={{ fontSize: 11.5, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.agency || "\u2014"}</span>
+              </div>
+            );
+          })}
+          {filtered.length === 0 && <div style={{ padding: "18px 22px", textAlign: "center", fontSize: 12.5, color: "#9AA0AE", fontWeight: 600 }}>No buyers match the current filters</div>}
+        </div>
       </div>
     </div>
   );
