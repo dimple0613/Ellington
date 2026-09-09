@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/router";
 import { AC, compact, money } from "../../lib/format";
-import { ST, UnitStatus, UNITS, Unit } from "../../lib/data";
+import { ST, UnitStatus, Unit } from "../../lib/unit";
 import { fetchJSON } from "../../lib/api";
 
 type UnitRow = {
@@ -136,7 +136,7 @@ export default function InventoryScreen({
     return () => { active = false; };
   }, [scope]);
 
-  const source = dbUnits.length ? dbUnits : UNITS;
+  const source = dbUnits;
 
   const units = useMemo(() => {
     const list = filter === "all" ? source : source.filter((u) => u.status === filter);

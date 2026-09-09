@@ -1,9 +1,22 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { withPerm } from "../../lib/permissions";
+import { withPerm, hasPerm } from "../../lib/permissions";
+import type { Session } from "../../lib/session";
 import { query } from "../../lib/db";
 import { ok, fail, methodNotAllowed, missingFields } from "../../lib/api";
 
-export default withPerm("Inventory", "CRE", async function (req: NextApiRequest, res: NextApiResponse) {
+export default withPerm("Inventory", "CRE", async function (req: NextApiRequest, res: NextApiResponse, session: Session) {
+  if (req.method === "GET") {
+    if (!(await hasPerm(session, "Inventory", "REA"))) {
+      return res.status(403).json({ error: "You don't have permission to perform this action." });
+    }
+    const rows = await query<any>(
+      `SELECT code, name, COALESCE(location, '') AS loc, status, units_total,
+              COALESCE(gdv, 0) AS gdv
+       FROM projects ORDER BY code`
+    );
+    return ok(res, { projects: rows.rows });
+  }
+
   if (req.method === "POST") {
     const body = (req.body || {}) as Record<string, unknown>;
     const { code, name, location, units_total, gdv } = body;

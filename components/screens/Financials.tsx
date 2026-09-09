@@ -1,6 +1,5 @@
 import { useMemo } from "react";
 import { AC, compact } from "../../lib/format";
-import { PROJECTS } from "../../lib/data";
 
 export type LiveProject = {
   code: string;
@@ -61,19 +60,7 @@ export function useFinancialData(projects?: LiveProject[]): FinExport {
   }, [projects]);
 }
 
-const PROP_FALLBACK: LiveProject[] = PROJECTS.map((p) => ({
-  code: p.code,
-  name: p.name,
-  loc: p.loc,
-  units: p.units,
-  sold: p.sold,
-  gdv: p.gdv,
-  soldV: p.soldV,
-  coll: p.coll,
-  cons: p.cons,
-  status: p.status,
-  flag: p.flag,
-}));
+const PROP_FALLBACK: LiveProject[] = [];
 
 const REV_BARS: [string, number][] = [
   ["Q1 25", 42], ["Q2 25", 58], ["Q3 25", 71], ["Q4 25", 96], ["Q1 26", 112], ["Q2 26", 138], ["Q3 26", 87],

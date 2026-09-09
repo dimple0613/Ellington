@@ -1,6 +1,6 @@
 import { useRouter } from "next/router";
 import { useCallback, useEffect, useRef, useState, ReactNode, CSSProperties } from "react";
-import { PROJECTS, UNITS, BUYERS, ST, Unit } from "../lib/data";
+import { ST, stKey } from "../lib/unit";
 import { money, AC } from "../lib/format";
 import { groupUrl, screenUrl, GROUP_PAGE } from "../lib/nav";
 import { useWindowSize } from "../lib/useWindowSize";
@@ -44,7 +44,7 @@ const NAV: Record<GroupId, { label: string; items: NavItem[] }> = {
   project: {
     label: "Project · BLG",
     items: [
-      { screen: "inventory", label: "Inventory", count: String(UNITS.filter((u) => u.status === "Available").length) },
+      { screen: "inventory", label: "Inventory" },
       { screen: "pricing", label: "Pricing & availability" },
       { screen: "construction", label: "Construction" },
     ],
@@ -196,6 +196,23 @@ export default function Shell({
   const [ticker, setTicker] = useState("AED 4.2M");
   const [live, setLive] = useState<{ receipts: any[]; docs: any[]; bookings: any[] }>({ receipts: [], docs: [], bookings: [] });
   const [focusIdx, setFocusIdx] = useState(0);
+  const [inv, setInv] = useState<{ units: any[]; projects: { code: string; name: string }[] }>({ units: [], projects: [] });
+  const [buyerNames, setBuyerNames] = useState<string[]>([]);
+
+  useEffect(() => {
+    let alive = true;
+    Promise.all([
+      fetch("/api/inventory").then((r) => r.ok ? r.json() : null).then((j) => (j && j.ok ? j.data : null)).catch(() => null),
+      fetch("/api/buyers").then((r) => r.ok ? r.json() : null).then((j) => (j && j.ok ? j.data.buyers : [])).catch(() => []),
+    ]).then(([data, buyers]) => {
+      if (!alive) return;
+      if (data && Array.isArray(data.units)) setInv({ units: data.units, projects: data.projects || [] });
+      const names: string[] = [];
+      (buyers || []).forEach((b: any) => { if (b && b.name) names.push(String(b.name)); });
+      setBuyerNames(names);
+    });
+    return () => { alive = false; };
+  }, []);
 
   useEffect(() => {
     if (!cmdk) return;
@@ -300,13 +317,7 @@ export default function Shell({
     router.push("/profile");
   };
 
-  const countMap: Record<string, { n: number; v: number }> = {};
-  UNITS.forEach((u) => {
-    countMap[u.status] = countMap[u.status] || { n: 0, v: 0 };
-    countMap[u.status].n++;
-    countMap[u.status].v += u.price;
-  });
-  const total = UNITS.length;
+  const liveAvailable = inv.units.filter((u: any) => String(u.status || "").toLowerCase() === "available").length;
 
   const scopeLocked = (scopeCode || "ALL") === "ALL";
   const groupLocked = (group === "project" || group === "sales") && scopeLocked;
@@ -318,7 +329,7 @@ export default function Shell({
     return {
       screen: it.screen,
       label: it.label,
-      count: it.count || "",
+      count: it.screen === "inventory" && liveAvailable > 0 ? String(liveAvailable) : (it.count || ""),
       locked,
       btn: {
         display: "flex",
@@ -359,20 +370,29 @@ export default function Shell({
     };
   });
 
+  const invStats = (code: string) => {
+    const us = inv.units.filter((u: any) => String(u.project_code || "") === code);
+    const sold = us.filter((u: any) => u.status === "sold" || u.status === "booked").length;
+    return { total: us.length, sold };
+  };
   const scopes = [
-    { code: "ALL", name: "All projects (Portfolio)", pct: 68, units: 850 },
-    ...PROJECTS.map((p) => ({ code: p.code, name: p.name, pct: Math.round((p.sold / p.units) * 100), units: p.units })),
+    { code: "ALL", name: "All projects (Portfolio)", pct: inv.units.length ? Math.round((inv.units.filter((u: any) => u.status === "sold" || u.status === "booked").length / inv.units.length) * 100) : 0, units: inv.units.length },
+    ...inv.projects.map((p) => {
+      const st2 = invStats(p.code);
+      return { code: p.code, name: p.name, pct: st2.total ? Math.round((st2.sold / st2.total) * 100) : 0, units: st2.total };
+    }),
   ];
   const [swq, setSwq] = useState("");
   const scopeHits = scopes.filter((s) => !swq || (s.code + " " + s.name).toLowerCase().includes(swq.toLowerCase()));
-  const proj = PROJECTS.find((p) => p.code === scopeCode);
+  const proj = inv.projects.find((p) => p.code === scopeCode);
+  const scopeStats = scopeCode && scopeCode !== "ALL" ? invStats(scopeCode) : { total: inv.units.length, sold: inv.units.filter((u: any) => u.status === "sold" || u.status === "booked").length };
   const groupLabel = group === "project" ? "Project · " + (proj ? proj.code : scopeCode || "ALL") : NAV[group].label;
 
-  const hitUnits = UNITS.filter(
-    (u) => !q || u.id.toLowerCase().includes(q.toLowerCase()) || u.typ.toLowerCase().includes(q.toLowerCase())
-  ).slice(0, 4);
-  const hitBuyers = BUYERS.filter((b) => !q || b.toLowerCase().includes(q.toLowerCase())).slice(0, 3);
-  const hitProjects = PROJECTS.filter((p) => !q || (p.code + " " + p.name + " " + p.loc).toLowerCase().includes(q.toLowerCase())).slice(0, 4);
+  const hitUnits = inv.units
+    .filter((u: any) => !q || String(u.id || "").toLowerCase().includes(q.toLowerCase()) || String(u.type || "").toLowerCase().includes(q.toLowerCase()))
+    .slice(0, 4);
+  const hitBuyers = buyerNames.filter((b) => !q || b.toLowerCase().includes(q.toLowerCase())).slice(0, 3);
+  const hitProjects = inv.projects.filter((p) => !q || (p.code + " " + p.name).toLowerCase().includes(q.toLowerCase())).slice(0, 4);
   const hitReceipts = (live.receipts || []).filter((r: any) => !q || (String(r.reference || "") + " " + (r.buyer || "") + " " + (r.unit || "")).toLowerCase().includes(q.toLowerCase())).slice(0, 4);
   const hitDocs = (live.docs || []).filter((d: any) => !q || (String(d.ref || "") + " " + (d.type || "") + " " + (d.buyer || "")).toLowerCase().includes(q.toLowerCase())).slice(0, 4);
   const hitBookings = (live.bookings || []).filter((b: any) => !q || (String(b.ref || "") + " " + String(b.unit_no || "") + " " + (b.buyer || "")).toLowerCase().includes(q.toLowerCase())).slice(0, 4);
@@ -388,9 +408,12 @@ export default function Shell({
 
   type PalItem = { group: string; key: string; title: string; sub: string; trail: string; icon: string; bg: string; fg: string; onClick: () => void };
   const palette: PalItem[] = [
-    ...hitUnits.map((u) => ({ group: "Units", key: u.id, title: u.id, sub: u.typ + " · L" + u.f + " · " + u.area + " sq.ft", trail: money(u.price), icon: "⌗", bg: ST[u.status][1], fg: ST[u.status][0], onClick: () => { closeCmdk(); navigate("unit", "project", { unit: u.id }); } })),
-    ...hitBuyers.map((b, i) => ({ group: "Buyers", key: b, title: b, sub: "H21-B-00" + (147 + i) + " · 2 units", trail: "AED " + (1.9 - i * 0.4).toFixed(1) + "M out", icon: b[0], bg: "#E7E9F0", fg: "#4A5060", onClick: () => { closeCmdk(); navigate("buyer", "sales", { name: b }); } })),
-    ...hitProjects.map((p) => ({ group: "Projects", key: p.code, title: p.name, sub: p.code + " · " + p.loc, trail: Math.round((p.sold / p.units) * 100) + "% sold", icon: p.code[0], bg: "#EDECFE", fg: AC, onClick: () => { closeCmdk(); onScope && onScope(p.code); } })),
+    ...hitUnits.map((u: any) => ({ group: "Units", key: String(u.id), title: String(u.id), sub: (u.type || "2BR") + " · " + (Number(u.area) || 0) + " sq.ft", trail: money(Number(u.price) || 0), icon: "⌗", bg: ST[stKey(u.status)][1], fg: ST[stKey(u.status)][0], onClick: () => { closeCmdk(); navigate("unit", "project", { unit: String(u.id) }); } })),
+    ...hitBuyers.map((b, i) => ({ group: "Buyers", key: b, title: b, sub: "Click to open buyer profile", trail: "", icon: b[0], bg: "#E7E9F0", fg: "#4A5060", onClick: () => { closeCmdk(); navigate("buyer", "sales", { name: b }); } })),
+    ...hitProjects.map((p) => {
+      const st2 = invStats(p.code);
+      return { group: "Projects", key: p.code, title: p.name, sub: p.code + " · " + st2.total + " units", trail: st2.total ? Math.round((st2.sold / st2.total) * 100) + "% sold" : "—", icon: p.code[0], bg: "#EDECFE", fg: AC, onClick: () => { closeCmdk(); onScope && onScope(p.code); } };
+    }),
     ...hitReceipts.map((r: any) => ({ group: "Receipts", key: "R" + r.id + (r.reference || ""), title: r.reference || "RCP-…", sub: (r.buyer || "—") + " · " + (r.unit || r.project || "") + " · " + r.date, trail: money(r.amount), icon: "₪", bg: "#E9F8F1", fg: "#1F9D6B", onClick: () => { closeCmdk(); navigate("payments", "finance"); } })),
     ...hitDocs.map((d: any) => ({ group: "Documents", key: d.ref + d.type, title: d.ref, sub: (d.type || "") + " · " + (d.buyer || ""), trail: d.status || "", icon: "◳", bg: "#FDF4E5", fg: "#B07B14", onClick: () => { closeCmdk(); navigate("documents", "sales"); } })),
     ...hitBookings.map((b: any) => ({ group: "Bookings", key: b.ref + b.unit_no, title: b.ref || "BKG-…", sub: (b.unit_no || "") + " · " + (b.buyer || ""), trail: money(b.net_price || 0), icon: "▤", bg: "#F1EEFE", fg: AC, onClick: () => { closeCmdk(); navigate("booking", "sales"); } })),
@@ -424,7 +447,7 @@ export default function Shell({
         <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10, fontWeight: 700, padding: "4px 6px", borderRadius: 8, background: "#EDECFE", color: AC }}>{scopeCode || (onScope ? "ALL" : "")}</span>
         <span style={{ flex: 1, minWidth: 0 }}>
           <span style={{ display: "block", fontSize: 12.5, fontWeight: 700, letterSpacing: "-.01em", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{proj ? proj.name : "All projects"}</span>
-          <span style={{ display: "block", fontSize: 10.5, color: "#6B7180", fontWeight: 500, marginTop: 2 }}>{proj ? proj.units + " units · " + Math.round((proj.sold / proj.units) * 100) + "% sold" : "850 units · 68% sold"}</span>
+          <span style={{ display: "block", fontSize: 10.5, color: "#6B7180", fontWeight: 500, marginTop: 2 }}>{scopeStats.total > 0 ? scopeStats.total + " units · " + Math.round((scopeStats.sold / scopeStats.total) * 100) + "% sold" : "no units on record"}</span>
         </span>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9AA0AE" strokeWidth="2" strokeLinecap="round"><path d="m6 9 6 6 6-6" /></svg>
       </button>

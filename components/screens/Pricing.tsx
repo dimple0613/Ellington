@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { AC, money } from "../../lib/format";
-import { ramp } from "../../lib/data";
+import { AC, money, ramp } from "../../lib/format";
 import { fetchJSON } from "../../lib/api";
 
 const BANDS = ["L1-10", "L11-20", "L21-30", "L31-40", "L41-45"];

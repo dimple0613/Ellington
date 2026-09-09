@@ -7,7 +7,6 @@ import FinancialsScreen from "../components/screens/Financials";
 import CashflowScreen from "../components/screens/Cashflow";
 import ReportsScreen from "../components/screens/Reports";
 import { compact, AC } from "../lib/format";
-import { PROJECTS } from "../lib/data";
 import { screenUrl } from "../lib/nav";
 import { SCR_TITLES } from "../lib/screens";
 import { exportPortfolioPdf } from "../lib/pdf";
@@ -50,65 +49,53 @@ const spark = (vals: number[], pts = 6): string => {
 };
 
 function fallbackDash(): DashData {
-  const projects = PROJECTS.map((p) => ({ ...p }));
-  const totalUnits = projects.reduce((a, b) => a + b.units, 0);
-  const avail = projects.reduce((a, b) => a + (b.units - b.sold), 0);
-  const gdv = projects.reduce((a, b) => a + b.gdv, 0);
-  const soldV = projects.reduce((a, b) => a + b.soldV, 0);
-  const collected = projects.reduce((a, b) => a + b.soldV * (b.coll / 100), 0);
-  const outstanding = Math.max(0, soldV - collected);
-  const overdue = 31.4 * 1e6;
-  const slow = Math.max(0, outstanding - overdue);
+  const projects: DashProject[] = [];
 
   const kpis: Kpi[] = [
-    { label: "Gross development value", value: compact(its(gdv)), chip: rnd((soldV / gdv) * 100, 1) + "% sold", dir: "up", sub: projects.length + " projects", target: { screen: "dashboard", group: "portfolio" }, spark: spark(projects.map((p) => p.gdv)) },
-    { label: "Total sold value", value: compact(its(soldV)), chip: rnd((collected / soldV) * 100, 1) + "% collected", dir: "up", sub: rnd((soldV / gdv) * 100, 1) + "% of GDV", target: { screen: "dashboard", group: "portfolio" }, spark: spark(projects.map((p) => p.soldV)) },
-    { label: "Collected to date", value: compact(its(collected)), chip: rnd(its(collected), 1) + "M banked", dir: "up", sub: rnd((collected / soldV) * 100, 1) + "% of sold", target: { screen: "payments", group: "finance" }, spark: spark(projects.map((p) => p.gdv * (p.coll / 100))) },
-    { label: "Outstanding receivable", value: compact(its(outstanding)), chip: "—", dir: "down", sub: rnd((outstanding / soldV) * 100, 1) + "% of sold", target: { screen: "collections", group: "finance" }, spark: spark(projects.map((p) => p.soldV - p.soldV * (p.coll / 100))) },
-    { label: "Overdue", value: compact(its(overdue)), chip: "—", dir: "bad", sub: rnd((overdue / outstanding) * 100, 1) + "% of outstanding", target: { screen: "collections", group: "finance" }, spark: spark([1, 0.9, 0.8, 0.62, 0.41, 0.3]) },
-    { label: "Units available", value: avail + " of " + totalUnits, chip: "AED " + compact(0).replace("AED ", "") + " inventory", dir: "down", sub: rnd(((totalUnits - avail) / totalUnits) * 100, 1) + "% sold through", target: { screen: "inventory", group: "project" }, spark: spark(projects.map((p) => p.units - p.sold)) },
+    { label: "Gross development value", value: compact(0), chip: "0% sold", dir: "up", sub: "0 projects", target: { screen: "dashboard", group: "portfolio" }, spark: spark([]) },
+    { label: "Total sold value", value: compact(0), chip: "0% collected", dir: "up", sub: "0% of GDV", target: { screen: "dashboard", group: "portfolio" }, spark: spark([]) },
+    { label: "Collected to date", value: compact(0), chip: "0M banked", dir: "up", sub: "0% of sold", target: { screen: "payments", group: "finance" }, spark: spark([]) },
+    { label: "Outstanding receivable", value: compact(0), chip: "—", dir: "down", sub: "0% of sold", target: { screen: "collections", group: "finance" }, spark: spark([]) },
+    { label: "Overdue", value: compact(0), chip: "—", dir: "bad", sub: "0% of outstanding", target: { screen: "collections", group: "finance" }, spark: spark([0, 0, 0, 0, 0, 0]) },
+    { label: "Units available", value: "0 of 0", chip: "AED 0.0M inventory", dir: "down", sub: "0% sold through", target: { screen: "inventory", group: "project" }, spark: spark([]) },
   ];
 
   return {
-    meta: { projects: projects.length, units: totalUnits, date: "—" },
+    meta: { projects: 0, units: 0, date: "—" },
     projects,
     kpis,
     donut: {
-      pct: Math.min(100, Math.round((collected / soldV) * 100)),
+      pct: 0,
       stops: [62, 96, 100],
       legend: [
-        ["Collected", compact(its(collected)), AC],
-        ["Outstanding", compact(its(slow)), "#B9B4FA"],
-        ["Overdue", compact(its(overdue)), "#E5484D"],
+        ["Collected", compact(0), AC],
+        ["Outstanding", compact(0), "#B9B4FA"],
+        ["Overdue", compact(0), "#E5484D"],
       ] as [string, string, string][],
     },
     ageing: [
-      ["Current", its(slow), 0, 0],
-      ["1–30", 18.4, 21, 22],
-      ["31–60", 7.1, 12, 10],
-      ["61–90", 3.7, 8, 5],
-      ["90+", its(overdue), 31, 60],
-    ],
+      ["Current", 0, 0, 0],
+      ["1–30", 0, 0, 0],
+      ["31–60", 0, 0, 0],
+      ["61–90", 0, 0, 0],
+      ["90+", 0, 0, 0],
+    ] as [string, number, number, number][],
     forecast: {
       bars: {
-        "7": [["Mon", 8.4], ["Tue", 12.1], ["Wed", 6.2], ["Thu", 14.8], ["Fri", 3.1], ["Sat", 1.2], ["Sun", 0.6]],
-        "30": [["W1", 21.4], ["W2", 34.8], ["W3", 18.2], ["W4", 26.6]],
+        "7": [],
+        "30": [],
         "90": [],
         "180": [],
       },
     },
-    attention: [
-      { text: "4 instalments overdue beyond 90 days", meta: "Belgravia Heights III", value: "AED 8.2M", tone: "red", target: { screen: "collections", group: "finance" } },
-      { text: "3 escrow variances unmatched", meta: "Ocean House · 12 items", value: "3", tone: "red", target: { screen: "escrow", group: "finance" } },
-      { text: "2 bookings awaiting approval", meta: "Sales approvals", value: "2", tone: "amber", target: { screen: "booking", group: "sales" } },
-    ],
+    attention: [],
     velocity: {
       stats: [
-        { label: "Absorption", value: "27 /mo" },
-        { label: "Stock left", value: "11.7 mo" },
-        { label: "Bookings (90d)", value: "82" },
+        { label: "Absorption", value: "0 /mo" },
+        { label: "Stock left", value: "0 mo" },
+        { label: "Bookings (90d)", value: "0" },
       ],
-      bars: [14, 22, 18, 27, 31, 24, 19, 29, 35, 26, 33, 28],
+      bars: [],
     },
   };
 }
@@ -135,7 +122,7 @@ export default function Dashboard() {
     return () => { active = false; };
   }, []);
 
-  const activeProjects = data.projects.length ? data.projects : PROJECTS as DashProject[];
+  const activeProjects = data.projects;
   const bars = data.forecast.bars[fc] || [];
   const sum = bars.reduce((a, b) => a + b[1], 0);
   const mx = Math.max.apply(null, bars.map((b) => b[1]).concat(0.001));

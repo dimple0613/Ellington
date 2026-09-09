@@ -19,3 +19,14 @@ export function fmtShortDate(v: unknown): string {
   if (isNaN(d.getTime())) return "";
   return String(d.getDate()).padStart(2, "0") + " " + MONTHS_ABBR[d.getMonth()] + " " + String(d.getFullYear()).slice(-2);
 }
+
+export function ramp(t: number): string {
+  const A = [240, 239, 254];
+  const B = [130, 124, 206];
+  const c = Math.max(0, Math.min(1, t));
+  return (
+    "rgb(" +
+    A.map((v, i) => Math.round(v + (B[i] - v) * c)).join(",") +
+    ")"
+  );
+}
