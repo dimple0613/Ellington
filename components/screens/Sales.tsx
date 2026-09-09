@@ -221,7 +221,21 @@ export default function Sales({ scope }: { scope: string }) {
   };
 
   if (s === "leads") return <Leads onNewBooking={blankBooking} onBookLead={goBooking} goRegister={go("bookings")} />;
-  if (s === "booking") return <Booking step={step} setStep={setStep} onBack={go("leads")} lead={lead} blank={!lead} />;
+  if (s === "booking") return <Booking step={step} setStep={setStep} onBack={go("leads")} lead={lead} blank={!lead}
+    onOpenBuyer={(bid) => {
+      if (bid != null) {
+        const q: Record<string,string> = { s: "buyer", id: String(bid) };
+        if (scope && scope !== "ALL") q.scope = scope;
+        router.replace({ pathname: "/sales", query: q }, undefined, { shallow: true });
+      } else {
+        go("leads")();
+      }
+    }}
+    onBackToInventory={() => {
+      const q: Record<string,string> = { s: "inventory" };
+      if (scope && scope !== "ALL") q.scope = scope;
+      router.replace({ pathname: "/project", query: q }, undefined, { shallow: true });
+    }} />;
   if (s === "bookings") return <BookingsRegister onBack={go("leads")} />;
   if (s === "buyer") {
     if (router.query.id) return <Buyer360 btab={btab} setBtab={setBtab} goUnit={goUnit} />;
@@ -585,7 +599,18 @@ function LeadDrawer({ lead, stage, color, onClose, onBook }: { lead: Card; stage
 /* ═══════════════════════════════════════════════════════════════════
    BOOKING WIZARD
    ═══════════════════════════════════════════════════════════════════ */
-function Booking({ step, setStep, onBack, lead, blank }: { step:number; setStep:(n:number)=>void; onBack:()=>void; lead: Card | null; blank: boolean }) {
+type PlanRow = { label: string; trigger: string; due: string; pct: number };
+const PLAN_DEFAULT: PlanRow[] = [
+  { label: "Booking token", trigger: "On booking", due: "14 Sep 2026", pct: 10 },
+  { label: "Excavation 20%", trigger: "Excavation complete", due: "14 Dec 2026", pct: 20 },
+  { label: "Structure 20%", trigger: "Structure at 50%", due: "14 Mar 2027", pct: 20 },
+  { label: "Structure 40%", trigger: "Structure complete", due: "14 Jun 2027", pct: 20 },
+  { label: "Watertight 20%", trigger: "Watertight enclosure", due: "14 Sep 2027", pct: 20 },
+  { label: "Handover 10%", trigger: "Handover", due: "Q4 2027", pct: 10 },
+];
+const PHASE_COLORS = ["#8B7CF6", "#5B8DEF", "#34C08A", "#E2A33C", "#F2715C", "#8A94A6"];
+
+function Booking({ step, setStep, onBack, lead, blank, onOpenBuyer, onBackToInventory }: { step:number; setStep:(n:number)=>void; onBack:()=>void; lead: Card | null; blank: boolean; onOpenBuyer: (id: number | null) => void; onBackToInventory: () => void }) {
   const leadName = blank ? "" : (lead?.name ?? "");
   const leadBudget = blank ? "" : (lead?.budget ?? "");
   const [buyer, setBuyer] = useState(leadName);
@@ -598,14 +623,72 @@ function Booking({ step, setStep, onBack, lead, blank }: { step:number; setStep:
   const [confirmErr, setConfirmErr] = useState("");
   const [savedRef, setSavedRef] = useState("");
   const [issuedReceipt, setIssuedReceipt] = useState("");
+  const [buyerId, setBuyerId] = useState<number | null>(null);
+  const [plan, setPlan] = useState<PlanRow[]>(PLAN_DEFAULT.map((r) => ({ ...r })));
+  const [escrow, setEscrow] = useState("ESC-2026-9021");
+  const [payMethod, setPayMethod] = useState("Bank transfer");
+  const [payBank, setPayBank] = useState("Emirates NBD");
+  const [payRef, setPayRef] = useState("TT-2026-441882");
+  const [draft, setDraft] = useState<{ ref: string; when: string } | null>(null);
+  const [draftSaving, setDraftSaving] = useState(false);
 
   const listPrice = 2450000;
   const discVal = parseFloat(disc || "0");
+  const discAmt = Math.round(listPrice * discVal / 100);
   const netVal = Math.round(listPrice * (1 - discVal / 100));
   const net = money(netVal);
   const bookingAmt = Math.round(netVal * 0.1);
   const psf = Math.round(netVal / 1180);
-  const escrowRef = SFIELDS[5].find((f) => f[0] === "Escrow deposit reference")?.[1] || "";
+  const planTotal = plan.reduce((a, r) => a + (r.pct || 0), 0);
+  const planOk = Math.abs(planTotal - 100) < 0.001;
+  const dld = Math.round(netVal * 0.04);
+  const oqood = 3150;
+  const devFee = 4200;
+  const grandTotal = netVal + dld + oqood + devFee;
+
+  const LOCK_MIN = 45;
+  const [lock, setLock] = useState<number>(LOCK_MIN * 60);
+  useEffect(() => {
+    const t = setInterval(() => setLock((s) => (s <= 1 ? 0 : s - 1)), 1000);
+    return () => clearInterval(t);
+  }, []);
+  const lockWarn = lock <= 300;
+  const lockLabel = lock > 0
+    ? "Unit soft-locked \u00b7 " + String(Math.floor(lock / 60)).padStart(2, "0") + ":" + String(Math.floor(lock % 60)).padStart(2, "0") + " left"
+    : "Soft-lock expired \u00b7 holding released";
+
+  const setRow = (i: number, patch: Partial<PlanRow>) => {
+    setPlan((n) => { const c = [...n]; c[i] = { ...c[i], ...patch }; return c; });
+  };
+
+  const saveDraft = async () => {
+    setDraftSaving(true);
+    setConfirmErr("");
+    try {
+      const d = await fetchJSON<{ id: number; ref: string }>("/api/bookings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          unit_no: "H21-T1-1204",
+          buyer_name: buyer || leadName || "Prospective buyer",
+          buyer_mobile: mobile,
+          buyer_email: null,
+          discount_pct: discVal,
+          discount_amt: discAmt,
+          list_price: listPrice,
+          net_price: netVal,
+          booking_amount: bookingAmt,
+          expected_spa: "2026-12-01",
+          status: "draft",
+        }),
+      });
+      setDraft({ ref: d.ref, when: new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) });
+    } catch (e: any) {
+      setConfirmErr(e?.message || "Draft not saved");
+    } finally {
+      setDraftSaving(false);
+    }
+  };
 
   const doConfirm = async () => {
     setConfirming(true);
@@ -615,22 +698,34 @@ function Booking({ step, setStep, onBack, lead, blank }: { step:number; setStep:
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          unit_no: "BLG-026",
+          unit_no: "H21-T1-1204",
           buyer_name: buyer || leadName || "Prospective buyer",
           buyer_mobile: mobile,
+          buyer_email: null,
           discount_pct: discVal,
+          discount_amt: discAmt,
           list_price: listPrice,
           net_price: netVal,
           booking_amount: bookingAmt,
+          expected_spa: "2026-12-01",
         }),
       });
       const res = await fetchJSON<any>("/api/bookings?id=" + created.id, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "confirm", escrow_ref: escrowRef, payment_method: "bank_transfer", buyer_email: null, buyer_mobile: mobile }),
+        body: JSON.stringify({
+          action: "confirm",
+          escrow_ref: escrow,
+          payment_method: payMethod.toLowerCase().replace(/[\s-]+/g, "_"),
+          payment_bank: payBank,
+          payment_reference: payRef,
+          buyer_email: null,
+          buyer_mobile: mobile,
+        }),
       });
       setSavedRef(res.ref || created.ref);
       setIssuedReceipt(String(res.receiptId || ""));
+      setBuyerId(res.buyerId != null ? Number(res.buyerId) : null);
       setConfirmed(true);
     } catch (e: any) {
       setConfirmErr(e?.message || "Booking failed to persist");
@@ -655,14 +750,62 @@ function Booking({ step, setStep, onBack, lead, blank }: { step:number; setStep:
     ["Broker", "Betterhomes \u00b7 2.0%"],
   ];
 
+  const cellIn = { width:"100%",height:30,border:"1px solid #EDEEF3",borderRadius:8,background:"#fff",padding:"0 8px",fontSize:12,fontWeight:600,fontFamily:"inherit",outline:"none",boxSizing:"border-box" as const };
+  const inStyle = { width:"100%",height:42,borderRadius:12,border:"1px solid #E4E6EE",background:"#fff",padding:"0 14px",fontSize:13,fontWeight:600,fontFamily:"inherit",outline:"none",boxSizing:"border-box" as const };
+
+  if (confirmed) {
+    const next = plan[1] || plan[0];
+    const nextAmt = money(Math.round(netVal * ((next && next.pct) || 10) / 100));
+    const nextDue = (next && next.due) || "14 Dec 2026";
+    const receiptStr = issuedReceipt ? "RCP-" + String(issuedReceipt).padStart(6, "0") : "RCP-000001";
+    const buyerStr = buyerId != null ? "B-" + String(buyerId).padStart(5, "0") : "\u2014";
+    const queued = [
+      ["Buyer welcome email", "payment schedule attached"],
+      ["Finance & Legal notification", "internal \u00b7 booking + receipt"],
+      ["Oqood registration task", "created for Buyer Services"],
+    ];
+    return (
+      <div>
+        <div style={{ background:"#fff", borderRadius:20, padding:"44px 32px", boxShadow:"0 1px 3px rgba(20,22,31,.04)", textAlign:"center" }}>
+          <div style={{ width:64, height:64, margin:"0 auto", borderRadius:20, background:"#E9F8F1", display:"grid", placeItems:"center" }}>
+            <span style={{ fontSize:28, fontWeight:900, color:"#1F9D6B" }}>{"\u2713"}</span>
+          </div>
+          <div style={{ fontSize:24, fontWeight:800, letterSpacing:"-.03em", marginTop:18 }}>Booking confirmed</div>
+          <div style={{ fontSize:13, color:"#6B7180", fontWeight:500, marginTop:6 }}>{buyer || "Prospective buyer"} \u00b7 {deal[0][1]} \u00b7 {deal[4][1]}</div>
+          <div style={{ display:"flex", gap:14, justifyContent:"center", marginTop:22, flexWrap:"wrap" }}>
+            {[["Booking reference", savedRef || "BKG-2026-00001"], ["Buyer ID", buyerStr], ["Receipt", receiptStr]].map(([l, v]) => (
+              <div key={l} style={{ borderRadius:14, background:"#F7F8FB", padding:"12px 18px", minWidth:150 }}>
+                <div style={{ fontSize:9.5, fontWeight:700, letterSpacing:".05em", textTransform:"uppercase", color:"#9AA0AE" }}>{l}</div>
+                <div style={{ fontSize:15, fontWeight:800, fontFamily:"'JetBrains Mono',monospace", marginTop:5 }}>{v}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{ display:"inline-flex", gap:8, alignItems:"center", marginTop:20, borderRadius:12, background:"#FDF4E5", padding:"10px 16px" }}>
+            <span style={{ width:7, height:7, borderRadius:5, background:"#E2A33C" }} />
+            <span style={{ fontSize:11.5, fontWeight:700, color:"#8A6410" }}>Next payment: {nextAmt} due {nextDue}</span>
+          </div>
+          <div style={{ marginTop:26, fontSize:10.5, fontWeight:700, letterSpacing:".05em", textTransform:"uppercase", color:"#9AA0AE" }}>Queued outbound</div>
+          <div style={{ display:"flex", gap:10, justifyContent:"center", marginTop:10, flexWrap:"wrap" }}>
+            {queued.map(([t, d]) => (
+              <div key={t} style={{ textAlign:"left", borderRadius:12, border:"1px solid #EDEEF3", padding:"10px 14px", width:230 }}>
+                <div style={{ fontSize:12, fontWeight:700 }}>{t}</div>
+                <div style={{ fontSize:10.5, color:"#9AA0AE", fontWeight:600, marginTop:3 }}>{d}</div>
+                <span style={{ ...pill("queued", true), marginTop:7, display:"inline-block" }}>queued</span>
+              </div>
+            ))}
+          </div>
+          <div style={{ display:"flex", gap:10, justifyContent:"center", marginTop:26, flexWrap:"wrap" }}>
+            <button onClick={() => (buyerId != null ? onOpenBuyer(buyerId) : onBack())} style={{ height:40, borderRadius:12, background:AC, color:"#fff", border:0, padding:"0 18px", fontFamily:"inherit", fontSize:12.5, fontWeight:700, cursor:"pointer" }}>Open buyer record</button>
+            <button onClick={onBack} style={{ height:40, borderRadius:12, border:"1px solid #EDEEF3", background:"#fff", padding:"0 18px", fontFamily:"inherit", fontSize:12.5, fontWeight:700, color:"#4A5060", cursor:"pointer" }}>Book another unit</button>
+            <button onClick={onBackToInventory} style={{ height:40, borderRadius:12, border:"1px solid #EDEEF3", background:"#fff", padding:"0 18px", fontFamily:"inherit", fontSize:12.5, fontWeight:700, color:"#4A5060", cursor:"pointer" }}>Back to inventory</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div>
-      {confirmed && (
-        <div style={{ background:"#E9F8F1", color:"#1F9D6B", borderRadius:14, padding:"14px 18px", marginBottom:16, fontSize:12.5, fontWeight:700 }}>
-          Booking confirmed \u00b7 {buyer || leadName || "Prospective buyer"} \u00b7 {deal[4][1]} \u00b7 {savedRef || ("escrow ref " + escrowRef)} \u00b7 {issuedReceipt ? ("receipt RCP-00" + String(issuedReceipt).padStart(4, "0") + " issued") : "receipt issued"}
-          <span style={{ display:"block", fontSize:11, fontWeight:600, marginTop:4, color:"#2EBD8B" }}>{blank ? "Blank booking created from lead pipeline." : "Created from lead \u2014 " + (lead?.name ?? "") + " (" + stage + " stage)."} Registered in the bookings register \u00b7 unit marked Reserved.</span>
-        </div>
-      )}
       {confirmErr && <div style={{ background:"#FDECEC", color:"#E5484D", borderRadius:12, padding:"11px 16px", fontSize:12, fontWeight:700, marginBottom:16 }}>Booking not persisted \u00b7 {confirmErr}</div>}
       <div style={{display:"grid",gridTemplateColumns:"210px 1fr 300px",gap:20,alignItems:"start"}}>
       {/* step rail */}
@@ -680,9 +823,12 @@ function Booking({ step, setStep, onBack, lead, blank }: { step:number; setStep:
             </button>
           );
         })}
-        <div style={{marginTop:16,paddingTop:14,borderTop:"1px solid #F1F2F7",display:"flex",alignItems:"center",gap:8}}>
-          <span style={{width:7,height:7,borderRadius:5,background:"#E2A33C"}} />
-          <span style={{fontSize:10.5,fontWeight:700,color:"#8A6410"}}>Unit locked \u00b7 43:12</span>
+        <div style={{marginTop:16,paddingTop:14,borderTop:"1px solid #F1F2F7"}}>
+          <div style={{display:"flex",alignItems:"center",gap:8}}>
+            <span style={{width:7,height:7,borderRadius:5,background:lockWarn?"#E5484D":"#E2A33C"}} />
+            <span style={{fontSize:10.5,fontWeight:700,color:lockWarn?"#E5484D":"#8A6410"}}>{lockLabel}</span>
+          </div>
+          <div style={{fontSize:9.5,color:"#9AA0AE",fontWeight:600,marginTop:4}}>Auto-release if a step is not saved or continued</div>
         </div>
       </div>
 
@@ -690,6 +836,120 @@ function Booking({ step, setStep, onBack, lead, blank }: { step:number; setStep:
       <div style={{background:"#fff",borderRadius:20,padding:"24px 26px",boxShadow:"0 1px 3px rgba(20,22,31,.04)"}}>
         <div style={{fontSize:18,fontWeight:800,letterSpacing:"-.025em"}}>Step {step}: {STEP_LABELS[step-1][0]}</div>
         <div style={{fontSize:12.5,color:"#6B7180",fontWeight:500,marginTop:6}}>{STEP_LABELS[step-1][1]}</div>
+        {step === 3 ? (
+        <div style={{marginTop:24}}>
+          <div style={{fontSize:11,fontWeight:800,color:"#6B7180"}}>Plan percentages must sum to exactly 100% — amounts recompute live from the {discVal}% net price.</div>
+          <div style={{marginTop:12,border:"1px solid #EDEEF3",borderRadius:14,overflow:"hidden"}}>
+            <div style={{display:"grid",gridTemplateColumns:"34px 1.3fr 1.3fr 1fr 0.8fr 0.8fr 1fr",gap:10,padding:"9px 12px",background:"#F7F8FB",fontSize:10,fontWeight:700,color:"#9AA0AE",textTransform:"uppercase",letterSpacing:".04em"}}>
+              <span></span><span>Milestone</span><span>Trigger</span><span>Due date</span><span>%</span><span style={{textAlign:"right"}}>Running</span><span style={{textAlign:"right"}}>Amount</span>
+            </div>
+            {plan.map((r: PlanRow, i: number) => {
+              const run = plan.slice(0, i + 1).reduce((a, x) => a + (x.pct || 0), 0);
+              return (
+                <div key={i} style={{display:"grid",gridTemplateColumns:"34px 1.3fr 1.3fr 1fr 0.8fr 0.8fr 1fr",gap:10,alignItems:"center",padding:"6px 12px",borderTop:"1px solid #F3F4F8"}}>
+                  <span style={{fontSize:10.5,fontWeight:800,color:"#9AA0AE"}}>{i + 1}</span>
+                  <input value={r.label} onChange={(e) => setRow(i, { label: e.target.value })} style={cellIn} />
+                  <input value={r.trigger} onChange={(e) => setRow(i, { trigger: e.target.value })} style={cellIn} />
+                  <input value={r.due} onChange={(e) => setRow(i, { due: e.target.value })} style={cellIn} />
+                  <input type="number" min={0} max={100} value={String(r.pct)} onChange={(e) => setRow(i, { pct: parseFloat(e.target.value) || 0 })} style={{ ...cellIn, textAlign:"right", fontFamily:"'JetBrains Mono',monospace" }} />
+                  <span style={{textAlign:"right",fontSize:11,fontWeight:700,fontFamily:"'JetBrains Mono',monospace"}}>{run.toFixed(1)}%</span>
+                  <span style={{textAlign:"right",fontSize:12,fontWeight:800,fontFamily:"'JetBrains Mono',monospace"}}>{money(Math.round(netVal * (r.pct || 0) / 100))}</span>
+                </div>
+              );
+            })}
+          </div>
+          <div style={{display:"flex",alignItems:"center",gap:10,marginTop:14}}>
+            <div style={{flex:1,height:8,borderRadius:5,background:"#F1F2F7",overflow:"hidden"}}>
+              <div style={{height:"100%",borderRadius:5,background:planOk?"#34C08A":"#E5484D",width:Math.min(100,planTotal) + "%",transition:"width .2s"}} />
+            </div>
+            <span style={{fontSize:11.5,fontWeight:800,fontFamily:"'JetBrains Mono',monospace",color:planOk?"#1F9D6B":"#E5484D"}}>{planTotal.toFixed(1)}%</span>
+            <span style={hint(planOk ? "valid" : "mandatory")}>{planOk ? "valid \u00b7 totals exactly 100%" : "adjust \u00b7 totals " + planTotal.toFixed(1) + "%"}</span>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"1.3fr 1fr",gap:18,marginTop:18}}>
+            <div style={{border:"1px solid #EDEEF3",borderRadius:14,padding:"14px 16px"}}>
+              <div style={{fontSize:10.5,fontWeight:700,letterSpacing:".05em",color:"#9AA0AE",textTransform:"uppercase",marginBottom:8}}>Additional charges</div>
+              {[["DLD registration 4%", "buyer", money(dld)], ["Oqood admin fee", "buyer", money(oqood)], ["Developer admin fee", "buyer", money(devFee)]].map(([l, p, v]) => (
+                <div key={l} style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,padding:"7px 0",borderBottom:"1px solid #F6F7FA"}}>
+                  <span style={{fontSize:11.5,fontWeight:600,color:"#4A5060"}}>{l}</span>
+                  <span style={{display:"flex",alignItems:"center",gap:9}}>
+                    <span style={{fontSize:10,fontWeight:700,color:"#9AA0AE"}}>{p}</span>
+                    <span style={{fontSize:12,fontWeight:800,fontFamily:"'JetBrains Mono',monospace"}}>{v}</span>
+                  </span>
+                </div>
+              ))}
+            </div>
+            <div style={{border:"1px solid #EDEEF3",borderRadius:14,padding:"14px 16px"}}>
+              <div style={{fontSize:10.5,fontWeight:700,letterSpacing:".05em",color:"#9AA0AE",textTransform:"uppercase",marginBottom:8}}>Summary</div>
+              {[["Total contract value", money(netVal)], ["Total plan amount", money(netVal)], ["Additional charges", money(dld + oqood + devFee)], ["Grand total", money(grandTotal)]].map(([l, v]) => (
+                <div key={l} style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,padding:"7px 0",borderBottom:"1px solid #F6F7FA"}}>
+                  <span style={{fontSize:11.5,fontWeight:600,color:"#6B7180"}}>{l}</span>
+                  <span style={{fontSize:12,fontWeight:800,fontFamily:"'JetBrains Mono',monospace"}}>{v}</span>
+                </div>
+              ))}
+              <div style={{fontSize:11.5,fontWeight:800,marginTop:10,color:planOk ? "#1F9D6B" : "#E5484D"}}>{planOk ? "Schedule valid \u2014 ready to proceed" : "Split percentages until they total 100%"}</div>
+            </div>
+          </div>
+          <div style={{marginTop:18}}>
+            <div style={{fontSize:10.5,fontWeight:700,letterSpacing:".05em",color:"#9AA0AE",textTransform:"uppercase",marginBottom:9}}>Instalments vs construction programme</div>
+            <div style={{display:"flex",height:14,borderRadius:7,overflow:"hidden",background:"#F1F2F7"}}>
+              {plan.map((r, i) => (
+                <div key={i} title={r.label + " \u00b7 " + money(Math.round(netVal * (r.pct || 0) / 100))} style={{width:(r.pct || 0) + "%",background:PHASE_COLORS[i % PHASE_COLORS.length],minWidth:16}} />
+              ))}
+            </div>
+            <div style={{display:"flex",marginTop:6}}>
+              {plan.map((r, i) => (
+                <div key={i} style={{width:(r.pct || 0) + "%",fontSize:9.5,fontWeight:600,color:"#9AA0AE",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",paddingRight:6}}>{r.trigger}</div>
+              ))}
+            </div>
+          </div>
+        </div>
+        ) : step === 5 ? (
+        <div style={{marginTop:24}}>
+          <div style={{fontSize:11,fontWeight:800,color:"#6B7180"}}>Record the booking payment — the escrow deposit reference is mandatory before confirm.</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"16px 20px",marginTop:14}}>
+            <div>
+              <div style={{fontSize:10.5,fontWeight:700,letterSpacing:".05em",color:"#9AA0AE",textTransform:"uppercase",marginBottom:7}}>Amount</div>
+              <div style={box(false)}>
+                <span style={{fontSize:13,fontWeight:700,color:"#9AA0AE",marginRight:6}}>AED</span>
+                <input value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9]/g, ""))} style={{flex:1,border:0,background:"transparent",fontSize:13,fontWeight:700,fontFamily:"inherit",outline:"none"}} />
+                <span style={hint("within bounds")}>10% of net</span>
+              </div>
+            </div>
+            <div>
+              <div style={{fontSize:10.5,fontWeight:700,letterSpacing:".05em",color:"#9AA0AE",textTransform:"uppercase",marginBottom:7}}>Date</div>
+              <div style={box(false)}><span style={{flex:1}}>25 Aug 2026</span></div>
+            </div>
+            <div>
+              <div style={{fontSize:10.5,fontWeight:700,letterSpacing:".05em",color:"#9AA0AE",textTransform:"uppercase",marginBottom:7}}>Method</div>
+              <select value={payMethod} onChange={(e) => setPayMethod(e.target.value)} style={inStyle}>
+                <option>Bank transfer</option><option>Cheque</option><option>Card</option><option>Cash</option><option>Crypto-converted</option>
+              </select>
+            </div>
+            <div>
+              <div style={{fontSize:10.5,fontWeight:700,letterSpacing:".05em",color:"#9AA0AE",textTransform:"uppercase",marginBottom:7}}>Bank</div>
+              <input value={payBank} onChange={(e) => setPayBank(e.target.value)} placeholder="Bank name" style={inStyle} />
+            </div>
+            <div>
+              <div style={{fontSize:10.5,fontWeight:700,letterSpacing:".05em",color:"#9AA0AE",textTransform:"uppercase",marginBottom:7}}>Transaction reference</div>
+              <input value={payRef} onChange={(e) => setPayRef(e.target.value)} placeholder="TT ref" style={inStyle} />
+            </div>
+            <div>
+              <div style={{fontSize:10.5,fontWeight:700,letterSpacing:".05em",color:"#9AA0AE",textTransform:"uppercase",marginBottom:7}}>Escrow deposit reference <span style={{color:"#E5484D"}}>*</span></div>
+              <input value={escrow} onChange={(e) => setEscrow(e.target.value)} placeholder="ESC-2026-0000" style={{ ...inStyle, borderColor: escrow.trim() ? "#E4E6EE" : "#E5484D" }} />
+            </div>
+          </div>
+          <div style={{marginTop:14,background:"#FDECEC",borderRadius:12,padding:"11px 14px",fontSize:11.5,fontWeight:700,color:"#E5484D"}}>All buyer funds must be deposited to the project escrow account.</div>
+          <div style={{marginTop:18,border:"1px solid #EDEEF3",borderRadius:14,padding:"14px 16px"}}>
+            <div style={{fontSize:10.5,fontWeight:700,letterSpacing:".05em",color:"#9AA0AE",textTransform:"uppercase",marginBottom:8}}>Final review</div>
+            {[["Unit", "H21-T1-1204 \u00b7 2BR-B \u00b7 Level 12"], ["Buyer", buyer || "\u2014"], ["List price", money(listPrice)], ["Discount", "\u2212" + discVal + "% \u00b7 " + money(discAmt)], ["Net price", net], ["Plan total", planOk ? planTotal + "%" : "INVALID (" + planTotal.toFixed(1) + "%)"], ["Booking token", money(bookingAmt)], ["Escrow ref", escrow], ["Method \u00b7 bank", payMethod + " \u00b7 " + payBank]].map(([l, v]) => (
+              <div key={l} style={{display:"flex",justifyContent:"space-between",gap:12,padding:"7px 0",borderBottom:"1px solid #F6F7FA"}}>
+                <span style={{fontSize:11.5,color:"#9AA0AE",fontWeight:600}}>{l}</span>
+                <span style={{fontSize:12,fontWeight:700,textAlign:"right"}}>{v}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+        ) : (
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"16px 20px",marginTop:24}}>
           {fields.map(([label,value,hintVal]) => {
             const isBuyer = label === "Full name (passport)";
@@ -753,6 +1013,7 @@ function Booking({ step, setStep, onBack, lead, blank }: { step:number; setStep:
             );
           })}
         </div>
+        )}
         {showApproval && (
           <div style={{marginTop:22,background:"#FDF4E5",borderRadius:16,padding:"16px 18px",display:"flex",gap:12}}>
             <span style={{width:8,height:8,borderRadius:5,background:"#E2A33C",marginTop:5,flex:"none"}} />
@@ -762,11 +1023,12 @@ function Booking({ step, setStep, onBack, lead, blank }: { step:number; setStep:
             </span>
           </div>
         )}
-        <div style={{display:"flex",gap:10,marginTop:26,paddingTop:20,borderTop:"1px solid #F1F2F7"}}>
-          <button style={{height:40,borderRadius:12,border:"1px solid #EDEEF3",background:"#fff",padding:"0 16px",fontFamily:"inherit",fontSize:12.5,fontWeight:700,color:"#4A5060",cursor:"pointer"}}>Save as draft</button>
+        <div style={{display:"flex",gap:10,marginTop:26,paddingTop:20,borderTop:"1px solid #F1F2F7",alignItems:"center"}}>
+          <button onClick={saveDraft} disabled={draftSaving} style={{height:40,borderRadius:12,border:"1px solid #EDEEF3",background:"#fff",padding:"0 16px",fontFamily:"inherit",fontSize:12.5,fontWeight:700,color:"#4A5060",cursor:draftSaving?"progress":"pointer"}}>{draftSaving ? "Saving\u2026" : "Save as draft"}</button>
+          {draft && <span style={{fontSize:11,fontWeight:700,color:"#1F9D6B",whiteSpace:"nowrap"}}>Draft {draft.ref} saved \u00b7 {draft.when}</span>}
           <div style={{flex:1}} />
           {step > 1 && <button onClick={() => setStep(step-1)} style={{height:40,borderRadius:12,border:"1px solid #EDEEF3",background:"#fff",padding:"0 16px",fontFamily:"inherit",fontSize:12.5,fontWeight:700,color:"#4A5060",cursor:"pointer"}}>Back</button>}
-          <button onClick={() => step === 5 ? doConfirm() : setStep(step+1)} disabled={confirming} style={{height:40,borderRadius:12,background:AC,color:"#fff",border:0,padding:"0 20px",fontFamily:"inherit",fontSize:12.5,fontWeight:700,cursor:confirming?"progress":"pointer",opacity:confirming?0.7:1}}>{confirming ? "Confirming\u2026" : nextLabel}</button>
+          <button onClick={() => step === 5 ? doConfirm() : setStep(step+1)} disabled={confirming || (step === 3 && !planOk) || (step === 5 && !escrow.trim())} style={{height:40,borderRadius:12,background:AC,color:"#fff",border:0,padding:"0 20px",fontFamily:"inherit",fontSize:12.5,fontWeight:700,cursor:confirming?"progress":"pointer",opacity:(confirming || (step === 3 && !planOk) || (step === 5 && !escrow.trim()))?0.6:1}}>{confirming ? "Confirming\u2026" : nextLabel}</button>
         </div>
       </div>
 
