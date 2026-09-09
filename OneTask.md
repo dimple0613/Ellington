@@ -7,7 +7,7 @@
 > Branch-per-task rule (see AGENTS.md): never push directly to main. Update this section per task.
 
 - Current branch: `fix/parity-live-data` (PLINTH parity — verified remaining gaps). Push target: this branch only.
-- Pushed (ALL SIX): **D1** `728b479` · **D2** `bf3f350` · **D3** `0c94935` · **D4** `57adfdd` · **D5** `bc4f84f` · **D6** `31ff7aa` · tracker `79fbe32`.
+- Pushed (ALL SIX): **D1** `728b479` · **D2** `bf3f350` · **D3** `0c94935` · **D4** `57adfdd` · **D5** `bc4f84f` · **D6** `31ff7aa` · tracker `79fbe32` · audit-vs-reference findings `<commit>`.
 - Everything intended for this task is on this branch — NO commit on `main` from this program.
 - Prior `fix/plinth-parity` commits (T1–T18) are historical and NOT completion evidence.
 
@@ -44,6 +44,18 @@
       (Company/Numbering/Notifications/Integrations/Other). Visual change → AGENTS.md approval required.
 - [ ] **`lib/data.ts` mock purge** (`POS :22-29`, `BUYERS :31-44`, `PROJECTS :60-66`, `UNITS :84-122`)
       — retained as offline fallback; every screen above is API-first.
+
+## Dynamic audit vs reference — confirmed findings (09 Sep 2026)
+> Full evidence: `docs/AUDIT-VS-REFERENCE.md` (committed with this entry).
+> 62 pass / 12 fail then code+DB verification of every fail. Baseline harnesses still green.
+
+- [ ] **BUG: Payments Collected today / MTD always AED 0** even with receipts today (ids 43/44, `09 Sept 26`).
+      Root cause `pages/api/receipts.ts:37,42` `en-GB` month `"Sept"` (4 letters) vs
+      `Payments.tsx:126` regex expecting 3-letter → `parseD` null → 0. Also cosmetic `"Sept"` in tables.
+- [ ] **Gap: Settings** — 5 tabs only; reference needs Financial/Templates/Data (Data folds retention/
+      export schedules/IP allow-list/SSO). Was deferred; still needs operator approval.
+- [ ] **Gap: Audit Log** — live data present but no expandable before→after diff rows and no date-range/
+      actor filters (`before_val`/`after_val` columns already exist).
 
 ## Working baseline (verified in code, NOT re-litigated)
 - Live DB-backed today: receipts (create/PDC/import), invoices (issue/void/bulk), collections, escrow,
