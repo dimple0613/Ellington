@@ -30,7 +30,7 @@
 - [x] **AuditLog** — static `ROWS` removed; count/filters live; error text fixed.
 - [x] **Users** — static `USERS` fallback emptied; header count computed; empty-state; `ROLE_PERMS`/`THRESHOLDS_BASE`/`PLAIN` kept as role config.
 - [x] **Sales** — dead `DEAL`/`refOf` removed; `BROK_FALLBACK` left (already all-empty, harmless).
-- [~] **Sales booking wizard** — STILL hardwired (SFIELDS step data, `listPrice=2450000`, `escrow="ESC-2026-9021"`, `payBank/payRef` defaults, `unit_no:"H21-T1-1204"` baked into `saveDraft`/`doConfirm` POST bodies at ~712/741). **Decision needed from operator** — gutting it changes the POST contract + wizard UI (AGENTS.md: stop-and-ask). Default position: keep wizard as-is until operator rules on it.
+- [x] **Sales booking wizard rewired to live data** (operator-approved) — deleted `SFIELDS` static step data; wizard now loads available units from `/api/inventory?status=available` (scoped to `?scope=`), unit picked in a live `<select>`, and `listPrice`/`psf`/`booking token`/`DLD` derived from the selected unit's `price`/`area`. `saveDraft`/`doConfirm` POST `unit_no` + `list_price` from the live unit; escrow/bank/ref defaults emptied (escrow is mandatory input before confirm); discount default 0 with live approval copy; step 2 identity fields honest ("Captured at KYC"/"—"/"Pending screening"); step 4 docs "Queued after confirmation"; deal rail + step-5 review + confirmed screen all live. Save-draft/continue disabled until a unit is selected.
 
 ## PLINTH Parity Program — verified remaining tasks
 > Re-audited from scratch against `C:\Users\admin\Downloads\New folder\plinth-prompt-pack_1.html`

@@ -43,14 +43,6 @@ type LbRow = { agent: string; units: number; value: number; conv: number; disc: 
 
 /* ── booking wizard ─────────────────────────────────────────────── */
 const STEP_LABELS: [string,string][] = [["Unit & terms","Price, discount, plan"],["Buyer","Identity, KYC, AML"],["Payment schedule","Milestones and charges"],["Documents","Reservation, offer, SPA"],["Payment & confirm","Escrow reference required"]];
-type Field = [string,string,string];
-const SFIELDS: Record<number,Field[]> = {
-  1:[["Unit","H21-T1-1204 \u00b7 2BR-B \u00b7 Level 12","locked"],["List price","AED 2,450,000","AED 1,972/sq.ft"],["Discount requested","7.5%  \u00b7  AED 183,750","approval"],["Net price","AED 2,266,250","AED 1,920/sq.ft"],["Payment plan","20/40/40 Construction Linked","7 milestones"],["Booking token","10%  \u00b7  AED 226,688","within bounds"],["DLD 4% payer","Buyer","AED 90,650"],["Broker","Betterhomes \u00b7 2.0% on SPA","external"]],
-  2:[["Buyer type","Individual",""],["Full name (passport)","Hassan Al Rayes",""],["Nationality","United Arab Emirates",""],["Passport no.","A04128877 \u00b7 exp 12 Jun 2031","valid"],["Emirates ID","784-1988-4471203-6","valid"],["Mobile","+971 50 118 4472",""],["Source of funds","Salary and business income",""],["AML risk rating","Low","screened"]],
-  3:[["Total contract value","AED 2,266,250",""],["Plan percentage total","100.0%","balanced"],["DLD registration 4%","AED 90,650","buyer"],["Oqood admin fee","AED 3,150","buyer"],["Developer admin fee","AED 4,200","buyer"],["Grand total","AED 2,364,250",""],["First instalment","14 Sep 2026",""],["Final instalment","Q4 2027 \u00b7 handover",""]],
-  4:[["Reservation form","Generated \u00b7 v1","ready"],["Expression of interest","Generated \u00b7 4 pages","ready"],["Unit sales offer","Generated \u00b7 valid to 08 Sep 2026","ready"],["SPA draft","Awaiting legal review","pending"],["Signature routing","Buyer \u2192 Developer signatory",""],["Reminder cadence","Day 2, 5, 9",""]],
-  5:[["Amount","AED 226,688",""],["Date","25 Aug 2026",""],["Method","Bank transfer",""],["Bank","Emirates NBD",""],["Transaction reference","TT-2026-441882",""],["Escrow deposit reference","ESC-2026-9021","mandatory"],["Receipt","RCP-H21-004713","auto"],["Upload","transfer-advice.pdf","attached"]],
-};
 
 
 /* ── buyer 360 ──────────────────────────────────────────────────── */
@@ -127,6 +119,7 @@ export default function Sales({ scope }: { scope: string }) {
   const s = (typeof router.query.s === "string" ? router.query.s : null) || "leads";
   const [step, setStep] = useState(1);
   const [lead, setLead] = useState<Card | null>(null);
+  const [units, setUnits] = useState<WizardUnit[]>([]);
   const [btab, setBtab] = useState<"units"|"ledger"|"sched"|"profile"|"docs"|"comms"|"activity">("units");
   const [brtab, setBrtab] = useState<"agencies"|"agents"|"onboard"|"activity">("agencies");
   const [brstep, setBrstep] = useState(3);
@@ -154,8 +147,19 @@ export default function Sales({ scope }: { scope: string }) {
     go("booking")();
   };
 
+  useEffect(() => {
+    let active = true;
+    const q = "status=available" + (scope && scope !== "ALL" ? "&project=" + encodeURIComponent(scope) : "");
+    fetchJSON<{ units: WizardUnit[] }>("/api/inventory?" + q)
+      .then((j) => {
+        if (active && Array.isArray(j.units)) setUnits(j.units);
+      })
+      .catch(() => { if (active) setUnits([]); });
+    return () => { active = false; };
+  }, [scope]);
+
   if (s === "leads") return <Leads onNewBooking={blankBooking} onBookLead={goBooking} goRegister={go("bookings")} />;
-  if (s === "booking") return <Booking step={step} setStep={setStep} onBack={go("leads")} lead={lead} blank={!lead}
+  if (s === "booking") return <Booking step={step} setStep={setStep} onBack={go("leads")} lead={lead} blank={!lead} units={units}
     onOpenBuyer={(bid) => {
       if (bid != null) {
         const q: Record<string,string> = { s: "buyer", id: String(bid) };
@@ -640,6 +644,7 @@ function LeadDrawer({ lead, stage, color, onClose, onBook }: { lead: Card; stage
    BOOKING WIZARD
    ═══════════════════════════════════════════════════════════════════ */
 type PlanRow = { label: string; trigger: string; due: string; pct: number };
+type WizardUnit = { id: number; no: string; type: string | null; beds: number | null; area: number | null; price: number | null; project_code: string | null; status: string };
 const PLAN_DEFAULT: PlanRow[] = [
   { label: "Booking token", trigger: "On booking", due: "14 Sep 2026", pct: 10 },
   { label: "Excavation 20%", trigger: "Excavation complete", due: "14 Dec 2026", pct: 20 },
@@ -650,13 +655,14 @@ const PLAN_DEFAULT: PlanRow[] = [
 ];
 const PHASE_COLORS = ["#8B7CF6", "#5B8DEF", "#34C08A", "#E2A33C", "#F2715C", "#8A94A6"];
 
-function Booking({ step, setStep, onBack, lead, blank, onOpenBuyer, onBackToInventory }: { step:number; setStep:(n:number)=>void; onBack:()=>void; lead: Card | null; blank: boolean; onOpenBuyer: (id: number | null) => void; onBackToInventory: () => void }) {
+function Booking({ step, setStep, onBack, lead, blank, onOpenBuyer, onBackToInventory, units }: { step:number; setStep:(n:number)=>void; onBack:()=>void; lead: Card | null; blank: boolean; onOpenBuyer: (id: number | null) => void; onBackToInventory: () => void; units: WizardUnit[] }) {
   const leadName = blank ? "" : (lead?.name ?? "");
   const leadBudget = blank ? "" : (lead?.budget ?? "");
   const [buyer, setBuyer] = useState(leadName);
-  const [mobile, setMobile] = useState(blank ? "" : "+971 50 000 0000");
-  const [disc, setDisc] = useState("7.5");
-  const [amount, setAmount] = useState("226688");
+  const [mobile, setMobile] = useState(blank ? "" : "");
+  const [disc, setDisc] = useState("0");
+  const [amount, setAmount] = useState("");
+  const [unitNo, setUnitNo] = useState("");
   const [stage, setStage] = useState(blank ? "New" : (leadChip(lead)));
   const [confirmed, setConfirmed] = useState(false);
   const [confirming, setConfirming] = useState(false);
@@ -665,26 +671,32 @@ function Booking({ step, setStep, onBack, lead, blank, onOpenBuyer, onBackToInve
   const [issuedReceipt, setIssuedReceipt] = useState("");
   const [buyerId, setBuyerId] = useState<number | null>(null);
   const [plan, setPlan] = useState<PlanRow[]>(PLAN_DEFAULT.map((r) => ({ ...r })));
-  const [escrow, setEscrow] = useState("ESC-2026-9021");
+  const [escrow, setEscrow] = useState("");
   const [payMethod, setPayMethod] = useState("Bank transfer");
-  const [payBank, setPayBank] = useState("Emirates NBD");
-  const [payRef, setPayRef] = useState("TT-2026-441882");
+  const [payBank, setPayBank] = useState("");
+  const [payRef, setPayRef] = useState("");
   const [draft, setDraft] = useState<{ ref: string; when: string } | null>(null);
   const [draftSaving, setDraftSaving] = useState(false);
 
-  const listPrice = 2450000;
+  const unit = units.find((u) => u.no === unitNo) || null;
+  const listPrice = unit ? Number(unit.price) || 0 : 0;
+  const unitLabel = unit ? [unit.no, unit.type, (unit.beds || 0) + "BR", (unit.area || 0) + " sq.ft"].filter(Boolean).join(" \u00b7 ") : "";
   const discVal = parseFloat(disc || "0");
   const discAmt = Math.round(listPrice * discVal / 100);
   const netVal = Math.round(listPrice * (1 - discVal / 100));
   const net = money(netVal);
   const bookingAmt = Math.round(netVal * 0.1);
-  const psf = Math.round(netVal / 1180);
+  const psf = unit && unit.area ? Math.round(netVal / unit.area) : 0;
   const planTotal = plan.reduce((a, r) => a + (r.pct || 0), 0);
   const planOk = Math.abs(planTotal - 100) < 0.001;
   const dld = Math.round(netVal * 0.04);
   const oqood = 3150;
   const devFee = 4200;
   const grandTotal = netVal + dld + oqood + devFee;
+
+  useEffect(() => {
+    if (listPrice > 0) setAmount(String(Math.round(netVal * 0.1)));
+  }, [unitNo, disc]);
 
   const LOCK_MIN = 45;
   const [lock, setLock] = useState<number>(LOCK_MIN * 60);
@@ -705,11 +717,12 @@ function Booking({ step, setStep, onBack, lead, blank, onOpenBuyer, onBackToInve
     setDraftSaving(true);
     setConfirmErr("");
     try {
+      if (!unitNo) { setConfirmErr("Select a unit before saving a draft"); return; }
       const d = await fetchJSON<{ id: number; ref: string }>("/api/bookings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          unit_no: "H21-T1-1204",
+          unit_no: unitNo,
           buyer_name: buyer || leadName || "Prospective buyer",
           buyer_mobile: mobile,
           buyer_email: null,
@@ -734,11 +747,12 @@ function Booking({ step, setStep, onBack, lead, blank, onOpenBuyer, onBackToInve
     setConfirming(true);
     setConfirmErr("");
     try {
+      if (!unitNo) { setConfirmErr("Select a unit before confirming"); return; }
       const created = await fetchJSON<{ id: number; ref: string; unit: string }>("/api/bookings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          unit_no: "H21-T1-1204",
+          unit_no: unitNo,
           buyer_name: buyer || leadName || "Prospective buyer",
           buyer_mobile: mobile,
           buyer_email: null,
@@ -774,20 +788,19 @@ function Booking({ step, setStep, onBack, lead, blank, onOpenBuyer, onBackToInve
     }
   };
 
-  const fields = SFIELDS[step] || [];
-  const showApproval = step === 1;
+  const showApproval = step === 1 && discVal > 3;
   const nextLabel = step === 5 ? "Confirm booking" : "Continue";
 
   const deal = [
-    ["Unit", "H21-T1-1204"],
-    ["Typology", "2BR-B \u00b7 1,180 sq.ft"],
-    ["List price", money(listPrice)],
-    ["Discount", "\u2212" + discVal + "%"],
-    ["Net price", net],
-    ["Price/sq.ft", "AED " + psf.toLocaleString("en-US")],
-    ["Plan", "20/40/40"],
+    ["Unit", unitLabel || "\u2014 No unit selected"],
+    ["Project", unit?.project_code?.replace(/_/g, " ") || "\u2014"],
+    ["List price", listPrice ? money(listPrice) : "\u2014"],
+    ["Discount", discVal ? "\u2212" + discVal + "% · " + money(discAmt) : "0%"],
+    ["Net price", listPrice ? net : "\u2014"],
+    ["Price/sq.ft", psf ? "AED " + psf.toLocaleString("en-US") : "\u2014"],
+    ["Plan", "Construction Linked · " + plan.length + " milestones"],
     ["Buyer", buyer || "\u2014"],
-    ["Broker", "Betterhomes \u00b7 2.0%"],
+    ["Broker", "Recorded at SPA"],
   ];
 
   const cellIn = { width:"100%",height:30,border:"1px solid #EDEEF3",borderRadius:8,background:"#fff",padding:"0 8px",fontSize:12,fontWeight:600,fontFamily:"inherit",outline:"none",boxSizing:"border-box" as const };
@@ -957,7 +970,7 @@ function Booking({ step, setStep, onBack, lead, blank, onOpenBuyer, onBackToInve
             </div>
             <div>
               <div style={{fontSize:10.5,fontWeight:700,letterSpacing:".05em",color:"#9AA0AE",textTransform:"uppercase",marginBottom:7}}>Date</div>
-              <div style={box(false)}><span style={{flex:1}}>25 Aug 2026</span></div>
+              <div style={box(false)}><span style={{flex:1}}>{new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}</span></div>
             </div>
             <div>
               <div style={{fontSize:10.5,fontWeight:700,letterSpacing:".05em",color:"#9AA0AE",textTransform:"uppercase",marginBottom:7}}>Method</div>
@@ -981,7 +994,7 @@ function Booking({ step, setStep, onBack, lead, blank, onOpenBuyer, onBackToInve
           <div style={{marginTop:14,background:"#FDECEC",borderRadius:12,padding:"11px 14px",fontSize:11.5,fontWeight:700,color:"#E5484D"}}>All buyer funds must be deposited to the project escrow account.</div>
           <div style={{marginTop:18,border:"1px solid #EDEEF3",borderRadius:14,padding:"14px 16px"}}>
             <div style={{fontSize:10.5,fontWeight:700,letterSpacing:".05em",color:"#9AA0AE",textTransform:"uppercase",marginBottom:8}}>Final review</div>
-            {[["Unit", "H21-T1-1204 \u00b7 2BR-B \u00b7 Level 12"], ["Buyer", buyer || "\u2014"], ["List price", money(listPrice)], ["Discount", "\u2212" + discVal + "% \u00b7 " + money(discAmt)], ["Net price", net], ["Plan total", planOk ? planTotal + "%" : "INVALID (" + planTotal.toFixed(1) + "%)"], ["Booking token", money(bookingAmt)], ["Escrow ref", escrow], ["Method \u00b7 bank", payMethod + " \u00b7 " + payBank]].map(([l, v]) => (
+            {[["Unit", unitLabel || "\u2014"], ["Buyer", buyer || "\u2014"], ["List price", listPrice ? money(listPrice) : "\u2014"], ["Discount", "\u2212" + discVal + "% \u00b7 " + money(discAmt)], ["Net price", listPrice ? net : "\u2014"], ["Plan total", planOk ? planTotal + "%" : "INVALID (" + planTotal.toFixed(1) + "%)"], ["Booking token", money(bookingAmt)], ["Escrow ref", escrow || "\u2014"], ["Method \u00b7 bank", payMethod + " \u00b7 " + (payBank || "\u2014")]].map(([l, v]) => (
               <div key={l} style={{display:"flex",justifyContent:"space-between",gap:12,padding:"7px 0",borderBottom:"1px solid #F6F7FA"}}>
                 <span style={{fontSize:11.5,color:"#9AA0AE",fontWeight:600}}>{l}</span>
                 <span style={{fontSize:12,fontWeight:700,textAlign:"right"}}>{v}</span>
@@ -991,67 +1004,130 @@ function Booking({ step, setStep, onBack, lead, blank, onOpenBuyer, onBackToInve
         </div>
         ) : (
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"16px 20px",marginTop:24}}>
-          {fields.map(([label,value,hintVal]) => {
-            const isBuyer = label === "Full name (passport)";
-            const isMobile = label === "Mobile";
-            const isUnit = label === "Unit";
-            const isDisc = label === "Discount requested";
-            const isAmt = label === "Amount";
-            if (isUnit) return (
-              <div key={label}>
-                <div style={{fontSize:10.5,fontWeight:700,letterSpacing:".05em",color:"#9AA0AE",textTransform:"uppercase",marginBottom:7}}>{label} <span style={{textTransform:"none",letterSpacing:0,color:AC,fontWeight:700}}>\u00b7 lead suggestion {leadChip(lead)}</span></div>
+          {step === 1 ? (
+            <>
+              <div>
+                <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".05em", color: "#9AA0AE", textTransform: "uppercase", marginBottom: 7 }}>Unit <span style={{ textTransform: "none", letterSpacing: 0, color: AC, fontWeight: 700 }}>· live from inventory {lead ? "· lead suggestion " + leadChip(lead) : ""}</span></div>
+                <select value={unitNo} onChange={(e) => setUnitNo(e.target.value)} style={{ ...inStyle, appearance: "auto" }}>
+                  <option value="">Select an available unit…</option>
+                  {units.map((u) => (
+                    <option key={u.id} value={u.no}>{u.no + " · " + [u.type, (u.beds || 0) + "BR", (u.area || 0) + " sq.ft"].filter(Boolean).join(" · ") + " · " + money(Number(u.price) || 0)}</option>
+                  ))}
+                </select>
+                {units.length === 0 && <div style={{ fontSize: 11, color: "#E5484D", fontWeight: 600, marginTop: 6 }}>No available units in scope yet — none will show in this wizard.</div>}
+              </div>
+              <div>
+                <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".05em", color: "#9AA0AE", textTransform: "uppercase", marginBottom: 7 }}>Project</div>
+                <div style={box(false)}><span style={{ flex: 1 }}>{unit?.project_code?.replace(/_/g, " ") || "—"}</span></div>
+              </div>
+              <div>
+                <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".05em", color: "#9AA0AE", textTransform: "uppercase", marginBottom: 7 }}>List price</div>
                 <div style={box(false)}>
-                  <span style={{flex:1}}>{value}</span>
-                  <span style={hint("locked")}>locked</span>
+                  <span style={{ flex: 1 }}>{listPrice ? money(listPrice) : "—"}</span>
+                  {unit && unit.area && listPrice ? <span style={hint("unit")}>AED {Math.round(listPrice / unit.area).toLocaleString("en-US")}/sq.ft</span> : null}
                 </div>
               </div>
-            );
-            if (isBuyer) return (
-              <div key={label}>
-                <div style={{fontSize:10.5,fontWeight:700,letterSpacing:".05em",color:"#9AA0AE",textTransform:"uppercase",marginBottom:7}}>{label}</div>
-                <input value={buyer} onChange={(e) => setBuyer(e.target.value)} placeholder="Enter buyer full name"
-                  style={{width:"100%",height:42,borderRadius:12,border:"1px solid #E4E6EE",background:"#fff",padding:"0 14px",fontSize:13,fontWeight:600,fontFamily:"inherit",outline:"none",boxSizing:"border-box"}} />
-              </div>
-            );
-            if (isMobile) return (
-              <div key={label}>
-                <div style={{fontSize:10.5,fontWeight:700,letterSpacing:".05em",color:"#9AA0AE",textTransform:"uppercase",marginBottom:7}}>{label}</div>
-                <input value={mobile} onChange={(e) => setMobile(e.target.value)} placeholder="+971 50 000 0000"
-                  style={{width:"100%",height:42,borderRadius:12,border:"1px solid #E4E6EE",background:"#fff",padding:"0 14px",fontSize:13,fontWeight:600,fontFamily:"inherit",outline:"none",boxSizing:"border-box"}} />
-              </div>
-            );
-            if (isDisc) return (
-              <div key={label}>
-                <div style={{fontSize:10.5,fontWeight:700,letterSpacing:".05em",color:"#9AA0AE",textTransform:"uppercase",marginBottom:7}}>{label}</div>
+              <div>
+                <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".05em", color: "#9AA0AE", textTransform: "uppercase", marginBottom: 7 }}>Discount requested</div>
                 <div style={box(true)}>
-                  <input value={disc} onChange={(e) => setDisc(e.target.value.replace(/[^0-9.]/g,""))} step="0.5"
-                    style={{flex:1,border:0,background:"transparent",fontSize:13,fontWeight:700,fontFamily:"inherit",outline:"none",width:60}} />
-                  <span style={{fontSize:12,fontWeight:700,color:"#6B7180"}}>% \u00b7 AED {Math.round(listPrice * discVal / 100).toLocaleString("en-US")}</span>
+                  <input value={disc} onChange={(e) => setDisc(e.target.value.replace(/[^0-9.]/g, ""))} step="0.5"
+                    style={{ flex: 1, border: 0, background: "transparent", fontSize: 13, fontWeight: 700, fontFamily: "inherit", outline: "none", width: 60 }} />
+                  <span style={{ fontSize: 12, fontWeight: 700, color: "#6B7180" }}>% · AED {Math.round(listPrice * discVal / 100).toLocaleString("en-US")}</span>
                   <span style={hint("approval")}>approval</span>
                 </div>
               </div>
-            );
-            if (isAmt) return (
-              <div key={label}>
-                <div style={{fontSize:10.5,fontWeight:700,letterSpacing:".05em",color:"#9AA0AE",textTransform:"uppercase",marginBottom:7}}>{label}</div>
+              <div>
+                <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".05em", color: "#9AA0AE", textTransform: "uppercase", marginBottom: 7 }}>Net price</div>
                 <div style={box(false)}>
-                  <span style={{fontSize:13,fontWeight:700,color:"#9AA0AE",marginRight:6}}>AED</span>
-                  <input value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9]/g,""))}
-                    style={{flex:1,border:0,background:"transparent",fontSize:13,fontWeight:700,fontFamily:"inherit",outline:"none"}} />
-                  <span style={hint("within bounds")}>10% of net</span>
+                  <span style={{ flex: 1 }}>{listPrice ? net : "—"}</span>
+                  {psf ? <span style={hint("unit")}>AED {psf.toLocaleString("en-US")}/sq.ft</span> : null}
                 </div>
               </div>
-            );
-            return (
-              <div key={label}>
-                <div style={{fontSize:10.5,fontWeight:700,letterSpacing:".05em",color:"#9AA0AE",textTransform:"uppercase",marginBottom:7}}>{label}</div>
-                <div style={box(hintVal==="approval"||hintVal==="mandatory")}>
-                  <span style={{flex:1}}>{value}</span>
-                  {hintVal ? <span style={hint(hintVal)}>{hintVal}</span> : null}
+              <div>
+                <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".05em", color: "#9AA0AE", textTransform: "uppercase", marginBottom: 7 }}>Payment plan</div>
+                <div style={box(false)}><span style={{ flex: 1 }}>Construction Linked · {plan.length} milestones</span></div>
+              </div>
+              <div>
+                <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".05em", color: "#9AA0AE", textTransform: "uppercase", marginBottom: 7 }}>Booking token</div>
+                <div style={box(false)}>
+                  <span style={{ flex: 1 }}>{listPrice ? "10% · " + money(bookingAmt) : "—"}</span>
+                  <span style={hint("within bounds")}>within bounds</span>
                 </div>
               </div>
-            );
-          })}
+              <div>
+                <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".05em", color: "#9AA0AE", textTransform: "uppercase", marginBottom: 7 }}>DLD 4% payer</div>
+                <div style={box(false)}><span style={{ flex: 1 }}>Buyer · {listPrice ? money(dld) : "—"}</span></div>
+              </div>
+              <div>
+                <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".05em", color: "#9AA0AE", textTransform: "uppercase", marginBottom: 7 }}>Broker</div>
+                <div style={box(false)}><span style={{ flex: 1 }}>Recorded at SPA</span></div>
+              </div>
+            </>
+          ) : step === 2 ? (
+            <>
+              <div>
+                <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".05em", color: "#9AA0AE", textTransform: "uppercase", marginBottom: 7 }}>Buyer type</div>
+                <div style={box(false)}><span style={{ flex: 1 }}>Individual</span></div>
+              </div>
+              <div>
+                <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".05em", color: "#9AA0AE", textTransform: "uppercase", marginBottom: 7 }}>Full name (passport)</div>
+                <input value={buyer} onChange={(e) => setBuyer(e.target.value)} placeholder="Enter buyer full name"
+                  style={{ width: "100%", height: 42, borderRadius: 12, border: "1px solid #E4E6EE", background: "#fff", padding: "0 14px", fontSize: 13, fontWeight: 600, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
+              </div>
+              <div>
+                <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".05em", color: "#9AA0AE", textTransform: "uppercase", marginBottom: 7 }}>Mobile</div>
+                <input value={mobile} onChange={(e) => setMobile(e.target.value)} placeholder="+971 50 000 0000"
+                  style={{ width: "100%", height: 42, borderRadius: 12, border: "1px solid #E4E6EE", background: "#fff", padding: "0 14px", fontSize: 13, fontWeight: 600, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
+              </div>
+              <div>
+                <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".05em", color: "#9AA0AE", textTransform: "uppercase", marginBottom: 7 }}>Nationality</div>
+                <div style={box(false)}><span style={{ flex: 1 }}>Captured at KYC</span></div>
+              </div>
+              <div>
+                <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".05em", color: "#9AA0AE", textTransform: "uppercase", marginBottom: 7 }}>Passport no.</div>
+                <div style={box(false)}><span style={{ flex: 1 }}>—</span></div>
+              </div>
+              <div>
+                <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".05em", color: "#9AA0AE", textTransform: "uppercase", marginBottom: 7 }}>Emirates ID</div>
+                <div style={box(false)}><span style={{ flex: 1 }}>—</span></div>
+              </div>
+              <div>
+                <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".05em", color: "#9AA0AE", textTransform: "uppercase", marginBottom: 7 }}>Source of funds</div>
+                <div style={box(false)}><span style={{ flex: 1 }}>—</span></div>
+              </div>
+              <div>
+                <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".05em", color: "#9AA0AE", textTransform: "uppercase", marginBottom: 7 }}>AML risk rating</div>
+                <div style={box(false)}><span style={{ flex: 1 }}>Pending screening</span><span style={hint("pending")}>screened</span></div>
+              </div>
+            </>
+          ) : (
+            <>
+              <div>
+                <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".05em", color: "#9AA0AE", textTransform: "uppercase", marginBottom: 7 }}>Reservation form</div>
+                <div style={box(false)}><span style={{ flex: 1 }}>Queued after confirmation</span></div>
+              </div>
+              <div>
+                <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".05em", color: "#9AA0AE", textTransform: "uppercase", marginBottom: 7 }}>Expression of interest</div>
+                <div style={box(false)}><span style={{ flex: 1 }}>Queued after confirmation</span></div>
+              </div>
+              <div>
+                <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".05em", color: "#9AA0AE", textTransform: "uppercase", marginBottom: 7 }}>Unit sales offer</div>
+                <div style={box(false)}><span style={{ flex: 1 }}>Queued after confirmation</span></div>
+              </div>
+              <div>
+                <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".05em", color: "#9AA0AE", textTransform: "uppercase", marginBottom: 7 }}>SPA draft</div>
+                <div style={box(false)}><span style={{ flex: 1 }}>Awaiting legal review</span></div>
+              </div>
+              <div>
+                <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".05em", color: "#9AA0AE", textTransform: "uppercase", marginBottom: 7 }}>Signature routing</div>
+                <div style={box(false)}><span style={{ flex: 1 }}>Buyer → Developer signatory</span></div>
+              </div>
+              <div>
+                <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".05em", color: "#9AA0AE", textTransform: "uppercase", marginBottom: 7 }}>Reminder cadence</div>
+                <div style={box(false)}><span style={{ flex: 1 }}>Day 2, 5, 9</span></div>
+              </div>
+            </>
+          )}
         </div>
         )}
         {showApproval && (
@@ -1059,7 +1135,7 @@ function Booking({ step, setStep, onBack, lead, blank, onOpenBuyer, onBackToInve
             <span style={{width:8,height:8,borderRadius:5,background:"#E2A33C",marginTop:5,flex:"none"}} />
             <span>
               <span style={{display:"block",fontSize:12.5,fontWeight:700,color:"#8A6410"}}>Approval required \u00b7 routes to Sales Director</span>
-              <span style={{display:"block",fontSize:11.5,color:"#A07C22",fontWeight:500,marginTop:4,lineHeight:1.55}}>7.5% exceeds the agent limit of 3%. Expected turnaround 4 working hours. The unit stays locked until a decision is recorded.</span>
+              <span style={{display:"block",fontSize:11.5,color:"#A07C22",fontWeight:500,marginTop:4,lineHeight:1.55}}>{discVal}% exceeds the agent limit of 3%. Expected turnaround 4 working hours. The unit stays locked until a decision is recorded.</span>
             </span>
           </div>
         )}
@@ -1068,7 +1144,7 @@ function Booking({ step, setStep, onBack, lead, blank, onOpenBuyer, onBackToInve
           {draft && <span style={{fontSize:11,fontWeight:700,color:"#1F9D6B",whiteSpace:"nowrap"}}>Draft {draft.ref} saved \u00b7 {draft.when}</span>}
           <div style={{flex:1}} />
           {step > 1 && <button onClick={() => setStep(step-1)} style={{height:40,borderRadius:12,border:"1px solid #EDEEF3",background:"#fff",padding:"0 16px",fontFamily:"inherit",fontSize:12.5,fontWeight:700,color:"#4A5060",cursor:"pointer"}}>Back</button>}
-          <button onClick={() => step === 5 ? doConfirm() : setStep(step+1)} disabled={confirming || (step === 3 && !planOk) || (step === 5 && !escrow.trim())} style={{height:40,borderRadius:12,background:AC,color:"#fff",border:0,padding:"0 20px",fontFamily:"inherit",fontSize:12.5,fontWeight:700,cursor:confirming?"progress":"pointer",opacity:(confirming || (step === 3 && !planOk) || (step === 5 && !escrow.trim()))?0.6:1}}>{confirming ? "Confirming\u2026" : nextLabel}</button>
+          <button onClick={() => step === 5 ? doConfirm() : setStep(step+1)} disabled={confirming || (step === 1 && !unitNo) || (step === 3 && !planOk) || (step === 5 && !escrow.trim())} style={{height:40,borderRadius:12,background:AC,color:"#fff",border:0,padding:"0 20px",fontFamily:"inherit",fontSize:12.5,fontWeight:700,cursor:confirming?"progress":"pointer",opacity:(confirming || (step === 1 && !unitNo) || (step === 3 && !planOk) || (step === 5 && !escrow.trim()))?0.6:1}}>{confirming ? "Confirming\u2026" : nextLabel}</button>
         </div>
       </div>
 
