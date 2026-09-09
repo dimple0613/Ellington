@@ -289,7 +289,9 @@ CREATE INDEX IF NOT EXISTS idx_audit_ts ON audit_log(ts);
 CREATE TABLE IF NOT EXISTS app_settings (
   id SMALLINT PRIMARY KEY,
   company JSONB NOT NULL DEFAULT '{}',
-  brand JSONB NOT NULL DEFAULT '{}'
+  brand JSONB NOT NULL DEFAULT '{}',
+  numbering JSONB NOT NULL DEFAULT '{}',
+  notif JSONB NOT NULL DEFAULT '{}'
 );
 
 -- Finance module (AUD-006): collections ageing ledger, escrow drawdowns, invoice ledger.
@@ -400,9 +402,11 @@ BEGIN
       (now() - interval '11 days 2 hours','Omar Saeed','Project Mgr','Updated','WPK · Milestone','Status','Pending','Certified',false);
   END IF;
   IF NOT EXISTS (SELECT 1 FROM app_settings) THEN
-    INSERT INTO app_settings (id, company, brand) VALUES (1,
+    INSERT INTO app_settings (id, company, brand, numbering, notif) VALUES (1,
       '{"Legal name":"Ellington Properties Development LLC","Trade licence":"CN-2847192","ORN":"21281","RERA":"1884","VAT TRN":"100234567800003"}'::jsonb,
-      '{"Primary color":"#4F46F5","Currency":"AED","Date format":"DD MMM YYYY","Timezone":"Asia/Dubai (GMT+4)","Fiscal year":"Jan – Dec"}'::jsonb);
+      '{"Primary color":"#4F46F5","Currency":"AED","Date format":"DD MMM YYYY","Timezone":"Asia/Dubai (GMT+4)","Fiscal year":"Jan – Dec"}'::jsonb,
+      '[{"object":"Unit","prefix":"{project}-T{tower}-{seq}","pattern":"WPK-T1-0402 — auto-increment per tower","next":403},{"object":"Receipt","prefix":"RCP-{project}-{seq}","pattern":"RCP-H21-004712 — sequential","next":4713},{"object":"Cheque","prefix":"CHQ-{seq}","pattern":"CHQ-884102 — sequential across all projects","next":884103},{"object":"Drawdown","prefix":"DDR-{seq}","pattern":"DDR-0004 — sequential per project","next":5},{"object":"Escrow ref","prefix":"ESC-{year}-{seq}","pattern":"ESC-2026-9014 — yearly reset","next":9015},{"object":"Notice","prefix":"NTC-{type}-{unit}","pattern":"NTC-30D-WPK-T1-0210","next":1}]'::jsonb,
+      '[{"event":"New booking created","inapp":true,"email":true,"slack":false},{"event":"Payment received","inapp":true,"email":true,"slack":true},{"event":"Milestone certified","inapp":true,"email":true,"slack":false},{"event":"Drawdown request","inapp":true,"email":true,"slack":true},{"event":"Snag raised","inapp":false,"email":true,"slack":false},{"event":"Title deed issued","inapp":true,"email":true,"slack":false},{"event":"Unit price changed","inapp":true,"email":true,"slack":false},{"event":"User invited","inapp":true,"email":false,"slack":false}]'::jsonb);
   END IF;
   IF NOT EXISTS (SELECT 1 FROM collections) THEN
     INSERT INTO collections (buyer, unit_no, amount, days_due, stage, action) VALUES

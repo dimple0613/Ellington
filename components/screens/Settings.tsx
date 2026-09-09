@@ -16,6 +16,16 @@ const NOTIF_ROWS: [string, boolean, boolean, boolean][] = [
   ["User invited", true, false, false],
 ];
 
+type NumRow = { object: string; prefix: string; pattern: string; next: number };
+const NUMBERING_ROWS: NumRow[] = [
+  { object: "Unit", prefix: "{project}-T{tower}-{seq}", pattern: "WPK-T1-0402 — auto-increment per tower", next: 403 },
+  { object: "Receipt", prefix: "RCP-{project}-{seq}", pattern: "RCP-H21-004712 — sequential", next: 4713 },
+  { object: "Cheque", prefix: "CHQ-{seq}", pattern: "CHQ-884102 — sequential across all projects", next: 884103 },
+  { object: "Drawdown", prefix: "DDR-{seq}", pattern: "DDR-0004 — sequential per project", next: 5 },
+  { object: "Escrow ref", prefix: "ESC-{year}-{seq}", pattern: "ESC-2026-9014 — yearly reset", next: 9015 },
+  { object: "Notice", prefix: "NTC-{type}-{unit}", pattern: "NTC-30D-WPK-T1-0210", next: 1 },
+];
+
 const INTEGRATIONS: { name: string; status: string; note: string; ok: boolean }[] = [
   { name: "Emirates NBD Escrow API", status: "Connected", note: "Statement import every 4 h", ok: true },
   { name: "DLD Oqood API", status: "Connected", note: "Registration sync daily", ok: true },
@@ -29,6 +39,7 @@ export default function SettingsScreen() {
   const [tab, setTab] = useState<Tab>("company");
   const [notice, setNotice] = useState("");
   const [notif, setNotif] = useState<[string, boolean, boolean, boolean][]>(NOTIF_ROWS);
+  const [numbering, setNumbering] = useState<NumRow[]>(NUMBERING_ROWS);
   const [integrations, setIntegrations] = useState(INTEGRATIONS);
   const [company, setCompany] = useState<Record<string, string>>({
     "Legal name": "Ellington Properties Development LLC",
@@ -48,11 +59,13 @@ export default function SettingsScreen() {
 
   useEffect(() => {
     let active = true;
-    fetchJSON<{ settings: { company: Record<string, string>; brand: Record<string, string> } }>("/api/system")
+    fetchJSON<{ settings: { company: Record<string, string>; brand: Record<string, string>; numbering: NumRow[]; notif: { event: string; inapp: boolean; email: boolean; slack: boolean }[] } }>("/api/system")
       .then((j) => {
         if (!active || !j?.settings) return;
         if (j.settings.company && Object.keys(j.settings.company).length) setCompany(j.settings.company);
         if (j.settings.brand && Object.keys(j.settings.brand).length) setBrand(j.settings.brand);
+        if (j.settings.numbering && j.settings.numbering.length) setNumbering(j.settings.numbering.map((r) => ({ object: r.object, prefix: r.prefix, pattern: r.pattern, next: r.next || 1 })));
+        if (j.settings.notif && j.settings.notif.length) setNotif(j.settings.notif.map((r) => [r.event, !!r.inapp, !!r.email, !!r.slack]));
       })
       .catch((e) => {
         if (active) setApiError(e?.message || "Failed to load settings");
@@ -63,10 +76,16 @@ export default function SettingsScreen() {
   const banner = (m: string) => { setNotice(m); setTimeout(() => setNotice(""), 3000); };
 
   const save = () => {
-    fetchJSON<{ settings: { company: Record<string, string>; brand: Record<string, string> } }>("/api/system", {
+    const payload: { company: Record<string, string>; brand: Record<string, string>; numbering: NumRow[]; notif: { event: string; inapp: boolean; email: boolean; slack: boolean }[] } = {
+      company,
+      brand,
+      numbering,
+      notif: notif.map(([event, inapp, email, slack]) => ({ event, inapp, email, slack })),
+    };
+    fetchJSON<{ settings: Record<string, unknown> }>("/api/system", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ company, brand }),
+      body: JSON.stringify(payload),
     })
       .then(() => banner("Changes saved \u00b7 will take effect immediately"))
       .catch((e) => banner("Save failed \u00b7 " + (e?.message || "try again")));
@@ -146,17 +165,25 @@ export default function SettingsScreen() {
         <div style={{ background: "#fff", borderRadius: 20, overflow: "hidden", boxShadow: "0 1px 3px rgba(20,22,31,.04)" }}>
           <div style={{ padding: "18px 22px", borderBottom: "1px solid #EDEEF3" }}>
             <span style={{ fontSize: 15, fontWeight: 700, letterSpacing: "-.015em" }}>Numbering conventions</span>
+            <span style={{ float: "right", fontSize: 11, color: "#9AA0AE", fontWeight: 600 }}>Prefixes, pattern &amp; next number — saved with the rest</span>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr 2fr", gap: 8, padding: "12px 22px", fontSize: 9.5, fontWeight: 700, letterSpacing: ".07em", color: "#9AA0AE", textTransform: "uppercase", borderBottom: "1px solid #F6F7FA" }}>
-            <span>Object</span><span>Prefix</span><span>Pattern</span>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1.8fr 2.4fr 1.2fr 1.8fr", gap: 10, padding: "12px 22px", fontSize: 9.5, fontWeight: 700, letterSpacing: ".07em", color: "#9AA0AE", textTransform: "uppercase", borderBottom: "1px solid #F6F7FA" }}>
+            <span>Object</span><span>Prefix</span><span>Pattern</span><span style={{ textAlign: "right" }}>Next</span><span>Live preview</span>
           </div>
-          {[["Unit", "{project}-T{tower}-{seq}", "WPK-T1-0402 \u2014 auto-increment per tower"], ["Receipt", "RCP-{project}-{seq}", "RCP-H21-004712 \u2014 sequential"], ["Cheque", "CHQ-{seq}", "CHQ-884102 \u2014 sequential across all projects"], ["Drawdown", "DDR-{seq}", "DDR-0004 \u2014 sequential per project"], ["Escrow ref", "ESC-{year}-{seq}", "ESC-2026-9014 \u2014 yearly reset"], ["Notice", "NTC-{type}-{unit}", "NTC-30D-WPK-T1-0210"]].map(([obj, prefix, pattern]) => (
-            <div key={obj} style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr 2fr", gap: 8, padding: "10px 22px", borderBottom: "1px solid #F6F7FA" }}>
-              <span style={{ fontSize: 12, fontWeight: 700 }}>{obj}</span>
-              <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, fontWeight: 600, color: AC }}>{prefix}</span>
-              <span style={{ fontSize: 11, color: "#6B7180", fontWeight: 600 }}>{pattern}</span>
-            </div>
-          ))}
+          {numbering.map((row, ri) => {
+            const preview = row.prefix
+              .replace("{project}", "H21").replace("{tower}", "1").replace("{type}", "30D").replace("{unit}", "WPK-T1-0210")
+              .replace("{year}", "2026").replace("{seq}", String(row.next).padStart(4, "0"));
+            return (
+              <div key={row.object} style={{ display: "grid", gridTemplateColumns: "1fr 1.8fr 2.4fr 1.2fr 1.8fr", gap: 10, alignItems: "center", padding: "10px 22px", borderBottom: "1px solid #F6F7FA" }}>
+                <span style={{ fontSize: 12, fontWeight: 700 }}>{row.object}</span>
+                <input value={row.prefix} onChange={(e) => setNumbering((p) => p.map((r, i) => i === ri ? { ...r, prefix: e.target.value } : r))} style={{ height: 30, borderRadius: 9, border: "1px solid #E4E6EE", padding: "0 10px", fontSize: 11.5, fontWeight: 600, fontFamily: "'JetBrains Mono',monospace", color: AC, width: "100%", boxSizing: "border-box" }} />
+                <input value={row.pattern} onChange={(e) => setNumbering((p) => p.map((r, i) => i === ri ? { ...r, pattern: e.target.value } : r))} style={{ height: 30, borderRadius: 9, border: "1px solid #E4E6EE", padding: "0 10px", fontSize: 11, fontWeight: 600, fontFamily: "'JetBrains Mono',monospace", color: "#4A5060", width: "100%", boxSizing: "border-box" }} />
+                <input value={row.next} type="number" onChange={(e) => setNumbering((p) => p.map((r, i) => i === ri ? { ...r, next: Number(e.target.value) || 1 } : r))} style={{ height: 30, borderRadius: 9, border: "1px solid #E4E6EE", padding: "0 10px", fontSize: 11.5, fontWeight: 700, fontFamily: "'JetBrains Mono',monospace", width: "100%", boxSizing: "border-box", textAlign: "right" }} />
+                <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, fontWeight: 700, color: "#1F9D6B", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{preview}</span>
+              </div>
+            );
+          })}
         </div>
       )}
 
