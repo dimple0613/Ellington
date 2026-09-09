@@ -118,20 +118,28 @@ export default function UnitScreen({
   const [tab, setTab] = useState<"overview" | "pay" | "docs" | "act">("overview");
 
   const data = useMemo(() => {
+    if (liveMiles.length) {
+      const liveNet = liveMiles.reduce((a, m) => a + (Number(m.amount) || 0), 0);
+      const liveCollected = liveMiles.reduce((a, m) => a + (mileStatus(m.status || "scheduled") === "Paid" ? (Number(m.amount) || 0) : 0), 0);
+      const net = liveNet || Math.round(su.price * (1 - NET_DISCOUNT));
+      const collected = liveCollected || Math.round(net * 0.62);
+      const outstanding = Math.max(0, net - collected);
+      return { net, collected, outstanding, live: true };
+    }
     const net = Math.round(su.price * (1 - NET_DISCOUNT));
     const collected = Math.round(net * 0.62);
     const outstanding = net - collected;
-    return { net, collected, outstanding };
-  }, [su]);
+    return { net, collected, outstanding, live: false };
+  }, [su, liveMiles]);
 
-  const { net, collected, outstanding } = data;
+  const { net, collected, outstanding, live: liveMetrics } = data;
   const where = "Tower 1 \u00b7 L" + su.f + " \u00b7 " + su.view;
 
   const metrics = [
     { label: "List price", value: money(su.price), note: "AED " + su.psf.toLocaleString("en-US") + " /sq.ft", color: "#14161F" },
-    { label: "Net price", value: money(net), note: "5.0% discount approved 14 Mar 2026", color: "#14161F" },
-    { label: "Collected", value: money(collected), note: "62% of net price", color: AC },
-    { label: "Outstanding", value: money(outstanding), note: "next due 14 Sep 2026", color: "#14161F" },
+    { label: "Net price", value: money(net), note: liveMetrics ? "from live payment schedule" : "5.0% discount approved 14 Mar 2026", color: "#14161F" },
+    { label: "Collected", value: money(collected), note: liveMetrics ? "paid instalments to date" : "62% of net price", color: AC },
+    { label: "Outstanding", value: money(outstanding), note: liveMetrics ? "remaining instalments" : "next due 14 Sep 2026", color: "#14161F" },
   ];
 
   const uBar = [
@@ -163,10 +171,12 @@ export default function UnitScreen({
     ["Sanitaryware", "Duravit / Grohe"], ["Joinery", "Oak veneer"], ["Smart home", "Loxone \u00b7 Tier 2"],
   ];
 
-  const uMiles: [string, string, boolean][] = [
-    ["Booking", "14 Mar 26", true], ["SPA", "02 Apr 26", true], ["20%", "14 Jun 26", true],
-    ["30%", "14 Sep 26", false], ["50%", "14 Mar 27", false], ["Handover", "Q4 2027", false],
-  ];
+  const uMiles: [string, string, boolean][] = liveMiles.length
+    ? liveMiles.slice(0, 6).map((m) => [m.milestone, m.due || "\u2014", mileStatus(m.status || "scheduled") === "Paid"])
+    : [
+        ["Booking", "14 Mar 26", true], ["SPA", "02 Apr 26", true], ["20%", "14 Jun 26", true],
+        ["30%", "14 Sep 26", false], ["50%", "14 Mar 27", false], ["Handover", "Q4 2027", false],
+      ];
 
   const uInstMock = [
     ["01", "Booking deposit", "On booking", "14 Mar 2026", "10%", "Paid"],
