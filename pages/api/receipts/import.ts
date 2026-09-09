@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { withPerm } from "../../../lib/permissions";
 import { query } from "../../../lib/db";
 import { ok, fail, methodNotAllowed } from "../../../lib/api";
+import { fmtShortDate } from "../../../lib/format";
 
 type StmtRow = { value_date: string; reference: string; amount: number; description: string };
 
@@ -65,7 +66,7 @@ export default withPerm("Finance", "UPD", async function (req: NextApiRequest, r
     return ok(res, {
       statements: rows.rows.map((s: any) => ({
         id: s.id,
-        date: s.value_date ? new Date(s.value_date).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "2-digit" }) : "",
+        date: fmtShortDate(s.value_date),
         reference: s.reference || "",
         amount: Number(s.amount) || 0,
         description: s.description || "",

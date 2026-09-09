@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { withPerm } from "../../lib/permissions";
 import { query } from "../../lib/db";
 import { ok, fail, methodNotAllowed } from "../../lib/api";
+import { fmtShortDate } from "../../lib/format";
 
 const PDC_STATUSES = ["Held", "Presented", "Cleared", "Bounced"];
 
@@ -34,12 +35,12 @@ export default withPerm("Finance", "REA", async function (req: NextApiRequest, r
       method: r.method || "bank_transfer",
       reference: r.reference || "",
       matched: !!r.matched,
-      date: new Date(r.received_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "2-digit" }),
+      date: fmtShortDate(r.received_at),
       project: r.project_code || "",
       buyer: r.buyer_name || "",
       unit: r.unit_no || "",
       cheque_no: r.cheque_no || "",
-      cheque_date: r.cheque_date ? new Date(r.cheque_date).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "2-digit" }) : "",
+      cheque_date: fmtShortDate(r.cheque_date),
       bank_name: r.bank_name || "",
       pdc_status: r.pdc_status || "",
     }));
