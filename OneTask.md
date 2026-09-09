@@ -8,7 +8,7 @@
 
 - Current branch: `feat/audit-halfdone-completion` (complete amber "Half-finished" audit items). Push target: this branch only.
 - PUSH THIS: **`0c36607`** "feat(audit): complete amber items — Reports pivot builder + schedule, per-role approval thresholds, notif matrix 'who' column, Mobile Pulse/Buyers tabs, brand token #3B6EF6 + Inter + compact money" (6 files: Mobile.tsx, Reports.tsx, Settings.tsx, Users.tsx, lib/format.ts, pages/_document.tsx). Lint + `next build` green (build run with dev server stopped, then restarted).
-- Audit HTML updated: `C:\Users\admin\Downloads\New folder\ELLINGTON-AUDIT-REPORT.html` — 40/51 checked; Escrow gauges + Construction risk register flipped to done (were already implemented); 1 honest open: dark-theme-as-default NOT converted (app stays light).
+- Audit HTML updated: `C:\Users\admin\Downloads\New folder\ELLINGTON-AUDIT-REPORT.html` — 41/51 checked, 0 half-finished; Escrow gauges + Construction risk register flipped to done (were already implemented); dark-theme-as-default skipped by operator decision (app stays light).
 - Everything intended for this task is on this branch — NO commit on `main` from this program.
 - Prior `fix/plinth-parity` and `fix/parity-live-data` commits (T1–T18, D1–D6) are historical and NOT completion evidence for this task.
 
