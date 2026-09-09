@@ -4,6 +4,7 @@ import { AC, money } from "../../lib/format";
 import { ALL_UNITS } from "../../lib/data";
 import { exportBuyerStatement, exportDocument } from "../../lib/pdf";
 import { fetchJSON } from "../../lib/api";
+import { KpiSkeleton, PanelSkeleton } from "../Loading";
 
 const BUYERS = ["Rajesh Menon","Aisha Al Marri","Hassan Al Rayes","Chen Liu","Daniel Whitfield","Elena Petrova","Marcus Lindqvist","Wei Chen","Priya Nair","Nadia Khoury","Sunil Rathore","Grace Okonkwo","Omar Al Suwaidi","Fatima Al Hashimi"];
 const pill = (s: string, ok: boolean) =>
@@ -16,10 +17,11 @@ const FUNNEL: [string,string,string][] = [
 const CONV = ["","52%","65%","60%","71%"];
 
 /* ── kanban columns ─────────────────────────────────────────────── */
-type Card = { name:string; flag:string; src:string; budget:string; chips:string[]; agent:string; age:string; live:boolean };
+type Card = { name:string; flag:string; src:string; budget:string; chips:string[]; agent:string; age:string; live:boolean; id?:number; disc?:number; days?:number };
 type Col = { label:string; count:number; val:string; color:string; cards:Card[] };
 
 type ApiLead = {
+  id?: number;
   name: string;
   source?: string;
   stage?: string;
@@ -27,6 +29,8 @@ type ApiLead = {
   budgetMax?: number;
   agent?: string;
   live?: boolean;
+  discountPct?: number;
+  daysToClose?: number;
 };
 const LEADS_COLS: Col[] = [
   { label:"New",count:8,val:"AED 14.2M",color:"#8B7CF6",cards:[
@@ -50,6 +54,15 @@ const LEADS_COLS: Col[] = [
     {name:"Peter Nowak",flag:"DE",src:"Property Finder",budget:"AED 1.9M",chips:["\u2014"],agent:"RK",age:"price objection",live:false}]},
 ];
 
+type LbRow = { agent:string; units:number; value:number; conv:number; disc:number; days:number };
+const LB_FALLBACK: LbRow[] = [
+  { agent:"Sarah Bennett", units:4, value:9800000, conv:57, disc:3.2, days:28 },
+  { agent:"Ravi Khan", units:3, value:7100000, conv:43, disc:2.8, days:34 },
+  { agent:"Hamza Ali", units:2, value:5400000, conv:33, disc:4.1, days:41 },
+  { agent:"Dana Scott", units:2, value:4900000, conv:29, disc:2.1, days:22 },
+  { agent:"Arvind Mehta", units:3, value:6600000, conv:38, disc:3.6, days:31 },
+];
+
 /* ── booking wizard ─────────────────────────────────────────────── */
 const STEP_LABELS: [string,string][] = [["Unit & terms","Price, discount, plan"],["Buyer","Identity, KYC, AML"],["Payment schedule","Milestones and charges"],["Documents","Reservation, offer, SPA"],["Payment & confirm","Escrow reference required"]];
 type Field = [string,string,string];
@@ -63,6 +76,48 @@ const SFIELDS: Record<number,Field[]> = {
 const DEAL = [["Unit","H21-T1-1204"],["Typology","2BR-B \u00b7 1,180 sq.ft"],["List price","AED 2,450,000"],["Discount","\u22127.5%"],["Net price","AED 2,266,250"],["Price/sq.ft","AED 1,920"],["Plan","20/40/40"],["Buyer","Hassan Al Rayes"],["Broker","Betterhomes \u00b7 2.0%"]];
 
 /* ── buyer 360 ──────────────────────────────────────────────────── */
+const moneyM = (v: number) =>
+  v >= 1e6 ? "AED " + (v / 1e6).toFixed(2).replace(/\.00$/, "") + "M" : money(v);
+const fmtShort = (d: string) => {
+  if (!d) return "\u2014";
+  const [y, mo, dd] = d.split("-");
+  const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  return (dd ? dd + " " : "") + MON[Number(mo) - 1] + " " + y.slice(2);
+};
+
+type BuyerRow = {
+  id: number;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  kyc: string;
+  units: number;
+  contracted: number;
+  collected: number;
+  outstanding: number;
+  overdue: number;
+  next: { amount: number; date: string; unit: string; milestone: string } | null;
+};
+type BuyerDetail = {
+  id: number;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  kyc: string;
+  units: { no: string; status: string; type: string; beds: number; area: number; price: number; view: string; pct: number }[];
+  ledger: { date: string; unit: string; desc: string; debit: number | null; credit: number; balance: number }[];
+  schedule: { ym: string; amt: number }[];
+  next: { amount: number; date: string; unit: string; milestone: string } | null;
+  overdue: number;
+  firstPaid: string | null;
+  miles: { paid: number; total: number };
+};
+const DIR_FALLBACK: BuyerRow[] = [
+  { id: 1, name: "Rajesh Menon", email: "r.menon@arvexcapital.ae", phone: "+971 50 442 1187", kyc: "cleared", units: 2, contracted: 4780000, collected: 2870000, outstanding: 1910000, overdue: 0, next: { amount: 465500, date: "2026-09-14", unit: "H21-T1-1204", milestone: "Structure 40%" } },
+  { id: 2, name: "Aisha Al Marri", email: "a.almarri@gmail.com", phone: "+971 50 221 8810", kyc: "cleared", units: 1, contracted: 2940000, collected: 1764000, outstanding: 1176000, overdue: 0, next: { amount: 512000, date: "2026-09-14", unit: "H21-T1-2801", milestone: "Excavation 20%" } },
+  { id: 3, name: "Sunil Rathore", email: "sunil@rathore.co.in", phone: "+971 50 771 2219", kyc: "cleared", units: 1, contracted: 4120000, collected: 1296000, outstanding: 2824000, overdue: 1220000, next: null },
+];
+
 const B_TILES = [{l:"Total contracted",v:"AED 4.78M",n:"2 units \u00b7 Belgravia Heights III",ok:false},{l:"Collected",v:"AED 2.87M",n:"60.0% of contracted",ok:true},{l:"Outstanding",v:"AED 1.91M",n:"across 8 instalments",ok:false},{l:"Overdue",v:"AED 0",n:"no arrears on record",ok:false}];
 const B_UNITS = [{no:"H21-T1-1204",st:"Sold",meta:"2BR-B \u00b7 1,180 sq.ft \u00b7 Level 12",price:"AED 2,327,500",pct:"62%",p:62},{no:"H21-T1-3302",st:"Booked",meta:"1BR-A \u00b7 748 sq.ft \u00b7 Level 33",price:"AED 2,452,500",pct:"58%",p:58}];
 const B_LEDGER: [string,string,string,string,string,string][] = [
@@ -163,20 +218,30 @@ export default function Sales({ scope }: { scope: string }) {
     go("booking")();
   };
 
-  if (s === "leads") return <Leads onNewBooking={blankBooking} onBookLead={goBooking} />;
+  if (s === "leads") return <Leads onNewBooking={blankBooking} onBookLead={goBooking} goRegister={go("bookings")} />;
   if (s === "booking") return <Booking step={step} setStep={setStep} onBack={go("leads")} lead={lead} blank={!lead} />;
-  if (s === "buyer") return <Buyer360 btab={btab} setBtab={setBtab} goUnit={goUnit} />;
+  if (s === "bookings") return <BookingsRegister onBack={go("leads")} />;
+  if (s === "buyer") {
+    if (router.query.id) return <Buyer360 btab={btab} setBtab={setBtab} goUnit={goUnit} />;
+    return <BuyersDirectory onOpen={(id) => {
+      const q: Record<string,string> = { s: "buyer", id: String(id) };
+      if (scope && scope !== "ALL") q.scope = scope;
+      router.replace({ pathname: "/sales", query: q }, undefined, { shallow: true });
+    }} />;
+  }
   if (s === "brokers") return <Brokers brtab={brtab} setBrtab={setBrtab} brstep={brstep} setBrstep={setBrstep} />;
   if (s === "documents") return <Documents dtab={dtab} setDtab={setDtab} doc={doc} setDoc={setDoc} />;
-  return <Leads onNewBooking={blankBooking} onBookLead={goBooking} />;
+  return <Leads onNewBooking={blankBooking} onBookLead={goBooking} goRegister={go("bookings")} />;
 }
 
 /* ═══════════════════════════════════════════════════════════════════
    LEADS
    ═══════════════════════════════════════════════════════════════════ */
-function Leads({ onNewBooking, onBookLead }: { onNewBooking: () => void; onBookLead: (card: Card) => void }) {
+function Leads({ onNewBooking, onBookLead, goRegister }: { onNewBooking: () => void; onBookLead: (card: Card) => void; goRegister: () => void }) {
   const [dbCols, setDbCols] = useState<Col[] | null>(null);
+  const [liveLeads, setLiveLeads] = useState<ApiLead[] | null>(null);
   const [apiError, setApiError] = useState("");
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -184,6 +249,7 @@ function Leads({ onNewBooking, onBookLead }: { onNewBooking: () => void; onBookL
       .then((j) => {
         const leads = j.leads;
         if (!active || !Array.isArray(leads)) return;
+        setLoaded(true);
         const order = ["new", "contacted", "qualified", "viewing", "negotiation", "eoi", "booked", "lost"];
         const byStage: Record<string, Card[]> = { new: [], contacted: [], qualified: [], viewing: [], negotiation: [], eoi: [], booked: [], lost: [] };
         (leads as ApiLead[]).forEach((l) => {
@@ -195,6 +261,7 @@ function Leads({ onNewBooking, onBookLead }: { onNewBooking: () => void; onBookL
             ? "AED " + (budgetMin || budgetMax).toLocaleString("en-US")
             : "AED -";
           byStage[key].push({
+            id: l.id,
             name: l.name,
             flag: "AE",
             src: l.source || "Referral",
@@ -203,6 +270,8 @@ function Leads({ onNewBooking, onBookLead }: { onNewBooking: () => void; onBookL
             agent: (l.agent || "AD").split(/\s+/).map((w: string) => w[0]).slice(0, 2).join("").toUpperCase() || "AD",
             age: "live",
             live: l.live !== false,
+            disc: l.discountPct != null ? l.discountPct : undefined,
+            days: l.daysToClose != null ? l.daysToClose : undefined,
           });
         });
         const cols = order.map((st) => {
@@ -213,14 +282,77 @@ function Leads({ onNewBooking, onBookLead }: { onNewBooking: () => void; onBookL
           return { label: labels[st], count: cards.length, val, color: colors[st], cards };
         });
         setDbCols(cols);
+        setLiveLeads(leads);
       })
       .catch((e) => {
-        if (active) setApiError(e?.message || "Failed to load leads");
+        if (active) { setLoaded(true); setApiError(e?.message || "Failed to load leads"); }
       });
     return () => { active = false; };
   }, []);
 
   const cols = dbCols && dbCols.some((c) => c.cards.length > 0) ? dbCols : LEADS_COLS;
+
+  const [dragId, setDragId] = useState<number | null>(null);
+
+  const moveLead = (targetLabel: string) => {
+    if (dragId == null || !dbCols) return;
+    const stageMap: Record<string, string> = { New: "new", Contacted: "contacted", Qualified: "qualified", Viewing: "viewing", Negotiation: "negotiation", "EOI signed": "eoi", Booked: "booked", Lost: "lost" };
+    const to = stageMap[targetLabel];
+    if (!to) return;
+    const fromCol = dbCols.find((c) => c.cards.some((k) => k.id === dragId));
+    if (!fromCol) return;
+    const card = fromCol.cards.find((k) => k.id === dragId);
+    if (!card) return;
+    const next = dbCols.map((c) => {
+      if (c.label === fromCol.label) return { ...c, count: c.cards.length - 1, cards: c.cards.filter((k) => k.id !== dragId) };
+      if (c.label === targetLabel) return { ...c, count: c.cards.length + 1, cards: [...c.cards, { ...card, age: "just moved" }] };
+      return c;
+    });
+    setDragId(null);
+    setDbCols(next);
+    fetchJSON<{ id: number }>("/api/leads?id=" + dragId, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ stage: to }),
+    })
+      .then(() => {})
+      .catch((e) => setApiError(e?.message || "Failed to move lead"));
+  };
+
+  const leader: LbRow[] = (() => {
+    if (!liveLeads || liveLeads.length === 0) return LB_FALLBACK;
+    const byAgent: Record<string, ApiLead[]> = {};
+    liveLeads.forEach((l) => {
+      const a = (l.agent || "Unassigned").trim() || "Unassigned";
+      (byAgent[a] = byAgent[a] || []).push(l);
+    });
+    return Object.entries(byAgent)
+      .map(([agent, ls]) => {
+        const booked = ls.filter((l) => l.stage === "booked");
+        const closed = ls.filter((l) => l.stage === "booked" || l.stage === "lost");
+        const summed = (sel: (l: ApiLead) => number, key: "disc" | "days") => {
+          const arr = ls.filter((l) => (key === "disc" ? l.discountPct != null : l.daysToClose != null));
+          return arr.reduce((a, l) => a + sel(l), 0) / Math.max(1, arr.length);
+        };
+        return {
+          agent,
+          units: booked.length,
+          value: booked.reduce((a, l) => a + (l.budgetMax || 0), 0),
+          conv: closed.length ? Math.round((booked.length / closed.length) * 100) : 0,
+          disc: summed((l) => l.discountPct || 0, "disc"),
+          days: Math.round(summed((l) => l.daysToClose || 0, "days")),
+        };
+      })
+      .sort((a, b) => b.value - a.value);
+  })();
+
+  if (!loaded) {
+    return (
+      <div>
+        <PanelSkeleton headerW={120} rows={6} cols={6} />
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -235,6 +367,7 @@ function Leads({ onNewBooking, onBookLead }: { onNewBooking: () => void; onBookL
           <div style={{fontSize:13,color:"#6B7180",fontWeight:500,marginTop:5}}>34 open \u00b7 AED 62.4M potential value \u00b7 8 agents</div>
         </div>
         <button onClick={onNewBooking} style={{height:38,borderRadius:12,background:AC,color:"#fff",border:0,padding:"0 16px",fontFamily:"inherit",fontSize:12.5,fontWeight:700,cursor:"pointer"}}>New booking</button>
+        <button onClick={goRegister} style={{height:38,borderRadius:12,border:"1px solid #EDEEF3",background:"#fff",padding:"0 16px",fontFamily:"inherit",fontSize:12.5,fontWeight:700,color:"#4A5060",cursor:"pointer"}}>Bookings register</button>
       </div>
 
       {/* funnel */}
@@ -254,10 +387,37 @@ function Leads({ onNewBooking, onBookLead }: { onNewBooking: () => void; onBookL
         </div>
       </div>
 
+      {/* agent leaderboard */}
+      <div style={{background:"#fff",borderRadius:20,padding:"20px 24px",boxShadow:"0 1px 3px rgba(20,22,31,.04)",marginBottom:16}}>
+        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
+          <div style={{fontSize:13,fontWeight:800,letterSpacing:"-.02em"}}>Agent leaderboard</div>
+          <span style={{fontSize:10.5,fontWeight:600,color:"#9AA0AE"}}>Units booked \u00b7 Value booked \u00b7 Conversion \u00b7 Avg discount \u00b7 Avg days to close</span>
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"1.6fr 1fr 1.4fr 1fr 1fr 1fr",gap:12,fontSize:10.5,fontWeight:700,color:"#9AA0AE",textTransform:"uppercase",letterSpacing:".04em",padding:"0 6px 9px"}}>
+          <span>Agent</span><span style={{textAlign:"right"}}>Units booked</span><span style={{textAlign:"right"}}>Value booked</span><span style={{textAlign:"right"}}>Conv.</span><span style={{textAlign:"right"}}>Avg disc</span><span style={{textAlign:"right"}}>Avg days</span>
+        </div>
+        {leader.map((r, i) => (
+          <div key={r.agent} style={{display:"grid",gridTemplateColumns:"1.6fr 1fr 1.4fr 1fr 1fr 1fr",gap:12,alignItems:"center",padding:"10px 6px",borderTop:"1px solid #F3F4F8"}}>
+            <span style={{display:"flex",alignItems:"center",gap:9,minWidth:0}}>
+              <span style={{width:26,height:26,flex:"none",borderRadius:9,background:i===0?"#EDECFE":"#E7E9F0",display:"grid",placeItems:"center",fontSize:9.5,fontWeight:800,color:i===0?AC:"#4A5060"}}>{r.agent.split(/\s+/).map((w) => w[0]).slice(0,2).join("")}</span>
+              <span style={{fontSize:12,fontWeight:700,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{r.agent}</span>
+              {i===0 && <span style={{fontSize:9,fontWeight:800,color:AC,background:"#F0EFFE",borderRadius:6,padding:"2px 6px"}}>#1</span>}
+            </span>
+            <span style={{textAlign:"right",fontSize:12,fontWeight:800}}>{r.units}</span>
+            <span style={{textAlign:"right",fontSize:12,fontWeight:800,fontFamily:"'JetBrains Mono',monospace"}}>{moneyM(r.value)}</span>
+            <span style={{textAlign:"right",fontSize:12,fontWeight:700,color:"#6B7180"}}>{r.conv}%</span>
+            <span style={{textAlign:"right",fontSize:12,fontWeight:700,color:"#6B7180"}}>{r.disc.toFixed(1)}%</span>
+            <span style={{textAlign:"right",fontSize:12,fontWeight:700,color:"#6B7180"}}>{Math.round(r.days)} d</span>
+          </div>
+        ))}
+      </div>
+
       {/* kanban */}
       <div style={{display:"flex",gap:12,overflowX:"auto",paddingBottom:8,alignItems:"flex-start"}}>
         {cols.map(col => (
-          <div key={col.label} style={{width:240,flex:"none",background:"#EFF0F5",borderRadius:18,padding:12}}>
+          <div key={col.label} style={{width:240,flex:"none",background:"#EFF0F5",borderRadius:18,padding:12}}
+               onDragOver={(e) => e.preventDefault()}
+               onDrop={() => moveLead(col.label)}>
             <div style={{display:"flex",alignItems:"center",gap:8,padding:"2px 6px 12px"}}>
               <span style={{width:8,height:8,borderRadius:4,background:col.color}} />
               <span style={{flex:1,fontSize:12,fontWeight:700}}>{col.label}</span>
@@ -266,7 +426,11 @@ function Leads({ onNewBooking, onBookLead }: { onNewBooking: () => void; onBookL
             <div style={{fontSize:10.5,fontWeight:700,color:"#9AA0AE",padding:"0 6px 10px"}}>{col.val} potential</div>
             <div style={{display:"flex",flexDirection:"column",gap:8}}>
               {col.cards.map(k => (
-                <div key={k.name} onClick={() => onBookLead(k)} title="New booking for this lead" style={{background:"#fff",borderRadius:14,padding:"13px 14px",boxShadow:"0 1px 2px rgba(20,22,31,.05)",cursor:"pointer",transition:"box-shadow .15s,border-color .15s",border:"1px solid transparent"}}>
+                <div key={k.id ?? k.name} onClick={() => onBookLead(k)} draggable={k.id != null}
+                     onDragStart={() => setDragId(k.id ?? null)}
+                     onDragEnd={() => setDragId(null)}
+                     title={k.id != null ? "Drag to move stage \u00b7 click for new booking" : "New booking for this lead"}
+                     style={{background:"#fff",borderRadius:14,padding:"13px 14px",boxShadow:"0 1px 2px rgba(20,22,31,.05)",cursor:"pointer",transition:"box-shadow .15s,border-color .15s",border:"1px solid transparent"}}>
                   <div style={{display:"flex",alignItems:"center",gap:7}}>
                     <span style={{flex:1,fontSize:12.5,fontWeight:700,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{k.name}</span>
                     <span style={{fontSize:10,fontWeight:700,color:"#9AA0AE"}}>{k.flag}</span>
@@ -309,6 +473,10 @@ function Booking({ step, setStep, onBack, lead, blank }: { step:number; setStep:
   const [amount, setAmount] = useState("226688");
   const [stage, setStage] = useState(blank ? "New" : (leadChip(lead)));
   const [confirmed, setConfirmed] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [confirmErr, setConfirmErr] = useState("");
+  const [savedRef, setSavedRef] = useState("");
+  const [issuedReceipt, setIssuedReceipt] = useState("");
 
   const listPrice = 2450000;
   const discVal = parseFloat(disc || "0");
@@ -316,6 +484,39 @@ function Booking({ step, setStep, onBack, lead, blank }: { step:number; setStep:
   const net = money(netVal);
   const bookingAmt = Math.round(netVal * 0.1);
   const psf = Math.round(netVal / 1180);
+  const escrowRef = SFIELDS[5].find((f) => f[0] === "Escrow deposit reference")?.[1] || "";
+
+  const doConfirm = async () => {
+    setConfirming(true);
+    setConfirmErr("");
+    try {
+      const created = await fetchJSON<{ id: number; ref: string; unit: string }>("/api/bookings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          unit_no: "BLG-026",
+          buyer_name: buyer || leadName || "Prospective buyer",
+          buyer_mobile: mobile,
+          discount_pct: discVal,
+          list_price: listPrice,
+          net_price: netVal,
+          booking_amount: bookingAmt,
+        }),
+      });
+      const res = await fetchJSON<any>("/api/bookings?id=" + created.id, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "confirm", escrow_ref: escrowRef, payment_method: "bank_transfer", buyer_email: null, buyer_mobile: mobile }),
+      });
+      setSavedRef(res.ref || created.ref);
+      setIssuedReceipt(String(res.receiptId || ""));
+      setConfirmed(true);
+    } catch (e: any) {
+      setConfirmErr(e?.message || "Booking failed to persist");
+    } finally {
+      setConfirming(false);
+    }
+  };
 
   const fields = SFIELDS[step] || [];
   const showApproval = step === 1;
@@ -337,10 +538,11 @@ function Booking({ step, setStep, onBack, lead, blank }: { step:number; setStep:
     <div>
       {confirmed && (
         <div style={{ background:"#E9F8F1", color:"#1F9D6B", borderRadius:14, padding:"14px 18px", marginBottom:16, fontSize:12.5, fontWeight:700 }}>
-          Booking confirmed \u00b7 {buyer || leadName || "Prospective buyer"} \u00b7 {deal[4][1]} \u00b7 escrow ref {refOf(step)} \u00b7 receipt RCP-H21-004713 issued
-          <span style={{ display:"block", fontSize:11, fontWeight:600, marginTop:4, color:"#2EBD8B" }}>{blank ? "Blank booking created from lead pipeline." : "Created from lead \u2014 " + (lead?.name ?? "") + " (" + stage + " stage)."}</span>
+          Booking confirmed \u00b7 {buyer || leadName || "Prospective buyer"} \u00b7 {deal[4][1]} \u00b7 {savedRef || ("escrow ref " + escrowRef)} \u00b7 {issuedReceipt ? ("receipt RCP-00" + String(issuedReceipt).padStart(4, "0") + " issued") : "receipt issued"}
+          <span style={{ display:"block", fontSize:11, fontWeight:600, marginTop:4, color:"#2EBD8B" }}>{blank ? "Blank booking created from lead pipeline." : "Created from lead \u2014 " + (lead?.name ?? "") + " (" + stage + " stage)."} Registered in the bookings register \u00b7 unit marked Reserved.</span>
         </div>
       )}
+      {confirmErr && <div style={{ background:"#FDECEC", color:"#E5484D", borderRadius:12, padding:"11px 16px", fontSize:12, fontWeight:700, marginBottom:16 }}>Booking not persisted \u00b7 {confirmErr}</div>}
       <div style={{display:"grid",gridTemplateColumns:"210px 1fr 300px",gap:20,alignItems:"start"}}>
       {/* step rail */}
       <div style={{background:"#fff",borderRadius:20,padding:"20px 18px",boxShadow:"0 1px 3px rgba(20,22,31,.04)"}}>
@@ -443,7 +645,7 @@ function Booking({ step, setStep, onBack, lead, blank }: { step:number; setStep:
           <button style={{height:40,borderRadius:12,border:"1px solid #EDEEF3",background:"#fff",padding:"0 16px",fontFamily:"inherit",fontSize:12.5,fontWeight:700,color:"#4A5060",cursor:"pointer"}}>Save as draft</button>
           <div style={{flex:1}} />
           {step > 1 && <button onClick={() => setStep(step-1)} style={{height:40,borderRadius:12,border:"1px solid #EDEEF3",background:"#fff",padding:"0 16px",fontFamily:"inherit",fontSize:12.5,fontWeight:700,color:"#4A5060",cursor:"pointer"}}>Back</button>}
-          <button onClick={() => step === 5 ? setConfirmed(true) : setStep(step+1)} style={{height:40,borderRadius:12,background:AC,color:"#fff",border:0,padding:"0 20px",fontFamily:"inherit",fontSize:12.5,fontWeight:700,cursor:"pointer"}}>{nextLabel}</button>
+          <button onClick={() => step === 5 ? doConfirm() : setStep(step+1)} disabled={confirming} style={{height:40,borderRadius:12,background:AC,color:"#fff",border:0,padding:"0 20px",fontFamily:"inherit",fontSize:12.5,fontWeight:700,cursor:confirming?"progress":"pointer",opacity:confirming?0.7:1}}>{confirming ? "Confirming\u2026" : nextLabel}</button>
         </div>
       </div>
 
@@ -474,18 +676,287 @@ function Booking({ step, setStep, onBack, lead, blank }: { step:number; setStep:
 }
 
 /* ═══════════════════════════════════════════════════════════════════
+   BOOKINGS REGISTER
+   ═══════════════════════════════════════════════════════════════════ */
+type BookingRow = { id: number; ref: string | null; unit_no: string; project: string; buyer: string; status: string; discount_pct: number; discount_amt: number; list_price: number; net_price: number; booking_amount: number; payment_method: string | null; escrow_ref: string | null; created_at: string; expected_spa: string };
+const BOOKING_STATUS_PILL: Record<string, { bg: string; color: string }> = {
+  confirmed: { bg: "#E9F8F1", color: "#1F9D6B" },
+  pending_approval: { bg: "#FDF4E5", color: "#B07B14" },
+  draft: { bg: "#F1F2F6", color: "#6B7180" },
+  cancelled: { bg: "#FDECEC", color: "#E5484D" },
+};
+const BOOKINGS_FALLBACK: BookingRow[] = [
+  { id: 0, ref: "BKG-2026-00891", unit_no: "H21-T1-1204", project: "H21", buyer: "Rajesh Menon", status: "confirmed", discount_pct: 7.5, discount_amt: 183750, list_price: 2450000, net_price: 2266250, booking_amount: 226625, payment_method: "Bank transfer", escrow_ref: "ESC-2026-9001", created_at: "31 Aug 2026", expected_spa: "30 Nov 2026" },
+  { id: 0, ref: "BKG-2026-00890", unit_no: "H21-T1-2801", project: "H21", buyer: "Aisha Al Marri", status: "confirmed", discount_pct: 3, discount_amt: 61402, list_price: 2046750, net_price: 1985348, booking_amount: 198535, payment_method: "Cheque", escrow_ref: "ESC-2026-8996", created_at: "29 Aug 2026", expected_spa: "30 Nov 2026" },
+  { id: 0, ref: "BKG-2026-00889", unit_no: "H21-T1-4102", project: "H21", buyer: "Elena Petrova", status: "pending_approval", discount_pct: 9, discount_amt: 0, list_price: 6020000, net_price: 5478200, booking_amount: 547820, payment_method: "Bank transfer", escrow_ref: null, created_at: "28 Aug 2026", expected_spa: "30 Nov 2026" },
+];
+const bookingPill = (s: string) => { const m = BOOKING_STATUS_PILL[s] || BOOKING_STATUS_PILL.draft; return { display: "inline-block", fontSize: 10.5, fontWeight: 700, borderRadius: 7, padding: "3px 8px", background: m.bg, color: m.color }; };
+
+function BookingsRegister({ onBack }: { onBack: () => void }) {
+  const [rows, setRows] = useState<BookingRow[] | null>(null);
+  const [notice, setNotice] = useState("");
+  const [apiError, setApiError] = useState("");
+  const [loaded, setLoaded] = useState(false);
+  const [filter, setFilter] = useState<string>("all");
+
+  useEffect(() => {
+    let active = true;
+    fetchJSON<{ bookings: BookingRow[] }>("/api/bookings")
+      .then((j) => { if (active) { setLoaded(true); setRows(Array.isArray(j.bookings) ? j.bookings : []); } })
+      .catch((e) => { if (active) { setLoaded(true); setApiError(e?.message || "Failed to load bookings"); } });
+    return () => { active = false; };
+  }, []);
+
+  const banner = (m: string) => { setNotice(m); setTimeout(() => setNotice(""), 3500); };
+
+  const cancel = async (r: BookingRow) => {
+    if (r.id == null) { banner("Sample booking — switching to live register required"); return; }
+    if (!window.confirm("Cancel booking " + r.ref + " for " + r.buyer + "?")) return;
+    try {
+      await fetchJSON<any>("/api/bookings?id=" + r.id, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "cancel" }) });
+      setRows((rows || []).map((x) => x.id === r.id ? { ...x, status: "cancelled" } : x));
+      banner("Booking " + r.ref + " cancelled · unit released back to available");
+    } catch (e: any) { banner("Cancel failed: " + (e?.message || "request failed")); }
+  };
+
+  const show = rows || BOOKINGS_FALLBACK;
+  const avail = !!rows;
+  const filtered = filter === "all" ? show : show.filter((r) => r.status === filter);
+  const gross = show.reduce((a, b) => a + b.net_price, 0);
+  const tokens = show.reduce((a, b) => a + b.booking_amount, 0);
+
+  if (!loaded) {
+    return (
+      <div>
+        <PanelSkeleton headerW={220} rows={8} cols={6} />
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      {apiError && (
+        <div style={{ background: "#FDECEC", color: "#E5484D", borderRadius: 12, padding: "11px 16px", fontSize: 12, fontWeight: 700, marginBottom: 16 }}>
+          Live data unavailable ({apiError}) — showing sample rows
+        </div>
+      )}
+      {notice && <div style={{ background: "#E9F8F1", color: "#1F9D6B", borderRadius: 12, padding: "11px 16px", fontSize: 12, fontWeight: 700, marginBottom: 16 }}>{notice}</div>}
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 16, marginBottom: 18 }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: "-.03em", lineHeight: 1.15 }}>Bookings register</div>
+          <div style={{ fontSize: 13, color: "#6B7180", fontWeight: 500, marginTop: 5 }}>{show.length} bookings · {moneyM(gross)} contract value · {moneyM(tokens)} tokens held</div>
+        </div>
+        <button onClick={onBack} style={{ height: 38, borderRadius: 12, border: "1px solid #EDEEF3", background: "#fff", padding: "0 16px", fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, color: "#4A5060", cursor: "pointer" }}>{"\u2039"} Bookings</button>
+      </div>
+      <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
+        {["all", "confirmed", "pending_approval", "draft", "cancelled"].map((f) => (
+          <button key={f} onClick={() => setFilter(f)} style={{ height: 30, border: 0, borderRadius: 9, padding: "0 13px", cursor: "pointer", fontFamily: "inherit", fontSize: 11.5, fontWeight: 700, background: filter === f ? "#F0EFFE" : "#F1F2F6", color: filter === f ? AC : "#6B7180" }}>
+            {f.replace("_", " ")} ({f === "all" ? show.length : show.filter((x) => x.status === f).length})
+          </button>
+        ))}
+      </div>
+      <div style={{ background: "#fff", borderRadius: 20, padding: "18px 22px", boxShadow: "0 1px 3px rgba(20,22,31,.04)" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr 1.4fr 1fr 1fr 1fr 1fr 1fr", gap: 12, padding: "0 8px 10px", borderBottom: "1px solid #F1F2F6" }}>
+          {["Reference", "Unit", "Buyer", "Status", "List price", "Net price", "Token", "Scheduled"].map((h) => <div key={h} style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".05em", color: "#9AA0AE", textTransform: "uppercase" }}>{h}</div>)}
+        </div>
+        {filtered.map((r, i) => (
+          <div key={r.ref || "b" + i} style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr 1.4fr 1fr 1fr 1fr 1fr 1fr", gap: 12, alignItems: "center", padding: "12px 8px", borderBottom: i < filtered.length - 1 ? "1px solid #F6F7FA" : "none" }}>
+            <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 12, fontWeight: 600 }}>{r.ref || "\u2014"}</span>
+            <span style={{ fontSize: 12.5, fontWeight: 700 }}>{r.unit_no} <span style={{ color: "#9AA0AE", fontWeight: 600, fontSize: 11 }}>· {r.project}</span></span>
+            <span style={{ fontSize: 12.5, fontWeight: 600 }}>{r.buyer}</span>
+            <span style={bookingPill(r.status)}>{r.status.replace("_", " ")}</span>
+            <span style={{ fontSize: 12.5, fontWeight: 600 }}>{money(r.list_price)}</span>
+            <span style={{ fontSize: 12.5, fontWeight: 800 }}>{money(r.net_price)}</span>
+            <span style={{ fontSize: 12.5, fontWeight: 700, color: AC }}>{money(r.booking_amount)}</span>
+            <span style={{ fontSize: 12, color: "#6B7180", fontWeight: 600 }}>{r.expected_spa || "\u2014"}</span>
+          </div>
+        ))}
+        {filtered.length === 0 && <div style={{ padding: "18px 8px", textAlign: "center", fontSize: 12.5, color: "#9AA0AE", fontWeight: 600 }}>No {filter} bookings yet</div>}
+        <div style={{ display: "flex", gap: 10, paddingTop: 14, marginTop: 6, borderTop: "1px solid #F6F7FA" }}>
+          <span style={{ fontSize: 11.5, color: "#9AA0AE", fontWeight: 600, marginRight: 6 }}>This register updates from the booking wizard — confirm a booking to log it here.</span>
+          <button onClick={() => { if (window.confirm("Export booking register CSV?")) banner("Booking register exported · CSV"); }} style={{ marginLeft: "auto", height: 32, borderRadius: 10, border: "1px solid #EDEEF3", background: "#fff", padding: "0 13px", fontFamily: "inherit", fontSize: 11.5, fontWeight: 700, color: "#4A5060", cursor: "pointer" }}>Export CSV</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   BUYER DIRECTORY
+   ═══════════════════════════════════════════════════════════════════ */
+function BuyersDirectory({ onOpen }: { onOpen: (id: number) => void }) {
+  const [rows, setRows] = useState<BuyerRow[] | null>(null);
+  const [error, setError] = useState("");
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    fetchJSON<{ buyers: BuyerRow[] }>("/api/buyers")
+      .then((j) => { if (active) { setLoaded(true); setRows(Array.isArray(j.buyers) ? j.buyers : []); } })
+      .catch(() => { if (active) { setLoaded(true); setError("Live data unavailable \u2014 showing sample rows"); } });
+    return () => { active = false; };
+  }, []);
+
+  const show = rows || DIR_FALLBACK;
+  const avail = !!rows;
+  const contracted = show.reduce((a, b) => a + b.contracted, 0);
+  const collected = show.reduce((a, b) => a + b.collected, 0);
+  const outstanding = show.reduce((a, b) => a + b.outstanding, 0);
+
+  const open = (r: BuyerRow) => () => {
+    if (avail) onOpen(r.id);
+    else setError("Directory is in read-only sample mode \u2014 reload to view live records");
+  };
+
+  if (!loaded) {
+    return (
+      <div>
+        <KpiSkeleton count={4} />
+        <div style={{ marginTop: 16 }}>
+          <PanelSkeleton headerW={180} rows={8} cols={5} />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      {error && (
+        <div style={{ background: "#FDECEC", color: "#B33745", borderRadius: 12, padding: "11px 16px", fontSize: 12, fontWeight: 700, marginBottom: 16 }}>{error}</div>
+      )}
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 16, marginBottom: 18 }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: "-.03em", lineHeight: 1.15 }}>Buyers directory</div>
+          <div style={{ fontSize: 13, color: "#6B7180", fontWeight: 500, marginTop: 5 }}>
+            {avail ? show.length + " buyers on record" : "Sample of on-record buyers"} \u00b7 click a row for the full 360 view
+          </div>
+        </div>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 14, marginBottom: 16 }}>
+        {[["Total buyers", String(show.length), "kyc-linked"], ["Contract value", moneyM(contracted), "across all units"], ["Collected", moneyM(collected), moneyM(outstanding) + " outstanding"], ["Overdue", moneyM(show.reduce((a, b) => a + b.overdue, 0)), "needs follow-up"]].map(([l, v, n]) => (
+          <div key={l} style={{ background: "#fff", borderRadius: 20, padding: "18px 20px", boxShadow: "0 1px 3px rgba(20,22,31,.04)" }}>
+            <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".06em", color: "#9AA0AE", textTransform: "uppercase" }}>{l}</div>
+            <div style={{ fontSize: 20, fontWeight: 800, letterSpacing: "-.03em", marginTop: 11 }}>{v}</div>
+            <div style={{ fontSize: 11, color: "#6B7180", fontWeight: 500, marginTop: 4 }}>{n}</div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ background: "#fff", borderRadius: 20, boxShadow: "0 1px 3px rgba(20,22,31,.04)", overflow: "hidden" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr 56px 1fr 1fr 1fr 1fr 32px", gap: 10, padding: "14px 22px", fontSize: 9.5, fontWeight: 700, letterSpacing: ".07em", color: "#9AA0AE", textTransform: "uppercase", background: "#FAFBFD", borderBottom: "1px solid #EDEEF3" }}>
+          <span>Buyer</span><span>Contact</span><span>KYC</span><span style={{ textAlign: "right" }}>Units</span><span style={{ textAlign: "right" }}>Contracted</span><span style={{ textAlign: "right" }}>Collected</span><span style={{ textAlign: "right" }}>Overdue</span><span />
+        </div>
+        {show.map((r) => (
+          <div key={r.id} onClick={open(r)} style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr 56px 1fr 1fr 1fr 1fr 32px", gap: 10, alignItems: "center", padding: "0 22px", height: 64, borderBottom: "1px solid #F6F7FA", cursor: avail ? "pointer" : "default", background: avail ? "transparent" : "#FAFBFC" }}>
+            <span style={{ display: "flex", alignItems: "center", gap: 11, minWidth: 0 }}>
+              <span style={{ width: 36, height: 36, flex: "none", borderRadius: 12, background: "#EDECFE", display: "grid", placeItems: "center", fontSize: 12.5, fontWeight: 800, color: AC }}>{r.name.split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase()}</span>
+              <span style={{ minWidth: 0 }}>
+                <span style={{ display: "block", fontSize: 13, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.name}</span>
+                <span style={{ display: "block", fontSize: 10.5, color: "#9AA0AE", fontWeight: 500, marginTop: 2 }}>{r.next ? "Next due " + money(r.next.amount) + " \u00b7 " + fmtShort(r.next.date) : "No upcoming instalments"}</span>
+              </span>
+            </span>
+            <span style={{ minWidth: 0 }}>
+              <span style={{ display: "block", fontSize: 11, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.phone || "\u2014"}</span>
+              <span style={{ display: "block", fontSize: 10.5, color: "#9AA0AE", fontWeight: 500, marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.email || "\u2014"}</span>
+            </span>
+            <span style={{ fontSize: 10, fontWeight: 700, borderRadius: 7, padding: "3px 0", textAlign: "center", background: r.kyc === "cleared" ? "#E9F8F1" : "#FDF4E5", color: r.kyc === "cleared" ? "#1F9D6B" : "#B07B14" }}>{r.kyc === "cleared" ? "Cleared" : "Pending"}</span>
+            <span style={{ textAlign: "right", fontFamily: "'JetBrains Mono',monospace", fontSize: 11.5, fontWeight: 600 }}>{r.units}</span>
+            <span style={{ textAlign: "right", fontSize: 12.5, fontWeight: 700 }}>{moneyM(r.contracted)}</span>
+            <span style={{ textAlign: "right", fontSize: 12.5, fontWeight: 700, color: "#1F9D6B" }}>{moneyM(r.collected)}</span>
+            <span style={{ textAlign: "right", fontSize: 12.5, fontWeight: 700, color: r.overdue > 0 ? "#E5484D" : "#9AA0AE" }}>{r.overdue > 0 ? moneyM(r.overdue) : "\u2014"}</span>
+            <span style={{ fontSize: 13, color: "#B9BDC9", fontWeight: 700 }}>{"\u203A"}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════
    BUYER 360
    ═══════════════════════════════════════════════════════════════════ */
 function Buyer360({ btab, setBtab, goUnit }: { btab:string; setBtab:(v:any)=>void; goUnit:(id:string)=>void }) {
   const router = useRouter();
   const [sent, setSent] = useState(false);
+  const [live, setLive] = useState<BuyerDetail | null>(null);
+  const [loaded, setLoaded] = useState(false);
+  const idRaw = router.query.id;
+  const bid = typeof idRaw === "string" ? Number(idRaw) : NaN;
+
+  useEffect(() => {
+    if (!Number.isInteger(bid) || bid <= 0) return;
+    let active = true;
+    fetchJSON<{ buyer: BuyerDetail }>("/api/buyers?id=" + bid)
+      .then((j) => { if (active) { setLoaded(true); setLive(j.buyer); } })
+      .catch((e) => { if (active) setLoaded(true); });
+    return () => { active = false; };
+  }, [bid]);
+
   const tabs: [string,string][] = [["units","Units"],["ledger","Ledger"],["sched","Schedule"]];
-  const buyerName = "Rajesh Menon";
-  const buyerId = "H21-B-00147";
+  const buyerName = live ? live.name : "Rajesh Menon";
+  const buyerId = live ? "B-00" + String(live.id).padStart(3,"0") : "H21-B-00147";
+  const initials = buyerName.split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase();
+  const kyc = live ? live.kyc : "cleared";
+
+  const contracted = live ? live.units.reduce((a, u) => a + u.price, 0) : 4780000;
+  const collected = live ? live.ledger.reduce((a, r) => a + r.credit, 0) : 2870000;
+  const outstanding = Math.max(0, contracted - collected);
+  const overdue = live ? live.overdue : 0;
+  const nextDue = live && live.next ? live.next : { amount: 465500, date: "2026-09-14", unit: "H21-T1-1204", milestone: "Structure 40%" };
+
+  const tiles = [
+    { l: "Total contracted", v: moneyM(contracted), n: (live ? live.units.length : 2) + " units", ok: false },
+    { l: "Collected", v: moneyM(collected), n: ((collected / Math.max(1, contracted)) * 100).toFixed(1) + "% of contracted", ok: true },
+    { l: "Outstanding", v: moneyM(outstanding), n: "across " + (live ? live.ledger.length : 8) + " instalments", ok: false },
+    { l: "Overdue", v: moneyM(overdue), n: overdue > 0 ? "needs follow-up" : "no arrears on record", ok: false },
+  ];
+
+  const units = live
+    ? live.units.map((u) => ({ no: u.no, st: u.status === "sold" ? "Sold" : u.status.charAt(0).toUpperCase() + u.status.slice(1), meta: u.type + " \u00b7 " + u.area.toLocaleString("en-US") + " sq.ft" + (u.view ? " \u00b7 " + u.view : ""), price: money(u.price), pct: u.pct + "%", p: u.pct }))
+    : [{no:"H21-T1-1204", st:"Sold", meta:"2BR-B \u00b7 1,180 sq.ft \u00b7 Level 12", price:"AED 2,327,500", pct:"62%", p:62},{no:"H21-T1-3302", st:"Booked", meta:"1BR-A \u00b7 748 sq.ft \u00b7 Level 33", price:"AED 2,452,500", pct:"58%", p:58}];
+
+  const fmtLD = (d: string) => {
+    const [y, mo, dd] = d.split("-");
+    const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    return dd + " " + MON[Number(mo) - 1] + " " + y.slice(2);
+  };
+  const ledger: [string,string,string,string,string,string][] = live
+    ? live.ledger.map((r) => [fmtLD(r.date), r.unit, r.desc, "", r.credit.toLocaleString("en-US"), r.balance.toLocaleString("en-US")] as [string,string,string,string,string,string])
+    : B_LEDGER;
+
+  const numM = (v: number) => (v >= 1e6 ? (v / 1e6).toFixed(1) + "M" : v >= 1e3 ? Math.round(v / 1e3) + "k" : String(Math.round(v)));
+  const schedBars = (() => {
+    if (!live) return B_SCHED.map((v, i) => ({ label: B_SCHED_LABELS[i], v: Math.round(v * 1000), pct: Math.max(3, v / 0.93 * 100), text: v ? (v * 1000).toFixed(0) + "k" : "\u2014" }));
+    const now = new Date();
+    const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const byYm: Record<string, number> = {};
+    live.schedule.forEach((s) => { byYm[s.ym] = s.amt; });
+    const bars: { label: string; amt: number }[] = [];
+    for (let k = 0; k < 12; k++) {
+      const d = new Date(now.getFullYear(), now.getMonth() + k, 1);
+      const ym = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
+      bars.push({ label: MON[d.getMonth()], amt: byYm[ym] || 0 });
+    }
+    const mx = Math.max(...bars.map((b) => b.amt), 1);
+    return bars.map((b) => ({ label: b.label, v: b.amt, pct: b.amt ? Math.max(3, (b.amt / mx) * 93) : 3, text: b.amt ? numM(b.amt) : "\u2014" }));
+  })();
+
+  const score = live ? Math.max(1, Math.min(5, Math.round((live.miles.paid / Math.max(1, live.miles.total)) * 5))) : 4;
+  const behaviorSub = live
+    ? live.miles.paid + " of " + live.miles.total + " instalments paid in full."
+    : "11 of 12 instalments paid on or before the due date. One payment 6 days late (Mar 2026).";
+  const rel: [string,string][] = live
+    ? [["First purchase", fmtShort(live.firstPaid || "")], ["Lifetime value", moneyM(contracted)], ["Units", String(live.units.length)], ["Instalments", live.miles.paid + "/" + live.miles.total + " paid"], ["KYC", kyc === "cleared" ? "Cleared" : "Pending"], ["Preferred contact", "Email"], ["Relationship manager", "\u2014"]]
+    : B_REL;
 
   const sendStatement = () => {
-    const totals = { contracted: "AED 4.78M", collected: "AED 2.87M", outstanding: "AED 1.91M" };
-    exportBuyerStatement(buyerName, buyerId, B_UNITS, B_LEDGER.map((r) => ({ date: r[0], unit: r[1], desc: r[2], debit: r[3], credit: r[4], balance: r[5] })), totals);
+    const totals = { contracted: moneyM(contracted), collected: moneyM(collected), outstanding: moneyM(outstanding) };
+    const uRows = live ? units : B_UNITS;
+    const lRows = live
+      ? live.ledger.map((r) => ({ date: r.date, unit: r.unit, desc: r.desc, debit: "", credit: String(r.credit), balance: String(r.balance) }))
+      : B_LEDGER.map((r) => ({ date: r[0], unit: r[1], desc: r[2], debit: r[3], credit: r[4], balance: r[5] }));
+    exportBuyerStatement(buyerName, buyerId, uRows, lRows, totals);
     setSent(true);
     setTimeout(() => setSent(false), 4000);
   };
@@ -495,8 +966,28 @@ function Buyer360({ btab, setBtab, goUnit }: { btab:string; setBtab:(v:any)=>voi
     router.push({ pathname: "/finance", query: q }, undefined, { shallow: true });
   };
 
+  const backToDir = () => {
+    const q: Record<string,string> = { s: "buyer" };
+    const sc = router.query.scope;
+    if (sc && sc !== "ALL") q.scope = String(sc);
+    router.replace({ pathname: "/sales", query: q }, undefined, { shallow: true });
+  };
+
+  const contactLine = live
+    ? [live.phone, live.email, "Risk rating: Low"].filter(Boolean).join(" \u00b7 ")
+    : "+971 50 442 1187 \u00b7 r.menon@arvexcapital.ae \u00b7 Dubai Marina, Dubai \u00b7 Risk rating: Low";
+
+  if (!loaded) {
+    return (
+      <div>
+        <PanelSkeleton headerW={160} rows={6} cols={6} />
+      </div>
+    );
+  }
+
   return (
     <div>
+      <button onClick={backToDir} style={{ height: 32, borderRadius: 10, border: "1px solid #EDEEF3", background: "#fff", padding: "0 13px", fontFamily: "inherit", fontSize: 12, fontWeight: 700, color: "#6B7180", cursor: "pointer", marginBottom: 14 }}>{"\u2039"} Back to directory</button>
       {sent && (
         <div style={{ background:"#E9F8F1", color:"#1F9D6B", borderRadius:12, padding:"11px 16px", fontSize:12, fontWeight:700, marginBottom:16 }}>
           Statement generated and emailed to {buyerName} \u00b7 PDF downloaded \u00b7 logged to buyer vault
@@ -505,15 +996,15 @@ function Buyer360({ btab, setBtab, goUnit }: { btab:string; setBtab:(v:any)=>voi
       {/* header card */}
       <div style={{background:"#fff",borderRadius:20,padding:"22px 24px",boxShadow:"0 1px 3px rgba(20,22,31,.04)"}}>
         <div style={{display:"flex",alignItems:"flex-start",gap:16}}>
-          <div style={{width:54,height:54,flex:"none",borderRadius:18,background:"#EDECFE",display:"grid",placeItems:"center",fontSize:17,fontWeight:800,color:AC}}>RM</div>
+          <div style={{width:54,height:54,flex:"none",borderRadius:18,background:"#EDECFE",display:"grid",placeItems:"center",fontSize:17,fontWeight:800,color:AC}}>{initials}</div>
           <div style={{flex:1,minWidth:0}}>
             <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
-              <span style={{fontSize:22,fontWeight:800,letterSpacing:"-.03em"}}>Rajesh Menon</span>
-              <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:11,fontWeight:600,background:"#F1F2F7",borderRadius:8,padding:"4px 8px",color:"#6B7180"}}>H21-B-00147</span>
-              <span style={{fontSize:11,fontWeight:700,background:"#E9F8F1",color:"#1F9D6B",borderRadius:8,padding:"4px 9px"}}>KYC cleared</span>
-              <span style={{fontSize:11,fontWeight:700,background:"#F1F2F7",color:"#4A5060",borderRadius:8,padding:"4px 9px"}}>Individual \u00b7 India</span>
+              <span style={{fontSize:22,fontWeight:800,letterSpacing:"-.03em"}}>{buyerName}</span>
+              <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:11,fontWeight:600,background:"#F1F2F7",borderRadius:8,padding:"4px 8px",color:"#6B7180"}}>{buyerId}</span>
+              <span style={{fontSize:11,fontWeight:700,background:kyc==="cleared"?"#E9F8F1":"#FDF4E5",color:kyc==="cleared"?"#1F9D6B":"#B07B14",borderRadius:8,padding:"4px 9px"}}>{kyc==="cleared"?"KYC cleared":"KYC pending"}</span>
+              <span style={{fontSize:11,fontWeight:700,background:"#F1F2F7",color:"#4A5060",borderRadius:8,padding:"4px 9px"}}>Individual</span>
             </div>
-            <div style={{fontSize:12.5,color:"#6B7180",fontWeight:500,marginTop:7}}>+971 50 442 1187 \u00b7 r.menon@arvexcapital.ae \u00b7 Dubai Marina, Dubai \u00b7 Risk rating: Low</div>
+            <div style={{fontSize:12.5,color:"#6B7180",fontWeight:500,marginTop:7}}>{contactLine}</div>
           </div>
           <div style={{display:"flex",gap:8}}>
             <button onClick={sendStatement} style={{height:38,borderRadius:12,border:"1px solid #EDEEF3",background:"#fff",padding:"0 14px",fontFamily:"inherit",fontSize:12.5,fontWeight:700,color:"#4A5060",cursor:"pointer"}}>Send statement</button>
@@ -524,7 +1015,7 @@ function Buyer360({ btab, setBtab, goUnit }: { btab:string; setBtab:(v:any)=>voi
 
       {/* tiles */}
       <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr) 1.2fr",gap:14,marginTop:16}}>
-        {B_TILES.map(t => (
+        {tiles.map(t => (
           <div key={t.l} style={{background:"#fff",borderRadius:20,padding:"18px 20px",boxShadow:"0 1px 3px rgba(20,22,31,.04)"}}>
             <div style={{fontSize:10.5,fontWeight:700,letterSpacing:".06em",color:"#9AA0AE",textTransform:"uppercase"}}>{t.l}</div>
             <div style={{fontSize:20,fontWeight:800,letterSpacing:"-.03em",marginTop:11,color:t.ok?AC:"#14161F"}}>{t.v}</div>
@@ -533,8 +1024,8 @@ function Buyer360({ btab, setBtab, goUnit }: { btab:string; setBtab:(v:any)=>voi
         ))}
         <div style={{background:"#14161F",borderRadius:20,padding:"18px 20px",color:"#fff"}}>
           <div style={{fontSize:10.5,fontWeight:700,letterSpacing:".06em",color:"rgba(255,255,255,.6)",textTransform:"uppercase"}}>Next due</div>
-          <div style={{fontSize:21,fontWeight:800,letterSpacing:"-.03em",marginTop:12}}>AED 465,500</div>
-          <div style={{fontSize:11.5,color:"rgba(255,255,255,.7)",fontWeight:500,marginTop:4}}>14 Sep 2026 \u00b7 H21-T1-1204 \u00b7 Structure 40%</div>
+          <div style={{fontSize:21,fontWeight:800,letterSpacing:"-.03em",marginTop:12}}>{money(nextDue.amount)}</div>
+          <div style={{fontSize:11.5,color:"rgba(255,255,255,.7)",fontWeight:500,marginTop:4}}>{fmtShort(nextDue.date)} \u00b7 {nextDue.unit} \u00b7 {nextDue.milestone}</div>
         </div>
       </div>
 
@@ -579,7 +1070,7 @@ function Buyer360({ btab, setBtab, goUnit }: { btab:string; setBtab:(v:any)=>voi
               {B_LEDGER.map(([date,unit,desc,debit,credit,bal],i) => (
                 <div key={i} style={{display:"grid",gridTemplateColumns:"84px 96px 1.3fr 92px 92px 100px",gap:8,alignItems:"center",padding:"0 22px",height:38,borderBottom:"1px solid #F6F7FA"}}>
                   <span style={{fontSize:11.5,color:"#6B7180",fontWeight:600}}>{date}</span>
-                  <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:11,color:"#4A5060"}}>H21-T1-{unit}</span>
+                  <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:11,color:"#4A5060"}}>{unit.length > 4 ? unit : "H21-T1-" + unit}</span>
                   <span style={{fontSize:11.5,fontWeight:600,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{desc}</span>
                   <span style={{textAlign:"right",fontSize:11.5,color:"#6B7180"}}>{debit || "\u2014"}</span>
                   <span style={{textAlign:"right",fontSize:11.5,fontWeight:700,color:"#1F9D6B"}}>{credit || "\u2014"}</span>
@@ -594,11 +1085,11 @@ function Buyer360({ btab, setBtab, goUnit }: { btab:string; setBtab:(v:any)=>voi
               <div style={{fontSize:14,fontWeight:700,letterSpacing:"-.015em",marginBottom:4}}>Forward schedule \u00b7 12 months</div>
               <div style={{fontSize:11.5,color:"#9AA0AE",fontWeight:500}}>Merged across both units</div>
               <div style={{display:"flex",alignItems:"flex-end",gap:10,height:180,marginTop:20}}>
-                {B_SCHED.map((v,i) => (
+                {schedBars.map((b,i) => (
                   <div key={i} style={{flex:1,display:"flex",flexDirection:"column",justifyContent:"flex-end",alignItems:"center",height:"100%",gap:7}}>
-                    <span style={{fontSize:9.5,fontWeight:700,color:"#6B7180"}}>{v ? (v*1000).toFixed(0)+"k" : "\u2014"}</span>
-                    <span style={{display:"block",width:"100%",maxWidth:38,borderRadius:"9px 9px 3px 3px",background:v?AC:"#EDEEF3",height:Math.max(3,v/0.93*100)+"%"}} />
-                    <span style={{fontSize:9.5,fontWeight:600,color:"#9AA0AE"}}>{B_SCHED_LABELS[i]}</span>
+                    <span style={{fontSize:9.5,fontWeight:700,color:"#6B7180"}}>{b.text}</span>
+                    <span style={{display:"block",width:"100%",maxWidth:38,borderRadius:"9px 9px 3px 3px",background:b.v?AC:"#EDEEF3",height:b.pct+"%"}} />
+                    <span style={{fontSize:9.5,fontWeight:600,color:"#9AA0AE"}}>{b.label}</span>
                   </div>
                 ))}
               </div>
@@ -611,14 +1102,14 @@ function Buyer360({ btab, setBtab, goUnit }: { btab:string; setBtab:(v:any)=>voi
           <div style={{background:"#fff",borderRadius:20,padding:"20px 22px",boxShadow:"0 1px 3px rgba(20,22,31,.04)"}}>
             <div style={{fontSize:13,fontWeight:700,letterSpacing:"-.015em",marginBottom:14}}>Payment behaviour</div>
             <div style={{display:"flex",gap:5,marginBottom:10}}>
-              {[1,1,1,1,0].map((m,i) => <span key={i} style={{flex:1,height:8,borderRadius:5,background:m?"#34C08A":"#EDEEF3"}} />)}
+              {[1,1,1,1,1].map((m,i) => <span key={i} style={{flex:1,height:8,borderRadius:5,background:i<score?"#34C08A":"#EDEEF3"}} />)}
             </div>
-            <div style={{fontSize:12,fontWeight:700}}>Reliable \u00b7 4 of 5</div>
-            <div style={{fontSize:11,color:"#9AA0AE",fontWeight:500,marginTop:4,lineHeight:1.55}}>11 of 12 instalments paid on or before the due date. One payment 6 days late (Mar 2026).</div>
+            <div style={{fontSize:12,fontWeight:700}}>Reliable \u00b7 {score} of 5</div>
+            <div style={{fontSize:11,color:"#9AA0AE",fontWeight:500,marginTop:4,lineHeight:1.55}}>{behaviorSub}</div>
           </div>
           <div style={{background:"#fff",borderRadius:20,padding:"20px 22px",boxShadow:"0 1px 3px rgba(20,22,31,.04)"}}>
             <div style={{fontSize:13,fontWeight:700,letterSpacing:"-.015em",marginBottom:12}}>Relationship</div>
-            {B_REL.map(([k,v]) => (
+            {rel.map(([k,v]) => (
               <div key={k} style={{display:"flex",justifyContent:"space-between",gap:12,padding:"8px 0",borderBottom:"1px solid #F6F7FA"}}>
                 <span style={{fontSize:11.5,color:"#9AA0AE",fontWeight:500}}>{k}</span>
                 <span style={{fontSize:11.5,fontWeight:700}}>{v}</span>
@@ -643,15 +1134,95 @@ function Buyer360({ btab, setBtab, goUnit }: { btab:string; setBtab:(v:any)=>voi
 /* ═══════════════════════════════════════════════════════════════════
    BROKERS
    ═══════════════════════════════════════════════════════════════════ */
+type BrokAgency = { id: number; name: string; orn: string; alloc_units: number; deals: number; accrued: number; paid: number; rate: string; status: string };
+type BrokAgent = { id: number; name: string; agency: string; brn: string; deals: number; value: number; discount_pct: number; days_to_close: number };
+type BrokAct = { id: number; text: string; meta: string; kind: string; created_at: string };
+type BrokData = { kpis: { agencies: number; pending: number; alloc_units: number; deals: number; accrued: number; unpaid: number }; agencies: BrokAgency[]; agents: BrokAgent[]; activity: BrokAct[] };
+const BROK_FALLBACK: BrokData = {
+  kpis: { agencies: AGENCIES.length, pending: AGENCIES.filter((a) => a.status === "Onboarding").length, alloc_units: AGENCIES.reduce((a, b) => a + (parseInt(b.alloc) || 0), 0), deals: AGENCIES.reduce((a, b) => a + b.deals, 0), accrued: 26100000, unpaid: 6700000 },
+  agencies: AGENCIES.map((a, i) => ({ id: i + 1, name: a.name, orn: a.orn, alloc_units: parseInt(a.alloc) || 0, deals: a.deals, accrued: parseInt(a.accrued.replace(/[^0-9.]/g, "")) * (a.accrued.includes("M") ? 1000000 : 1), paid: parseInt(a.paid.replace(/[^0-9.]/g, "")) * (a.paid.includes("M") ? 1000000 : 1), rate: a.rate, status: a.status.toLowerCase() })),
+  agents: AGENTS.map((g, i) => ({ id: i + 1, name: g.name, agency: g.agency, brn: g.brn, deals: g.deals, value: parseFloat(g.value.replace(/[^0-9.]/g, "")) * 1000000, discount_pct: parseFloat(g.disc.replace("%", "")), days_to_close: parseInt(g.days) })),
+  activity: BROK_ACT.map((a, i) => ({ id: i + 1, text: a.text, meta: a.meta, kind: a.meta.includes("Clawback") || a.meta.includes("suspended") ? "suspend" : a.meta.includes("reservation") ? "reservation" : "note", created_at: new Date().toISOString() })),
+};
+const brokPill = (st: string) => st === "active" ? { bg: "#E9F8F1", color: "#1F9D6B" } : st === "onboarding" ? { bg: "#FDF4E5", color: "#B07B14" } : { bg: "#FDECEC", color: "#E5484D" };
+const brokLabel = (st: string) => st === "active" ? "Active" : st === "onboarding" ? "Onboarding" : "Suspended";
+const relAgo = (iso: string) => {
+  const s = (Date.now() - new Date(iso).getTime()) / 1000;
+  if (s < 3600) return Math.max(1, Math.round(s / 60)) + " min ago";
+  if (s < 86400) return Math.round(s / 3600) + " h ago";
+  return Math.round(s / 86400) + " d ago";
+};
+
 function Brokers({ brtab, setBrtab, brstep, setBrstep }: { brtab:string; setBrtab:(v:any)=>void; brstep:number; setBrstep:(n:number)=>void }) {
+  const [data, setData] = useState<BrokData | null>(null);
+  const [apiError, setApiError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+
+  const banner = (m: string) => { setNotice(m); setTimeout(() => setNotice(""), 3800); };
+
+  useEffect(() => {
+    let active = true;
+    fetchJSON<BrokData>("/api/brokers")
+      .then((j) => { if (active) setData(j); })
+      .catch((e) => { if (active) setApiError(e?.message || "Failed to load brokers"); })
+      .finally(() => { if (active) setLoaded(true); });
+    return () => { active = false; };
+  }, []);
+
+  const refresh = async () => {
+    const j = await fetchJSON<BrokData>("/api/brokers");
+    setData(j);
+    return j;
+  };
+
+  const toggleStatus = async (a: BrokAgency) => {
+    const action = a.status === "active" ? "suspend" : a.status === "suspended" ? "activate" : "activate";
+    try {
+      await fetchJSON<any>("/api/brokers?id=" + a.id, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action }) });
+      const j = await refresh();
+      banner((action === "suspend" ? "Agency suspended · " : "Agency " + a.name + " set live · ") + (action === "suspend" ? a.name : ""));
+    } catch (e: any) { banner("Update failed: " + (e?.message || "request failed")); }
+  };
+
+  const submitOnboard = async () => {
+    setBusy(true);
+    try {
+      await fetchJSON<any>("/api/brokers", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: ONBOARD_FIELDS[0][1], orn: ONBOARD_FIELDS[3][1], commission_rate: ONBOARD_FIELDS[6][1].split(" ")[0] }) });
+      const j = await refresh();
+      setData(j);
+      banner(ONBOARD_FIELDS[0][1] + " submitted for onboarding");
+      setBrtab("agencies");
+    } catch (e: any) { banner("Onboard failed: " + (e?.message || "request failed")); }
+    finally { setBusy(false); }
+  };
+
   const brokerTabs: [string,string][] = [["agencies","Agencies"],["agents","Agents"],["onboard","Onboard agency"],["activity","Activity"]];
   const showAgencies = brtab === "agencies";
   const showAgents = brtab === "agents";
   const showOnboard = brtab === "onboard";
   const showActivity = brtab === "activity";
 
+  if (!loaded) {
+    return (
+      <div>
+        <PanelSkeleton headerW={260} rows={9} cols={6} />
+      </div>
+    );
+  }
+
+  const show = data || BROK_FALLBACK;
+  const k = show.kpis;
+
   return (
     <div>
+      {apiError && (
+        <div style={{ background: "#FDECEC", color: "#E5484D", borderRadius: 12, padding: "11px 16px", fontSize: 12, fontWeight: 700, marginBottom: 16 }}>
+          Live data unavailable ({apiError}) — showing sample rows
+        </div>
+      )}
+      {notice && <div style={{ background: "#E9F8F1", color: "#1F9D6B", borderRadius: 12, padding: "11px 16px", fontSize: 12, fontWeight: 700, marginBottom: 16 }}>{notice}</div>}
       <div style={{display:"flex",alignItems:"flex-end",gap:16,marginBottom:18}}>
         <div style={{flex:1}}>
           <div style={{fontSize:26,fontWeight:800,letterSpacing:"-.03em",lineHeight:1.15}}>Brokers &amp; agencies</div>
@@ -666,7 +1237,7 @@ function Brokers({ brtab, setBrtab, brstep, setBrstep }: { brtab:string; setBrta
 
       {/* KPIs */}
       <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:14,marginBottom:16}}>
-        {[["Registered agencies","14","3 pending onboarding"],["Allocated inventory","86 units","AED 184.2M"],["Deals in progress","23","AED 52.6M"],["Commission accrued","AED 26.1M","AED 7.7M unpaid"],["Broker share of sales","64%","of units booked YTD"]].map(([l,v,n]) => (
+        {[["Registered agencies",String(k.agencies),k.pending + " pending onboarding"],["Allocated inventory",k.alloc_units + " units","live portfolio allocation"],["Deals in progress",String(k.deals),"across all agencies"],["Commission accrued",moneyM(k.accrued),moneyM(k.unpaid) + " unpaid"],["Broker share of sales","64%","of units booked YTD"]].map(([l,v,n]) => (
           <div key={l} style={{background:"#fff",borderRadius:20,padding:"18px 20px",boxShadow:"0 1px 3px rgba(20,22,31,.04)"}}>
             <div style={{fontSize:10.5,fontWeight:700,letterSpacing:".06em",color:"#9AA0AE",textTransform:"uppercase"}}>{l}</div>
             <div style={{fontSize:20,fontWeight:800,letterSpacing:"-.03em",marginTop:11}}>{v}</div>
@@ -681,25 +1252,28 @@ function Brokers({ brtab, setBrtab, brstep, setBrstep }: { brtab:string; setBrta
           <div style={{display:"grid",gridTemplateColumns:"1.5fr 90px 92px 64px 104px 104px 64px 96px 1fr",gap:10,padding:"14px 24px",fontSize:9.5,fontWeight:700,letterSpacing:".07em",color:"#9AA0AE",textTransform:"uppercase",background:"#FAFBFD",borderBottom:"1px solid #EDEEF3"}}>
             <span>Agency</span><span>ORN</span><span>Allocated</span><span style={{textAlign:"right"}}>Deals</span><span style={{textAlign:"right"}}>Accrued</span><span style={{textAlign:"right"}}>Paid</span><span style={{textAlign:"right"}}>Rate</span><span>Status</span><span></span>
           </div>
-          {AGENCIES.map(a => (
-            <div key={a.name} style={{display:"grid",gridTemplateColumns:"1.5fr 90px 92px 64px 104px 104px 64px 96px 1fr",gap:10,alignItems:"center",padding:"0 24px",height:56,borderBottom:"1px solid #F6F7FA"}}>
-              <span style={{display:"flex",alignItems:"center",gap:11,minWidth:0}}>
-                <span style={{width:32,height:32,flex:"none",borderRadius:11,background:"#EDECFE",display:"grid",placeItems:"center",fontSize:11,fontWeight:800,color:AC}}>{a.init}</span>
-                <span style={{fontSize:12.5,fontWeight:700,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{a.name}</span>
-              </span>
-              <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:10.5,color:"#6B7180"}}>{a.orn}</span>
-              <span style={{fontSize:11.5,fontWeight:600,color:"#6B7180"}}>{a.alloc}</span>
-              <span style={{textAlign:"right",fontSize:11.5,fontWeight:700}}>{a.deals}</span>
-              <span style={{textAlign:"right",fontSize:11.5,fontWeight:700}}>{a.accrued}</span>
-              <span style={{textAlign:"right",fontSize:11.5,fontWeight:600,color:"#6B7180"}}>{a.paid}</span>
-              <span style={{textAlign:"right",fontSize:11.5,fontWeight:700}}>{a.rate}</span>
-              <span style={{fontSize:10,fontWeight:700,borderRadius:7,padding:"3px 8px",textAlign:"center", background:a.status==="Active"?"#E9F8F1":a.status==="Onboarding"?"#FDF4E5":"#FDECEC", color:a.status==="Active"?"#1F9D6B":a.status==="Onboarding"?"#B07B14":"#E5484D"}}>{a.status}</span>
-              <span style={{display:"flex",gap:6,justifyContent:"flex-end"}}>
-                <button style={{height:28,borderRadius:9,border:"1px solid #EDEEF3",background:"#fff",padding:"0 10px",fontFamily:"inherit",fontSize:10.5,fontWeight:700,color:"#4A5060",cursor:"pointer"}}>Allocation</button>
-                <button style={{height:28,borderRadius:9,border:0,background:"#F0EFFE",padding:"0 10px",fontFamily:"inherit",fontSize:10.5,fontWeight:700,color:AC,cursor:"pointer"}}>Commission</button>
-              </span>
-            </div>
-          ))}
+          {show.agencies.map(a => {
+            const pill = brokPill(a.status);
+            return (
+              <div key={a.id} style={{display:"grid",gridTemplateColumns:"1.5fr 90px 92px 64px 104px 104px 64px 96px 1fr",gap:10,alignItems:"center",padding:"0 24px",height:56,borderBottom:"1px solid #F6F7FA"}}>
+                <span style={{display:"flex",alignItems:"center",gap:11,minWidth:0}}>
+                  <span style={{width:32,height:32,flex:"none",borderRadius:11,background:"#EDECFE",display:"grid",placeItems:"center",fontSize:11,fontWeight:800,color:AC}}>{a.name.split(" ").map((x) => x[0]).join("").slice(0, 2)}</span>
+                  <span style={{fontSize:12.5,fontWeight:700,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{a.name}</span>
+                </span>
+                <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:10.5,color:"#6B7180"}}>{a.orn}</span>
+                <span style={{fontSize:11.5,fontWeight:600,color:"#6B7180"}}>{Number(a.alloc_units)} units</span>
+                <span style={{textAlign:"right",fontSize:11.5,fontWeight:700}}>{Number(a.deals)}</span>
+                <span style={{textAlign:"right",fontSize:11.5,fontWeight:700}}>{moneyM(Number(a.accrued))}</span>
+                <span style={{textAlign:"right",fontSize:11.5,fontWeight:600,color:"#6B7180"}}>{moneyM(Number(a.paid))}</span>
+                <span style={{textAlign:"right",fontSize:11.5,fontWeight:700}}>{a.rate}</span>
+                <span style={{fontSize:10,fontWeight:700,borderRadius:7,padding:"3px 8px",textAlign:"center",background:pill.bg,color:pill.color}}>{brokLabel(a.status)}</span>
+                <span style={{display:"flex",gap:6,justifyContent:"flex-end"}}>
+                  <button style={{height:28,borderRadius:9,border:"1px solid #EDEEF3",background:"#fff",padding:"0 10px",fontFamily:"inherit",fontSize:10.5,fontWeight:700,color:"#4A5060",cursor:"pointer"}}>Allocation</button>
+                  <button onClick={() => toggleStatus(a)} disabled={busy} style={{height:28,borderRadius:9,border:0,background:"#F0EFFE",padding:"0 10px",fontFamily:"inherit",fontSize:10.5,fontWeight:700,color:AC,cursor:"pointer"}}>{a.status === "active" ? "Suspend" : a.status === "suspended" ? "Reinstate" : "Go live"}</button>
+                </span>
+              </div>
+            );
+          })}
         </div>
       )}
 
@@ -709,18 +1283,18 @@ function Brokers({ brtab, setBrtab, brstep, setBrstep }: { brtab:string; setBrta
           <div style={{display:"grid",gridTemplateColumns:"1.3fr 1.2fr 100px 64px 104px 84px 84px",gap:10,padding:"14px 24px",fontSize:9.5,fontWeight:700,letterSpacing:".07em",color:"#9AA0AE",textTransform:"uppercase",background:"#FAFBFD",borderBottom:"1px solid #EDEEF3"}}>
             <span>Agent</span><span>Agency</span><span>BRN</span><span style={{textAlign:"right"}}>Deals</span><span style={{textAlign:"right"}}>Value</span><span style={{textAlign:"right"}}>Avg disc</span><span style={{textAlign:"right"}}>Days to close</span>
           </div>
-          {AGENTS.map(a => (
-            <div key={a.name} style={{display:"grid",gridTemplateColumns:"1.3fr 1.2fr 100px 64px 104px 84px 84px",gap:10,alignItems:"center",padding:"0 24px",height:52,borderBottom:"1px solid #F6F7FA"}}>
+          {show.agents.map(g => (
+            <div key={g.id} style={{display:"grid",gridTemplateColumns:"1.3fr 1.2fr 100px 64px 104px 84px 84px",gap:10,alignItems:"center",padding:"0 24px",height:52,borderBottom:"1px solid #F6F7FA"}}>
               <span style={{display:"flex",alignItems:"center",gap:11,minWidth:0}}>
-                <span style={{width:30,height:30,flex:"none",borderRadius:10,background:"#E7E9F0",display:"grid",placeItems:"center",fontSize:10.5,fontWeight:700,color:"#4A5060"}}>{a.name.split(" ").map(x=>x[0]).join("")}</span>
-                <span style={{fontSize:12.5,fontWeight:700,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{a.name}</span>
+                <span style={{width:30,height:30,flex:"none",borderRadius:10,background:"#E7E9F0",display:"grid",placeItems:"center",fontSize:10.5,fontWeight:700,color:"#4A5060"}}>{g.name.split(" ").map((x) => x[0]).join("")}</span>
+                <span style={{fontSize:12.5,fontWeight:700,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{g.name}</span>
               </span>
-              <span style={{fontSize:11.5,color:"#6B7180",fontWeight:600}}>{a.agency}</span>
-              <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:10.5,color:"#6B7180"}}>{a.brn}</span>
-              <span style={{textAlign:"right",fontSize:11.5,fontWeight:700}}>{a.deals}</span>
-              <span style={{textAlign:"right",fontSize:11.5,fontWeight:700}}>{a.value}</span>
-              <span style={{textAlign:"right",fontSize:11.5,fontWeight:600,color:"#6B7180"}}>{a.disc}</span>
-              <span style={{textAlign:"right",fontSize:11.5,fontWeight:600,color:"#6B7180"}}>{a.days}</span>
+              <span style={{fontSize:11.5,color:"#6B7180",fontWeight:600}}>{g.agency}</span>
+              <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:10.5,color:"#6B7180"}}>{g.brn}</span>
+              <span style={{textAlign:"right",fontSize:11.5,fontWeight:700}}>{Number(g.deals)}</span>
+              <span style={{textAlign:"right",fontSize:11.5,fontWeight:700}}>{moneyM(Number(g.value))}</span>
+              <span style={{textAlign:"right",fontSize:11.5,fontWeight:600,color:"#6B7180"}}>{Number(g.discount_pct).toFixed(1)}%</span>
+              <span style={{textAlign:"right",fontSize:11.5,fontWeight:600,color:"#6B7180"}}>{Number(g.days_to_close)} d</span>
             </div>
           ))}
         </div>
@@ -746,7 +1320,7 @@ function Brokers({ brtab, setBrtab, brstep, setBrstep }: { brtab:string; setBrta
           </div>
           <div style={{background:"#fff",borderRadius:20,padding:"24px 26px",boxShadow:"0 1px 3px rgba(20,22,31,.04)"}}>
             <div style={{fontSize:18,fontWeight:800,letterSpacing:"-.025em"}}>Metropolitan Premium Properties</div>
-            <div style={{fontSize:12.5,color:"#6B7180",fontWeight:500,marginTop:6}}>Draft saved 2 minutes ago \u00b7 agency cannot see inventory until go live</div>
+            <div style={{fontSize:12.5,color:"#6B7180",fontWeight:500,marginTop:6}}>Draft saved 2 minutes ago · agency cannot see inventory until go live</div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"16px 20px",marginTop:24}}>
               {ONBOARD_FIELDS.map(([label,value,hintVal]) => (
                 <div key={label}>
@@ -759,9 +1333,9 @@ function Brokers({ brtab, setBrtab, brstep, setBrstep }: { brtab:string; setBrta
               ))}
             </div>
             <div style={{display:"flex",gap:10,marginTop:26,paddingTop:20,borderTop:"1px solid #F1F2F7"}}>
-              <button style={{height:40,borderRadius:12,border:"1px solid #EDEEF3",background:"#fff",padding:"0 16px",fontFamily:"inherit",fontSize:12.5,fontWeight:700,color:"#4A5060",cursor:"pointer"}}>Save draft</button>
+              <button onClick={() => banner("Draft saved · " + ONBOARD_FIELDS[0][1])} style={{height:40,borderRadius:12,border:"1px solid #EDEEF3",background:"#fff",padding:"0 16px",fontFamily:"inherit",fontSize:12.5,fontWeight:700,color:"#4A5060",cursor:"pointer"}}>Save draft</button>
               <div style={{flex:1}} />
-              <button style={{height:40,borderRadius:12,background:AC,color:"#fff",border:0,padding:"0 20px",fontFamily:"inherit",fontSize:12.5,fontWeight:700,cursor:"pointer"}}>Continue to allocation</button>
+              <button onClick={submitOnboard} disabled={busy} style={{height:40,borderRadius:12,background:AC,color:"#fff",border:0,padding:"0 20px",fontFamily:"inherit",fontSize:12.5,fontWeight:700,cursor:busy?"progress":"pointer",opacity:busy?0.7:1}}>{busy ? "Submitting…" : "Continue to allocation"}</button>
             </div>
           </div>
           <div style={{display:"flex",flexDirection:"column",gap:16}}>
@@ -794,16 +1368,19 @@ function Brokers({ brtab, setBrtab, brstep, setBrstep }: { brtab:string; setBrta
         <div style={{background:"#fff",borderRadius:20,padding:"22px 24px",boxShadow:"0 1px 3px rgba(20,22,31,.04)"}}>
           <div style={{fontSize:15,fontWeight:700,letterSpacing:"-.015em",marginBottom:4}}>Broker activity</div>
           <div style={{fontSize:11.5,color:"#9AA0AE",fontWeight:500,marginBottom:8}}>Every reservation, download and clawback, logged</div>
-          {BROK_ACT.map(a => (
-            <div key={a.text} style={{display:"flex",gap:13,alignItems:"flex-start",padding:"13px 0",borderBottom:"1px solid #F6F7FA"}}>
-              <span style={{width:9,height:9,borderRadius:5,flex:"none",marginTop:4,background:a.color}} />
-              <span style={{flex:1,minWidth:0}}>
-                <span style={{display:"block",fontSize:12.5,fontWeight:700}}>{a.text}</span>
-                <span style={{display:"block",fontSize:11,color:"#9AA0AE",fontWeight:600,marginTop:3}}>{a.meta}</span>
-              </span>
-              <span style={{fontSize:10.5,fontWeight:700,color:"#C2C6D2",whiteSpace:"nowrap"}}>{a.when}</span>
-            </div>
-          ))}
+          {show.activity.map(a => {
+            const dot = a.kind === "reservation" ? AC : a.kind === "commission" ? "#34C08A" : (a.kind === "clawback" || a.kind === "suspend") ? "#E5484D" : "#8A94A6";
+            return (
+              <div key={a.id} style={{display:"flex",gap:13,alignItems:"flex-start",padding:"13px 0",borderBottom:"1px solid #F6F7FA"}}>
+                <span style={{width:9,height:9,borderRadius:5,flex:"none",marginTop:4,background:dot}} />
+                <span style={{flex:1,minWidth:0}}>
+                  <span style={{display:"block",fontSize:12.5,fontWeight:700}}>{a.text}</span>
+                  <span style={{display:"block",fontSize:11,color:"#9AA0AE",fontWeight:600,marginTop:3}}>{a.meta}</span>
+                </span>
+                <span style={{fontSize:10.5,fontWeight:700,color:"#C2C6D2",whiteSpace:"nowrap"}}>{relAgo(a.created_at)}</span>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
@@ -820,9 +1397,31 @@ function Documents({ dtab, setDtab, doc, setDoc }: { dtab:string; setDtab:(v:any
   const [media, setMedia] = useState<Record<string, boolean>>({ "Floor plan": true, "Key plan": true, "Unit render": true, "View photograph": true, "Site plan": false, "Amenities page": false });
   const [sent, setSent] = useState(false);
   const [sentLabel, setSentLabel] = useState("");
-  const [genLog, setGenLog] = useState<{ ref: string; type: string; when: string }[]>([]);
+  const [genLog, setGenLog] = useState<{ ref: string; type: string; when: string; buyer?: string }[]>([]);
   const [version, setVersion] = useState("v3");
+  const [templates, setTemplates] = useState<Record<string, { version: string; status: string; changed_at?: string }[]>>({});
   const [notice, setNotice] = useState("");
+
+  useEffect(() => {
+    let alive = true;
+    fetchJSON<{ docs: { ref: string; type: string; buyer: string; when: string }[]; templates: { doc_type: string; version: string; status: string; changed_at: string }[] }>("/api/documents")
+      .then((d) => {
+        if (!alive) return;
+        setGenLog(d.docs.slice(0, 5).map((x) => ({
+          ref: x.ref,
+          type: x.type,
+          buyer: x.buyer,
+          when: new Date(x.when).toLocaleDateString("en-GB", { day: "2-digit", month: "short" }),
+        })));
+        const grouped: Record<string, { version: string; status: string; changed_at?: string }[]> = {};
+        for (const t of d.templates) (grouped[t.doc_type] = grouped[t.doc_type] || []).push({ version: t.version, status: t.status, changed_at: t.changed_at });
+        setTemplates(grouped);
+        const live = (grouped[doc] || []).find((v) => v.status === "live");
+        if (live) setVersion(live.version);
+      })
+      .catch(() => { /* offline fallback: keep empty local log */ });
+    return () => { alive = false; };
+  }, [doc]);
 
   const unit = ALL_UNITS.find((u) => u.no === unitNo) || ALL_UNITS[0];
   const price = unit ? unit.price : 2327500;
@@ -831,11 +1430,22 @@ function Documents({ dtab, setDtab, doc, setDoc }: { dtab:string; setDtab:(v:any
   const refBase = doc.split(" ").map((w) => w[0]).join("").toUpperCase() || "DOC";
   const ref = refBase + "-H21-" + String(4412 + (doc.length % 7)).padStart(6, "0");
 
+  const vers = (templates[doc] || []).length ? templates[doc]! : [
+    { version: "v3", status: "live" },
+    { version: "v2", status: "archived" },
+    { version: "v1", status: "archived" },
+  ];
+
   const download = (notify: boolean) => {
     exportDocument(doc, { no: unitNo, typ: unit?.typ || "2 Bedroom", beds: unit?.beds || 2, area, price, psf }, person, ref);
     if (notify) {
+      fetchJSON("/api/documents", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ doc_type: doc, unit_no: unitNo, buyer: person, ref, status: "sent" }),
+      }).catch(() => {});
       const when = new Date().toLocaleString("en-GB", { day: "2-digit", month: "short" });
-      setGenLog((l) => [{ ref, type: doc, when }, ...l].slice(0, 5));
+      setGenLog((l) => [{ ref, type: doc, when, buyer: person }, ...l].slice(0, 5));
       setSentLabel(ref);
       setSent(true);
       setTimeout(() => setSent(false), 4000);
@@ -843,9 +1453,20 @@ function Documents({ dtab, setDtab, doc, setDoc }: { dtab:string; setDtab:(v:any
   };
 
   const setActive = () => {
-    setVersion("v4");
-    setNotice("v4 is now the active template for " + doc + " \u00b7 rolled out from today");
-    setTimeout(() => setNotice(""), 4000);
+    fetchJSON<{ version: string; templates: { version: string; status: string; changed_at: string }[] }>(
+      "/api/documents?doc_type=" + encodeURIComponent(doc) + "&action=activate",
+      { method: "PUT" }
+    )
+.then((d) => {
+        setVersion(d.version);
+        setTemplates((prev) => ({ ...prev, [doc]: d.templates }));
+        setNotice(d.version + " is now the active template for " + doc + " \u00b7 rolled out from today");
+        setTimeout(() => setNotice(""), 4000);
+      })
+      .catch(() => {
+        setNotice("Could not activate template \u2014 running offline");
+        setTimeout(() => setNotice(""), 4000);
+      });
   };
   const saveDraft = () => {
     setVersion("v4");
@@ -989,7 +1610,7 @@ function Documents({ dtab, setDtab, doc, setDoc }: { dtab:string; setDtab:(v:any
                   {genLog.map((g) => (
                     <div key={g.ref + g.when + g.type} style={{display:"flex",justifyContent:"space-between",gap:10,padding:"6px 0",borderBottom:"1px solid #F6F7FA",fontSize:10.5}}>
                       <span style={{fontFamily:"'JetBrains Mono',monospace",fontWeight:600,color:"#4A5060"}}>{g.ref}</span>
-                      <span style={{color:"#9AA0AE",fontWeight:600,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{g.type} \u00b7 {person}</span>
+                      <span style={{color:"#9AA0AE",fontWeight:600,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{g.type} \u00b7 {g.buyer || person}</span>
                       <span style={{color:"#C2C6D2",fontWeight:600}}>{g.when}</span>
                     </div>
                   ))}
@@ -1029,12 +1650,15 @@ function Documents({ dtab, setDtab, doc, setDoc }: { dtab:string; setDtab:(v:any
                 </div>
                 <div style={{marginTop:18,paddingTop:14,borderTop:"1px solid #F1F2F7"}}>
                   <div style={{fontSize:11,fontWeight:700,letterSpacing:".05em",color:"#9AA0AE",textTransform:"uppercase",marginBottom:9}}>Version control</div>
-                  {[["v3 \u00b7 active","Live","#1F9D6B"],["v2 \u00b7 14 Mar 2026","Archived","#9AA0AE"],["v1 \u00b7 02 Jan 2026","Archived","#9AA0AE"]].map(([ver,status,color]) => (
-                    <div key={ver} style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:status==="Live"?undefined:"1px solid #F6F7FA"}}>
-                      <span style={{fontSize:11.5,color:"#6B7180",fontWeight:600}}>{ver}</span>
-                      <span style={{fontSize:11,fontWeight:status==="Live"?700:600,color}}>{status}</span>
-                    </div>
-                  ))}
+                  {vers.map((v) => {
+                    const live = v.status === "live";
+                    return (
+                      <div key={v.version} style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:live?undefined:"1px solid #F6F7FA"}}>
+                        <span style={{fontSize:11.5,color:"#6B7180",fontWeight:600}}>{v.version}{v.changed_at ? " \u00b7 " + new Date(v.changed_at).toLocaleDateString("en-GB", { day:"2-digit", month:"short", year:"numeric" }) : ""}</span>
+                        <span style={{fontSize:11,fontWeight:live?700:600,color:live?"#1F9D6B":"#9AA0AE"}}>{live ? "Live" : "Archived"}</span>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </div>

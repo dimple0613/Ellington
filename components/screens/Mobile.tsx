@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { fetchJSON } from "../../lib/api";
 
 const TABS = [
   { key: "home", label: "Home", icon: "\u2302" },
@@ -12,11 +13,99 @@ type Tab = typeof TABS[number]["key"];
 
 type MoneySub = "Collections" | "Forecast" | "Ageing";
 
+type MobileAgg = {
+  me: { name: string; role: string };
+  portfolio: {
+    value: number;
+    collected: number;
+    target: number;
+    overdue: number;
+    cheques: number;
+    max_due: number;
+    confidence: { amount: number; pct: number };
+  };
+  projects: {
+    code: string;
+    name: string;
+    total: number;
+    gdv: number;
+    sold: number;
+    collected: number;
+    counts: { available: number; booked: number; reserved: number; held: number; blocked: number; sold: number };
+    mix: { type: string; count: number; sold: number }[];
+  }[];
+  money: {
+    ytd: number;
+    target: number;
+    instalments: number;
+    forecast30: number;
+    milestones: { project: string; milestone: string; amount: number; due: string }[];
+    ageing: { bucket: string; amount: number; pct: number }[];
+    buyer: { name: string; unit: string; amount: number; days: number } | null;
+  };
+  approvals: { count: number; valueM: string };
+};
+
+const aedM = (v: number) =>
+  v >= 1e6 ? "AED " + (v / 1e6).toFixed(1) + "M" : v >= 1e3 ? "AED " + (v / 1e3).toFixed(1) + "K" : "AED " + Math.round(v).toLocaleString("en-US");
+
+const shortDate = (d: string) => {
+  if (!d) return "";
+  const [y, mo, dd] = d.split("-");
+  const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  return dd + " " + MON[Number(mo) - 1];
+};
+
 export default function MobileScreen() {
   const [activeTab, setActiveTab] = useState<Tab>("home");
   const [notice, setNotice] = useState("");
   const [moneyTab, setMoneyTab] = useState<MoneySub>("Ageing");
   const [resolved, setResolved] = useState<Record<string, string>>({ discount: "", drawdown: "" });
+  const [agg, setAgg] = useState<MobileAgg | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    fetchJSON<MobileAgg>("/api/mobile")
+      .then((j) => {
+        if (active && j) setAgg(j);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const ao = agg?.portfolio;
+  const aM = agg?.money;
+  const proj0 = agg?.projects?.[0];
+
+  const projName = proj0 ? proj0.code + " " + proj0.name : "BLG Belgravia Heights III";
+  const ringPct = proj0
+    ? Math.round(((proj0.counts.sold + proj0.counts.booked + proj0.counts.reserved) / Math.max(1, proj0.total)) * 100)
+    : 71;
+  const legend = proj0
+    ? [
+        ["Sold", "#4F46E5", String(proj0.counts.sold + proj0.counts.booked)],
+        ["Available", "#34C08A", String(proj0.counts.available)],
+        ["Reserved", "#F5A623", String(proj0.counts.reserved)],
+        ["Blocked", "#E5484D", String(proj0.counts.held + proj0.counts.blocked)],
+      ]
+    : [["Sold", "#4F46E5", "62"], ["Available", "#34C08A", "24"], ["Reserved", "#F5A623", "6"], ["Blocked", "#E5484D", "4"]];
+  const TYP_LABEL: Record<string, string> = { "1BR": "1 Bed", "2BR": "2 Bed", "3BR": "3 Bed" };
+  const mix = proj0
+    ? proj0.mix.map((m) => [TYP_LABEL[m.type] || m.type, m.sold, Math.round((m.count ? m.sold / m.count : 0) * 100) + "%"] as [string, number, string])
+    : [["Studio", 18, "42%"], ["1 Bed", 24, "58%"], ["2 Bed", 14, "35%"], ["3 Bed", 6, "43%"]];
+
+  const mileRows = aM && aM.milestones.length
+    ? aM.milestones.map((m) => [m.project + " \u00b7 " + m.milestone, aedM(m.amount), shortDate(m.due)] as [string, string, string])
+    : [["Structure 40% \u00b7 WPK", "AED 2.4M", "12 Sep"], ["Structure 60% \u00b7 BLG III", "AED 5.1M", "28 Sep"], ["Handover \u00b7 WPK", "AED 4.9M", "30 Sep"]];
+  const AG_COLORS = ["#34C08A", "#F5A623", "#F5A623", "#E5484D", "#E5484D"];
+  const ageingLive = aM
+    ? aM.ageing.map((b, i) => [b.bucket, AG_COLORS[i] || "#9AA0AE", aedM(b.amount), b.pct + "%"] as [string, string, string, string])
+    : [["Current", "#34C08A", "AED 8.2M", "64%"], ["1\u201330 days", "#F5A623", "AED 1.4M", "11%"], ["31\u201360 days", "#F5A623", "AED 0.8M", "6%"], ["61\u201390 days", "#E5484D", "AED 0.4M", "3%"], ["90+ days", "#E5484D", "AED 0.3M", "2%"]];
+  const buyerInfo = aM && aM.buyer
+    ? { name: aM.buyer.name, sub: "Unit " + aM.buyer.unit + " \u00b7 " + aedM(aM.buyer.amount) + " \u00b7 " + aM.buyer.days + " days overdue", days: aM.buyer.days }
+    : { name: "Rajesh Menon", sub: "Unit BLG-0402 \u00b7 AED 2.1M \u00b7 1 overdue cheque", days: 62 };
 
   const showNotice = (msg: string) => { setNotice(msg); setTimeout(() => setNotice(""), 3000); };
 
@@ -83,29 +172,29 @@ export default function MobileScreen() {
               <div style={{ fontSize: 10, color: "#9AA0AE", fontWeight: 600, marginBottom: 12 }}>Thursday, 3 September</div>
               <Card>
                 <div style={{ fontSize: 9, fontWeight: 700, color: "#9AA0AE", letterSpacing: ".05em", textTransform: "uppercase" as const }}>Portfolio value</div>
-                <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: "-.03em", marginTop: 4 }}>AED 1.32B</div>
+                <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: "-.03em", marginTop: 4 }}>{aedM(ao ? ao.value : 1320000000)}</div>
                 <div style={{ fontSize: 9.5, color: "#1F9D6B", fontWeight: 700, marginTop: 2 }}>{"\u25B2"} 2.4% vs last month</div>
               </Card>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
                 <Card>
                   <div style={{ fontSize: 9, fontWeight: 700, color: "#9AA0AE", letterSpacing: ".05em", textTransform: "uppercase" as const }}>Collected</div>
-                  <div style={{ fontSize: 15, fontWeight: 800, marginTop: 3 }}>AED 84.2M</div>
-                  <div style={{ fontSize: 9, color: "#1F9D6B", fontWeight: 700 }}>96% of target</div>
+                  <div style={{ fontSize: 15, fontWeight: 800, marginTop: 3 }}>{aedM(ao ? ao.collected : 84200000)}</div>
+                  <div style={{ fontSize: 9, color: "#1F9D6B", fontWeight: 700 }}>{Math.round(((ao ? ao.collected : 0) / (ao ? ao.target : 1)) * 100)}% of target</div>
                 </Card>
                 <Card>
                   <div style={{ fontSize: 9, fontWeight: 700, color: "#9AA0AE", letterSpacing: ".05em", textTransform: "uppercase" as const }}>Overdue</div>
-                  <div style={{ fontSize: 15, fontWeight: 800, marginTop: 3, color: "#E5484D" }}>AED 3.1M</div>
-                  <div style={{ fontSize: 9, color: "#E5484D", fontWeight: 700 }}>7 cheques</div>
+                  <div style={{ fontSize: 15, fontWeight: 800, marginTop: 3, color: "#E5484D" }}>{aedM(ao ? ao.overdue : 3100000)}</div>
+                  <div style={{ fontSize: 9, color: "#E5484D", fontWeight: 700 }}>{agg ? agg.portfolio.cheques : 7} cheques</div>
                 </Card>
               </div>
               <Section title="30-day confidence">
                 <Card>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                    <span style={{ fontSize: 10, fontWeight: 700 }}>Expected AED 12.4M</span>
-                    <span style={{ fontSize: 9, color: "#1F9D6B", fontWeight: 700 }}>87% likely</span>
+                    <span style={{ fontSize: 10, fontWeight: 700 }}>Expected {aedM(ao ? ao.confidence.amount : 12400000)}</span>
+                    <span style={{ fontSize: 9, color: "#1F9D6B", fontWeight: 700 }}>{agg ? agg.portfolio.confidence.pct : 87}% likely</span>
                   </div>
                   <div style={{ height: 6, borderRadius: 3, background: "#F1F2F7", overflow: "hidden" }}>
-                    <div style={{ width: "87%", height: "100%", borderRadius: 3, background: "#4F46E5" }} />
+                    <div style={{ width: (agg ? agg.portfolio.confidence.pct : 87) + "%", height: "100%", borderRadius: 3, background: "#4F46E5" }} />
                   </div>
                 </Card>
               </Section>
@@ -114,15 +203,15 @@ export default function MobileScreen() {
 
           {activeTab === "snap" && (
             <div>
-              <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 4 }}>BLG Belgravia Heights III</div>
+              <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 4 }}>{projName}</div>
               <Card>
                 <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
                   <div style={{ width: 64, height: 64, borderRadius: 32, border: "5px solid #4F46E5", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column" }}>
-                    <span style={{ fontSize: 14, fontWeight: 800 }}>71%</span>
+                    <span style={{ fontSize: 14, fontWeight: 800 }}>{ringPct}%</span>
                     <span style={{ fontSize: 7, color: "#9AA0AE", fontWeight: 600 }}>sold</span>
                   </div>
                   <div style={{ flex: 1 }}>
-                    { [["Sold", "#4F46E5", "62"], ["Available", "#34C08A", "24"], ["Reserved", "#F5A623", "6"], ["Blocked", "#E5484D", "4"]].map(([label, color, count]) => (
+                    {legend.map(([label, color, count]) => (
                       <div key={label} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
                         <span style={{ width: 7, height: 7, borderRadius: 3, background: color }} />
                         <span style={{ fontSize: 9, fontWeight: 600, flex: 1 }}>{label}</span>
@@ -133,13 +222,13 @@ export default function MobileScreen() {
                 </div>
               </Card>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
-                <Card><div style={{ fontSize: 8, color: "#9AA0AE", fontWeight: 700, textTransform: "uppercase" as const }}>Collected</div><div style={{ fontSize: 13, fontWeight: 800, marginTop: 2 }}>AED 52.1M</div></Card>
-                <Card><div style={{ fontSize: 8, color: "#9AA0AE", fontWeight: 700, textTransform: "uppercase" as const }}>Outstanding</div><div style={{ fontSize: 13, fontWeight: 800, marginTop: 2 }}>AED 31.8M</div></Card>
-                <Card><div style={{ fontSize: 8, color: "#9AA0AE", fontWeight: 700, textTransform: "uppercase" as const }}>Overdue</div><div style={{ fontSize: 13, fontWeight: 800, marginTop: 2, color: "#E5484D" }}>AED 1.2M</div></Card>
+                <Card><div style={{ fontSize: 8, color: "#9AA0AE", fontWeight: 700, textTransform: "uppercase" as const }}>Collected</div><div style={{ fontSize: 13, fontWeight: 800, marginTop: 2 }}>{aedM(proj0 ? proj0.collected : 52100000)}</div></Card>
+                <Card><div style={{ fontSize: 8, color: "#9AA0AE", fontWeight: 700, textTransform: "uppercase" as const }}>Outstanding</div><div style={{ fontSize: 13, fontWeight: 800, marginTop: 2 }}>{aedM(proj0 ? Math.max(0, proj0.gdv - proj0.collected) : 31800000)}</div></Card>
+                <Card><div style={{ fontSize: 8, color: "#9AA0AE", fontWeight: 700, textTransform: "uppercase" as const }}>Overdue</div><div style={{ fontSize: 13, fontWeight: 800, marginTop: 2, color: "#E5484D" }}>{proj0 ? "AED 0" : "AED 1.2M"}</div></Card>
                 <Card><div style={{ fontSize: 8, color: "#9AA0AE", fontWeight: 700, textTransform: "uppercase" as const }}>Net margin</div><div style={{ fontSize: 13, fontWeight: 800, marginTop: 2 }}>28.4%</div></Card>
               </div>
               <Section title="Typology mix">
-                { [["Studio", 18, "42%"], ["1 Bed", 24, "58%"], ["2 Bed", 14, "35%"], ["3 Bed", 6, "43%"]].map(([t, sold, pct]) => (
+                {mix.map(([t, sold, pct]) => (
                   <div key={t as string} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
                     <span style={{ fontSize: 9, fontWeight: 600, width: 42 }}>{t as string}</span>
                     <div style={{ flex: 1, height: 5, borderRadius: 3, background: "#F1F2F7", overflow: "hidden" }}>
@@ -166,12 +255,12 @@ export default function MobileScreen() {
                   <Section title="This month">
                     <Card>
                       <div style={{ fontSize: 9, fontWeight: 700, color: "#9AA0AE", textTransform: "uppercase" as const }}>Collected YTD</div>
-                      <div style={{ fontSize: 20, fontWeight: 800, letterSpacing: "-.03em", marginTop: 3 }}>AED 84.2M</div>
-                      <div style={{ fontSize: 9.5, color: "#1F9D6B", fontWeight: 700, marginTop: 2 }}>{"\u25B2"} 96% of target</div>
+                      <div style={{ fontSize: 20, fontWeight: 800, letterSpacing: "-.03em", marginTop: 3 }}>{aedM(aM ? aM.ytd : 84200000)}</div>
+                      <div style={{ fontSize: 9.5, color: "#1F9D6B", fontWeight: 700, marginTop: 2 }}>{"\u25B2"} {Math.round(((aM ? aM.ytd : 0) / (aM ? aM.target : 1)) * 100)}% of target</div>
                     </Card>
                   </Section>
                   <Section title="Source mix">
-                    {[["Instalments", "#4F46E5", "62%"], ["Final / handover", "#34C08A", "21%"], ["Reservation", "#F5A623", "9%"], ["Other", "#9AA0AE", "8%"]].map(([label, color, pct]) => (
+                    {[["Instalments", "#4F46E5", aM ? aM.instalments + "%" : "62%"], ["Final / handover", "#34C08A", "21%"], ["Reservation", "#F5A623", "9%"], ["Other", "#9AA0AE", "8%"]].map(([label, color, pct]) => (
                       <Card key={label as string}>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -191,12 +280,12 @@ export default function MobileScreen() {
                   <Section title="Cashflow forecast">
                     <Card>
                       <div style={{ fontSize: 9, fontWeight: 700, color: "#9AA0AE", textTransform: "uppercase" as const }}>Expected next 30 days</div>
-                      <div style={{ fontSize: 20, fontWeight: 800, letterSpacing: "-.03em", marginTop: 3 }}>AED 12.4M</div>
-                      <div style={{ fontSize: 9.5, color: "#1F9D6B", fontWeight: 700, marginTop: 2 }}>87% confidence</div>
+                      <div style={{ fontSize: 20, fontWeight: 800, letterSpacing: "-.03em", marginTop: 3 }}>{aedM(aM ? aM.forecast30 : 12400000)}</div>
+                      <div style={{ fontSize: 9.5, color: "#1F9D6B", fontWeight: 700, marginTop: 2 }}>{agg ? agg.portfolio.confidence.pct : 87}% confidence</div>
                     </Card>
                   </Section>
                   <Section title="Milestone-driven">
-                    {[["Structure 40% \u00b7 WPK", "AED 2.4M", "12 Sep"], ["Structure 60% \u00b7 BLG III", "AED 5.1M", "28 Sep"], ["Handover \u00b7 WPK", "AED 4.9M", "30 Sep"]].map(([label, amt, due]) => (
+                    {mileRows.map(([label, amt, due]) => (
                       <Card key={label as string}>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                           <span style={{ fontSize: 10, fontWeight: 700 }}>{label as string}</span>
@@ -214,7 +303,7 @@ export default function MobileScreen() {
               {moneyTab === "Ageing" && (
                 <div>
                   <Section title="Ageing buckets">
-                    { [["Current", "#34C08A", "AED 8.2M", "64%"], ["1\u201330 days", "#F5A623", "AED 1.4M", "11%"], ["31\u201360 days", "#F5A623", "AED 0.8M", "6%"], ["61\u201390 days", "#E5484D", "AED 0.4M", "3%"], ["90+ days", "#E5484D", "AED 0.3M", "2%"]].map(([bucket, color, amt, pct]) => (
+                    { ageingLive.map(([bucket, color, amt, pct]) => (
                       <Card key={bucket as string}>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -232,10 +321,10 @@ export default function MobileScreen() {
                   <Section title="Buyer">
                     <Card>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                        <span style={{ fontSize: 10, fontWeight: 700 }}>Rajesh Menon</span>
-                        <span style={{ fontSize: 9, color: "#E5484D", fontWeight: 700 }}>{"\u25CF"} 62 days</span>
+                        <span style={{ fontSize: 10, fontWeight: 700 }}>{buyerInfo.name}</span>
+                        <span style={{ fontSize: 9, color: "#E5484D", fontWeight: 700 }}>{"\u25CF"} {buyerInfo.days} days</span>
                       </div>
-                      <div style={{ fontSize: 9, color: "#9AA0AE", fontWeight: 600, marginTop: 2 }}>Unit BLG-0402 {"\u00b7"} AED 2.1M {"\u00b7"} 1 overdue cheque</div>
+                      <div style={{ fontSize: 9, color: "#9AA0AE", fontWeight: 600, marginTop: 2 }}>{buyerInfo.sub}</div>
                     </Card>
                   </Section>
                 </div>
@@ -248,7 +337,7 @@ export default function MobileScreen() {
               <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 8 }}>Approvals inbox</div>
               {getPendingCount() > 0 ? (
                 <div style={{ background: "#FDECEC", borderRadius: 10, padding: "8px 10px", marginBottom: 10 }}>
-                  <span style={{ fontSize: 9, fontWeight: 700, color: "#E5484D" }}>{"\u26A0"} {getPendingCount()} pending approvals {"\u00b7"} AED {pendingValueM()}M</span>
+                  <span style={{ fontSize: 9, fontWeight: 700, color: "#E5484D" }}>{"\u26A0"} {getPendingCount()} pending approvals {"\u00b7"} AED {(agg ? Number(agg.approvals.valueM) + (resolved.discount === "" && resolved.drawdown === "" ? 0.085 : resolved.discount === "" ? 0.085 : 0) : Number(pendingValueM())).toFixed(1)}M</span>
                 </div>
               ) : (
                 <div style={{ background: "#E9F8F1", borderRadius: 10, padding: "8px 10px", marginBottom: 10 }}>
@@ -302,8 +391,8 @@ export default function MobileScreen() {
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <div style={{ width: 40, height: 40, borderRadius: 20, background: "#4F46E5", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 800, color: "#fff" }}>KA</div>
                   <div>
-                    <div style={{ fontSize: 12, fontWeight: 700 }}>Khalid Al Fahim</div>
-                    <div style={{ fontSize: 9, color: "#9AA0AE", fontWeight: 600 }}>CEO {"\u00b7"} Ellington Properties</div>
+                    <div style={{ fontSize: 12, fontWeight: 700 }}>{agg ? agg.me.name : "Khalid Al Fahim"}</div>
+                    <div style={{ fontSize: 9, color: "#9AA0AE", fontWeight: 600 }}>{agg ? (agg.me.role || "CEO").replace(/_/g, " ") : "CEO"} {"\u00b7"} Ellington Properties</div>
                   </div>
                 </div>
               </Card>

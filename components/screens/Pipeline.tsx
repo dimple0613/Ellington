@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import { AC } from "../../lib/format";
 import { fetchJSON } from "../../lib/api";
+import { PanelSkeleton } from "../Loading";
 
 type PipeCard = { no: string; buyer: string; meta: string };
 type PipeCol = { label: string; count: number; color: string; cards: PipeCard[] };
@@ -24,6 +25,9 @@ const BLOCKED = [
   { unit: "WPK-T1-0308", buyer: "A. Farouk", reason: "Documents missing", detail: "Passport renewal", color: "#E2A33C" },
   { unit: "WPK-T1-0421", buyer: "C. Liu", reason: "Utilities pending", detail: "Empower activation", color: "#8B7CF6" },
 ];
+
+type BlockedRow = { unit: string; buyer: string; reason: string; detail: string; color: string };
+type ReadinessRow = { unit_no: string; buyer: string; stage: string; payment_ok: boolean; snags_ok: boolean; docs_ok: boolean; blocked: boolean; reason: string; detail: string };
 
 const STAGE_DAYS = [
   { label: "Payment cleared", days: 6 },
@@ -57,31 +61,57 @@ export default function PipelineScreen() {
     PIPE.forEach((c, i) => { m[i] = c.count; });
     return m;
   });
+  const [blocked, setBlocked] = useState<BlockedRow[]>(BLOCKED);
+  const [overview, setOverview] = useState<{ total: number; ready: number; blocked: number }>({ total: 140, ready: 0, blocked: 4 });
+  const [readyInfo, setReadyInfo] = useState<Record<string, ReadinessRow>>({});
   const [apiError, setApiError] = useState("");
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     let active = true;
-    fetchJSON<{ pipeline: { unit_no: string; buyer: string; stage: string; meta: string }[] }>("/api/handover")
+    fetchJSON<{
+      pipeline: { unit_no: string; buyer: string; stage: string; meta: string }[];
+      readiness: ReadinessRow[];
+      overview: { total: number; ready: number; blocked: number };
+    }>("/api/handover")
       .then((j) => {
-        if (!active || !Array.isArray(j.pipeline)) return;
-        const byStage: Record<string, PipeCard[]> = {};
-        for (const p of j.pipeline) {
-          const slug = STAGE_SLUGS.includes(p.stage) ? p.stage : "payment_cleared";
-          (byStage[slug] = byStage[slug] || []).push({ no: p.unit_no || "", buyer: p.buyer || "", meta: p.meta || "" });
+        if (!active) return;
+        setLoaded(true);
+        if (Array.isArray(j.pipeline)) {
+          const byStage: Record<string, PipeCard[]> = {};
+          for (const p of j.pipeline) {
+            const slug = STAGE_SLUGS.includes(p.stage) ? p.stage : "payment_cleared";
+            (byStage[slug] = byStage[slug] || []).push({ no: p.unit_no || "", buyer: p.buyer || "", meta: p.meta || "" });
+          }
+          setCards((c) => {
+            const next = { ...c };
+            STAGE_SLUGS.forEach((slug, i) => { if (byStage[slug]) next[i] = byStage[slug]; });
+            return next;
+          });
+          setCounts((c) => {
+            const next = { ...c };
+            STAGE_SLUGS.forEach((slug, i) => { if (byStage[slug]) next[i] = byStage[slug].length; });
+            return next;
+          });
         }
-        setCards((c) => {
-          const next = { ...c };
-          STAGE_SLUGS.forEach((slug, i) => { if (byStage[slug]) next[i] = byStage[slug]; });
-          return next;
-        });
-        setCounts((c) => {
-          const next = { ...c };
-          STAGE_SLUGS.forEach((slug, i) => { if (byStage[slug]) next[i] = byStage[slug].length; });
-          return next;
-        });
+        if (Array.isArray(j.readiness)) {
+          const info: Record<string, ReadinessRow> = {};
+          for (const r of j.readiness) info[r.unit_no] = r;
+          setReadyInfo(info);
+          setBlocked(
+            j.readiness.filter((r) => r.blocked).map((r) => ({
+              unit: r.unit_no,
+              buyer: r.buyer,
+              reason: r.reason,
+              detail: r.detail,
+              color: r.reason === "Outstanding payment" ? "#E5484D" : r.reason === "Snags open" ? "#E2A33C" : "#8B7CF6",
+            }))
+          );
+        }
+        if (j.overview) setOverview(j.overview);
       })
       .catch((e) => {
-        if (active) setApiError(e?.message || "Failed to load pipeline");
+        if (active) { setLoaded(true); setApiError(e?.message || "Failed to load pipeline"); }
       });
     return () => { active = false; };
   }, []);
@@ -96,6 +126,14 @@ export default function PipelineScreen() {
     setNotice("Handover scheduled for " + unit + " on " + date + " \u00b7 added to Payment cleared");
     setTimeout(() => setNotice(""), 3800);
   };
+
+  if (!loaded) {
+    return (
+      <div>
+        <PanelSkeleton headerW={160} rows={6} cols={6} />
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -123,14 +161,19 @@ export default function PipelineScreen() {
               <span style={{ fontSize: 11, fontWeight: 800, color: "#6B7180" }}>{counts[ci]}</span>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {(cards[ci] || []).map((k, ki) => (
-                <div key={k.no + ki} onClick={() => setSel(sel === ci * 100 + ki ? null : ci * 100 + ki)} style={{ background: "#fff", borderRadius: 14, padding: "12px 13px", boxShadow: "0 1px 2px rgba(20,22,31,.05)", cursor: "pointer", border: sel === ci * 100 + ki ? "2px solid " + col.color : "1px solid transparent" }}>
-                  <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11.5, fontWeight: 600 }}>{k.no}</div>
-                  <div style={{ fontSize: 11.5, fontWeight: 700, marginTop: 6 }}>{k.buyer}</div>
-                  <div style={{ fontSize: 10.5, color: "#9AA0AE", fontWeight: 600, marginTop: 4 }}>{k.meta}</div>
-                  {sel === ci * 100 + ki && <div style={{ fontSize: 10, fontWeight: 700, color: col.color, marginTop: 8, paddingTop: 8, borderTop: "1px solid #F1F2F6" }}>Selected \u00b7 ready to advance</div>}
-                </div>
-              ))}
+              {(cards[ci] || []).map((k, ki) => {
+                const info = readyInfo[k.no];
+                const paymentBlocked = ci === 0 && info && !info.payment_ok;
+                return (
+                  <div key={k.no + ki} onClick={() => setSel(sel === ci * 100 + ki ? null : ci * 100 + ki)} style={{ background: "#fff", borderRadius: 14, padding: "12px 13px", boxShadow: "0 1px 2px rgba(20,22,31,.05)", cursor: "pointer", border: sel === ci * 100 + ki ? "2px solid " + (paymentBlocked ? "#E5484D" : col.color) : paymentBlocked ? "1px solid #F3C2C6" : "1px solid transparent" }}>
+                    <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11.5, fontWeight: 600, color: paymentBlocked ? "#E5484D" : "#14161F" }}>{k.no}</div>
+                    <div style={{ fontSize: 11.5, fontWeight: 700, marginTop: 6 }}>{k.buyer}</div>
+                    <div style={{ fontSize: 10.5, color: "#9AA0AE", fontWeight: 600, marginTop: 4 }}>{k.meta}</div>
+                    {paymentBlocked && <div style={{ fontSize: 9.5, fontWeight: 800, color: "#E5484D", marginTop: 7 }}>Blocked · {info.detail}</div>}
+                    {!paymentBlocked && sel === ci * 100 + ki && <div style={{ fontSize: 10, fontWeight: 700, color: col.color, marginTop: 8, paddingTop: 8, borderTop: "1px solid #F1F2F6" }}>Selected · ready to advance</div>}
+                  </div>
+                );
+              })}
             </div>
           </div>
         ))}
@@ -138,11 +181,13 @@ export default function PipelineScreen() {
 
       <div style={{ display: "grid", gridTemplateColumns: "1.1fr 1fr 1fr", gap: 16, marginTop: 18, alignItems: "start" }}>
         <div style={{ background: "#fff", borderRadius: 20, padding: "22px 24px", boxShadow: "0 1px 3px rgba(20,22,31,.04)" }}>
-          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 14 }}>
+          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 4 }}>
             <span style={{ fontSize: 15, fontWeight: 700, letterSpacing: "-.015em" }}>Blocked units</span>
-            <span style={{ fontSize: 11, fontWeight: 700, background: "#FDECEC", color: "#E5484D", borderRadius: 8, padding: "3px 9px" }}>4 blocked</span>
+            <span style={{ fontSize: 11, fontWeight: 700, background: "#FDECEC", color: "#E5484D", borderRadius: 8, padding: "3px 9px" }}>{overview.blocked} blocked</span>
           </div>
-          {BLOCKED.map((b) => (
+          <div style={{ fontSize: 11.5, color: "#9AA0AE", fontWeight: 500, marginBottom: 10 }}>Computed live from collections, invoices, snags &amp; title deeds · {overview.ready} of {overview.total} ready</div>
+          {blocked.length === 0 && <div style={{ fontSize: 12, color: "#1F9D6B", fontWeight: 700, padding: "10px 0" }}>All units ready — nothing blocking handover.</div>}
+          {blocked.map((b) => (
             <div key={b.unit} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 0", borderBottom: "1px solid #F6F7FA" }}>
               <span style={{ width: 7, height: 7, borderRadius: 4, flex: "none", marginTop: 5, background: b.color }} />
               <span style={{ flex: 1, minWidth: 0 }}>

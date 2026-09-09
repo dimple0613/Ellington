@@ -183,7 +183,7 @@ Only parameterized SQL is used. Seeds/scripts under `db/` (`schema.sql`, `seed.t
   Fix: shared `{ ok, data, error }` envelope + small validation helpers reused across
   the 13 routes. **FIXED** (`421594a` on branch `fix/aud-009-api-envelope`) — `lib/api.ts`
   adds the envelope (`ok`/`fail`/`methodNotAllowed`/`notFound`) + `validEmail`/`missingFields`
-  helpers; all 13 routes return `{ ok, data, error }`; `useApi`/`useSession`/login + the
+  helpers; all 13 routes return `{ ok, data, error }`; `useSession`/login + the
   wired screens parse `data`; error messages and status codes unchanged.
 
 ### Low
@@ -202,6 +202,9 @@ Only parameterized SQL is used. Seeds/scripts under `db/` (`schema.sql`, `seed.t
 - **AUD-014 — Repo hygiene.** `backups/` holds real Neon data and is not in `.gitignore`;
   records in `OneTask.md` referencing old branches need consolidation. Fix: add
   `backups/` (+ `*.local`, `.vercel/`) to `.gitignore`.
+- **AUD-016 (#51) — Dead `lib/useApi.ts`.** Only `pages/dashboard.tsx` imported it; all
+  wired screens use `fetchJSON<T>` from `lib/api.ts`. **FIXED** (`fix/aud-051-dead-use-api`) —
+  dashboard.tsx switched to `fetchJSON`, `lib/useApi.ts` deleted, references tidied.
 
 ## 5. Standardized folder structure (target)
 

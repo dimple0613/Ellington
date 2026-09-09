@@ -1,7 +1,9 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { withPerm } from "../../lib/permissions";
+import { withPerm, hasPerm } from "../../lib/permissions";
 import { query } from "../../lib/db";
-import { ok, fail, methodNotAllowed, missingFields } from "../../lib/api";
+import { ok, fail, methodNotAllowed, missingFields, notFound } from "../../lib/api";
+
+const STAGE_ORDER = ["new", "contacted", "qualified", "viewing", "negotiation", "eoi", "booked", "lost"];
 
 export function stageLabel(stage: string): string {
   const map: Record<string, string> = {
@@ -18,16 +20,16 @@ export function stageLabel(stage: string): string {
 }
 
 function stageIndex(stage: string): number {
-  const order = ["new", "contacted", "qualified", "viewing", "negotiation", "eoi", "booked", "lost"];
-  const i = order.indexOf((stage || "new").toLowerCase());
+  const i = STAGE_ORDER.indexOf((stage || "new").toLowerCase());
   return i >= 0 ? i : 0;
 }
 
-export default withPerm("Sales", "REA", async function (req: NextApiRequest, res: NextApiResponse) {
+export default withPerm("Sales", "REA", async function (req: NextApiRequest, res: NextApiResponse, session: any) {
   if (req.method === "GET") {
     const leads = await query<any>(
       `SELECT l.id, l.name, COALESCE(l.source,'referral') AS source, COALESCE(l.stage,'new') AS stage,
               l.budget_min, l.budget_max, COALESCE(l.agent,'') AS agent, l.phone,
+              l.discount_pct, l.days_to_close,
               p.code AS project_code
        FROM leads l
        LEFT JOIN projects p ON p.id = l.project_id
@@ -45,6 +47,8 @@ export default withPerm("Sales", "REA", async function (req: NextApiRequest, res
       agent: l.agent,
       phone: l.phone || "",
       projectCode: l.project_code || "",
+      discountPct: l.discount_pct != null ? Number(l.discount_pct) : null,
+      daysToClose: l.days_to_close != null ? Number(l.days_to_close) : null,
       live: stageIndex(l.stage) < 6,
     }));
     return ok(res, { leads: data });
@@ -78,6 +82,24 @@ export default withPerm("Sales", "REA", async function (req: NextApiRequest, res
       ]
     );
     return ok(res, { id: ins.rows[0].id }, 201);
+  }
+
+  if (req.method === "PUT") {
+    if (!(await hasPerm(session, "Sales", "UPD"))) {
+      return fail(res, "You don't have permission to perform this action.", 403);
+    }
+    const id = Number(req.query.id);
+    if (!Number.isInteger(id) || id <= 0) return fail(res, "Invalid lead id", 400);
+    const stage = String((req.body || {}).stage || "").toLowerCase();
+    if (!STAGE_ORDER.includes(stage)) {
+      return fail(res, "Invalid stage: " + (STAGE_ORDER.join(", ")), 400);
+    }
+    const upd = await query<any>(
+      `UPDATE leads SET stage = $2, stage_changed_at = now() WHERE id = $1 RETURNING id`,
+      [id, stage]
+    );
+    if (upd.rows.length === 0) return notFound(res, "Lead not found");
+    return ok(res, { id: upd.rows[0].id, stage });
   }
 
   return methodNotAllowed(res);

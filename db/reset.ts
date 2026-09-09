@@ -6,14 +6,13 @@ const url = process.env.DATABASE_URL || "postgresql://postgres@localhost:5432/de
 async function main() {
   const client = new Client({ connectionString: url });
   await client.connect();
-  const tables = [
-    "escrow_ledger", "payment_milestones", "receipts", "leads",
-    "units", "buyers", "projects", "admins",
-  ];
-  for (const t of tables) {
-    await client.query(`DROP TABLE IF EXISTS ${t} CASCADE`);
+  const tables = await client.query<{ tablename: string }>(
+    "SELECT tablename FROM pg_tables WHERE schemaname = 'public'"
+  );
+  for (const { tablename } of tables.rows) {
+    await client.query(`DROP TABLE IF EXISTS "${tablename}" CASCADE`);
   }
   await client.end();
-  console.log("reset ok");
+  console.log(`reset ok (${tables.rows.length} tables dropped)`);
 }
 main().catch((e) => { console.error(e); process.exit(1); });

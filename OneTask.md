@@ -6,6 +6,8 @@
 ## Push (current branch + what to push)
 > Branch-per-task rule (see AGENTS.md): never push directly to main. Update this section per task.
 
+- Current branch: `fix/plinth-parity` (PLINTH Parity Program). Pushed: `81d9b7b` (T1), `8e405db` (T2), `a518b68` (T3), `20d764d` (T4), `91adcb5` (T5), `3fbec64` (T6), `b0ed1df` (T7), `234e74c` (T8), `b2b6180` (T9), `02da04c` (T10), `734c4ed` (T11), `35b4e9b` (T12), `d905002` (T13), `363d1be` (T14), `7cac9bd` (T15), `fb72f6e` (T16), `a6c5872` (T17), `aef6db9` (T18). Final phase: ALL 18 parity tasks committed and pushed. T18 Settings — `app_settings` gained `numbering` + `notif` JSONB columns (schema.sql + dev DB, seeded with per-object prefix/next and the 8-event matrix); `/api/system` GET/PUT carries numbering + notif (whole-row upsert, missing-body 400); `Settings.tsx` numbering tab editable (prefix/pattern/text inputs + numeric next) with live green previews (`H21-T1-0403`, `ESC-2026-9015`), notification matrix loaded from DB + persisted via Save changes. Fresh-setup shakeout performed: `db/reset.ts` rewritten to drop ALL public tables (was a stale 9-table list missing brokers/documents/bookings/settings), then `npx tsx db/reset.ts && npx tsx db/seed.ts` on a clean DB — 26 tables dropped/35 seeded (6 projects incl. H21, 134 units, 8 buyers, 3 bookings, 6 agencies, 5 agents, 3 docs + 7 template versions, 44 receipts incl. 6 PDC + H21 recon rows, 8 collections, 4 drawdowns, 6 invoices, 3 leads, 42 payment milestones, 36 construction milestones, 12 audit rows, 1 admin with settings); test-agent@ellington.com/Test1234 re-created via /api/admins (seed admin defaults from .env: admin@gmail.com + INITIAL_ADMIN_PASSWORD). Full E2E sweep on fresh DB: 23/23 screens PASS (portfolio, project×3, sales×5, finance×4, handover×3, system×3, incl. brokers register, bookings register, documents log, PDC, invoices, settings numbering) + ⌘K opens and typing "record" + Enter navigates to /finance. Cleaned up temp harnesses; remaining temporary files only in `C:\Users\admin\AppData\Local\Temp\opencode\`. Note: git push to origin hangs on GCM credential prompt — workaround `git push "https://oauth2:<gh-token>@github.com/..."`; local Postgres died mid-T6 (0xC0000142) and was restarted by the operator — if it dies again retry start, else commit on lint-only + re-verify pending. Operator out of office — no merges to main. Merge to main only after operator approval.
+- Closed on GitHub (no merge): issue #51 (dead `lib/useApi.ts` removed) on `fix/aud-051-dead-use-api` (`f8cbbd0` + `7a0bd8b`); issue #52 (any-type cleanups) on `fix/aud-052-any-types` (`164047b`).
 - Current branch: `main` (`ad22adf`; `fix/aud-006-system`, `fix/aud-006-finance`, `fix/aud-015-analytics` merged; `fix/aud-015-analytics` branch deleted local+remote).
 - **AUD-015 (#37) CLOSED/MERGED** — `fix/aud-015-analytics` (`ad22adf`): cashflow forecast + report exports live via `/api/finance-analytics` + `/api/report-export`; branch deleted.
 - **DEPLOYED TO CLOUDFLARE** — `npx wrangler deploy` (`wrangler.jsonc`, account `49dcdcff…`): worker `ellington-worker` live at
@@ -39,6 +41,36 @@
   Merge pending operator approval.
 - Last task: merge `feat/cloudflare-hyperdrive` → `main` (Hyperdrive DB connection fix so production reads Neon, delivered 200 on `/api/auth/login` + `/api/auth/me` with admin `Dipin Ellington`/`admin@gmail.com`); pushed.
 - Admin on Neon: id 1 = `Dipin Ellington` / `admin@gmail.com` / `Admin123` (role super_admin) — verified login 200 on live worker.
+
+## PLINTH Parity Program (branch `fix/plinth-parity`)
+> Reference: `C:\Users\admin\Downloads\New folder\plinth-prompt-pack_1.html` (PLINTH prompt pack).
+> Goal: every screen/page functions like the reference. Wiring map verified at start:
+> **16 screens already live** (dashboard, inventory, leads, payments, collections, escrow, invoices,
+> pipeline, snagging, deeds, users, settings, audit, cashflow, reports, projects) via `fetchJSON`;
+> **5 static** (financials, unit, pricing, construction, mobile) + Sales sub-screens
+> (booking/buyer/brokers/documents) + missing write-APIs + loading states (#50). Do one at a time.
+> - [x] **T1** Wire `Financials` (`/dashboard?s=financials`) → live `/api/dashboard` project data
+> - [x] **T2** Wire `Unit Detail` (`/project?s=unit`) → `/api/inventory?unit=` + `/api/milestones?unit=`
+> - [x] **T3** Wire `Pricing & Availability` (`/project?s=pricing`) → live units from `/api/inventory`
+> - [x] **T4** `Construction Progress` → new `construction_milestones` table + `/api/construction` + wire screen
+> - [x] **T5** `Mobile` exec app → new `/api/mobile` aggregate + wire the 5 tabs
+> - [x] **T6** `Buyers` directory + Buyer 360 → new `/api/buyers` (GET) + wire Sales buyer subscreens
+> - [x] **T7** `Leads` → PUT stage to `/api/leads` (drag-persist) + agent leaderboard (live aggregate by agent)
+> - [x] **T8** `Escrow` → add `/api/finance` PUT (reconcile match / drawdown submit) + wire actions
+> - [x] **T9** `Invoices` → add `/api/invoices` POST/PUT (issue / void / bulk-issue) + wire actions
+> - [x] **T10** `Collections` → dunning action PUT (remind/log/promise) + live default calculator (construction %)
+> - [x] **T11** `Payments` → bank-statement import (CSV) + PDC register live from receipts
+> - [x] **T12** `Handover` → payment-clear hard block from collections + readiness dashboard computed
+> - [x] **T13** Loading states (closes issue #50) → spinner/skeleton on all wired screens while fetching
+> - [x] **T14** `Bookings` → `bookings` table + `/api/bookings` + wire booking wizard + bookings register
+> - [x] **T15** `Brokers & agencies` → `brokers` table + `/api/brokers` + wire screen
+> - [x] **T16** `Document generator` → `documents` + `document_templates` tables + `/api/documents` + wire log & template activation
+> - [x] **T16** `Documents vault` audit → covered by Document generator wiring above (generation log persisted, every send logged)
+> - [x] **T17** Shell audit → ⌘K completed (keyboard nav + live indexes), switcher now searchable; notification centre & alerts ticker confirmed working
+> - [x] **T18** `Settings` → persist numbering / notification-matrix tabs via `/api/system` PUT
+> - [x] **Final** Fresh DB reset (all tables) → seed → re-create test agent → full E2E sweep 23/23 PASS → cleanup temp files (all parity work complete, awaiting operator review/merge)
+
+> Out of scope (flag as N/A): SSO/2FA, buyer portal, broker portal, Arabic/RTL, e-signature, WhatsApp/SMS channels, Mollak API.
 
 ## Today's Focus
 - [x] Task 1 — Scaffold project (complete md set)

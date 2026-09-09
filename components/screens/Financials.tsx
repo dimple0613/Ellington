@@ -2,6 +2,20 @@ import { useMemo } from "react";
 import { AC, compact } from "../../lib/format";
 import { PROJECTS } from "../../lib/data";
 
+export type LiveProject = {
+  code: string;
+  name: string;
+  loc: string;
+  units: number;
+  sold: number;
+  gdv: number;
+  soldV: number;
+  coll: number;
+  cons: number;
+  status: string;
+  flag: boolean;
+};
+
 type FinRow = {
   code: string;
   name: string;
@@ -18,7 +32,7 @@ type TitleTile = { label: string; value: string; note: string; bad?: boolean };
 
 export type FinExport = { tiles: TitleTile[]; rows: FinRow[] };
 
-export function useFinancialData(): FinExport {
+export function useFinancialData(projects?: LiveProject[]): FinExport {
   return useMemo(() => {
     const tiles: TitleTile[] = [
       { label: "Gross development value", value: "AED 1.94B", note: "5 SPVs consolidated" },
@@ -28,7 +42,8 @@ export function useFinancialData(): FinExport {
       { label: "Commission accrued", value: "AED 26.1M", note: "AED 18.4M paid" },
       { label: "DLD collected vs remitted", value: "AED 52.8M / 51.2M", note: "AED 1.6M pending", bad: true },
     ];
-    const rows: FinRow[] = PROJECTS.map((p) => {
+    const src = projects && projects.length ? projects : PROP_FALLBACK;
+    const rows: FinRow[] = src.map((p) => {
       const coll = (p.soldV * p.coll) / 100;
       return {
         code: p.code,
@@ -43,8 +58,22 @@ export function useFinancialData(): FinExport {
       };
     });
     return { tiles, rows };
-  }, []);
+  }, [projects]);
 }
+
+const PROP_FALLBACK: LiveProject[] = PROJECTS.map((p) => ({
+  code: p.code,
+  name: p.name,
+  loc: p.loc,
+  units: p.units,
+  sold: p.sold,
+  gdv: p.gdv,
+  soldV: p.soldV,
+  coll: p.coll,
+  cons: p.cons,
+  status: p.status,
+  flag: p.flag,
+}));
 
 const REV_BARS: [string, number][] = [
   ["Q1 25", 42], ["Q2 25", 58], ["Q3 25", 71], ["Q4 25", 96], ["Q1 26", 112], ["Q2 26", 138], ["Q3 26", 87],
@@ -71,8 +100,8 @@ function csv(rows: FinRow[]) {
   return head + "\n" + body.join("\n");
 }
 
-export default function FinancialsScreen() {
-  const { tiles, rows } = useFinancialData();
+export default function FinancialsScreen({ projects }: { projects?: LiveProject[] }) {
+  const { tiles, rows } = useFinancialData(projects);
   const maxRev = 138;
 
   const accountingExport = () => {

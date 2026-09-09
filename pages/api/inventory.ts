@@ -6,6 +6,7 @@ import { ok } from "../../lib/api";
 export default withPerm("Inventory", "REA", async function (req: NextApiRequest, res: NextApiResponse) {
   const project = (req.query.project as string) || "all";
   const status = (req.query.status as string) || "all";
+  const unit = (req.query.unit as string) || "all";
 
   const conds: string[] = [];
   const params: any[] = [];
@@ -17,6 +18,10 @@ export default withPerm("Inventory", "REA", async function (req: NextApiRequest,
   if (status && status !== "all") {
     params.push(status);
     conds.push(`u.status = $${params.length}`);
+  }
+  if (unit && unit !== "all") {
+    params.push(unit);
+    conds.push(`u.id::text = $${params.length}`);
   }
 
   const where = conds.length ? "WHERE " + conds.join(" AND ") : "";

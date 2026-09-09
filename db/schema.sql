@@ -17,10 +17,10 @@ CREATE TABLE IF NOT EXISTS role_permissions (
 );
 
 INSERT INTO role_permissions (role, perms) VALUES
-  ('super_admin', '{"Dashboard":{"CRE":true,"REA":true,"UPD":true,"DEL":false,"APR":true,"EXP":true},"Inventory":{"CRE":true,"REA":true,"UPD":true,"DEL":true,"APR":true,"EXP":true},"Sales":{"CRE":true,"REA":true,"UPD":true,"DEL":true,"APR":true,"EXP":true},"Finance":{"CRE":true,"REA":true,"UPD":true,"DEL":true,"APR":true,"EXP":true},"Handover":{"CRE":true,"REA":true,"UPD":true,"DEL":true,"APR":true,"EXP":true},"Settings":{"CRE":true,"REA":true,"UPD":true,"DEL":true,"APR":true,"EXP":true}}'),
-  ('ops', '{"Dashboard":{"CRE":false,"REA":true,"UPD":false,"DEL":false,"APR":false,"EXP":true},"Inventory":{"CRE":false,"REA":true,"UPD":true,"DEL":false,"APR":false,"EXP":true},"Sales":{"CRE":true,"REA":true,"UPD":true,"DEL":false,"APR":false,"EXP":true},"Finance":{"CRE":false,"REA":false,"UPD":false,"DEL":false,"APR":false,"EXP":false},"Handover":{"CRE":false,"REA":true,"UPD":true,"DEL":false,"APR":false,"EXP":false},"Settings":{"CRE":false,"REA":false,"UPD":false,"DEL":false,"APR":false,"EXP":false}}'),
-  ('finance', '{"Dashboard":{"CRE":false,"REA":true,"UPD":false,"DEL":false,"APR":false,"EXP":true},"Inventory":{"CRE":false,"REA":true,"UPD":false,"DEL":false,"APR":false,"EXP":false},"Sales":{"CRE":false,"REA":true,"UPD":false,"DEL":false,"APR":false,"EXP":true},"Finance":{"CRE":true,"REA":true,"UPD":true,"DEL":false,"APR":true,"EXP":true},"Handover":{"CRE":false,"REA":true,"UPD":false,"DEL":false,"APR":false,"EXP":false},"Settings":{"CRE":false,"REA":false,"UPD":false,"DEL":false,"APR":false,"EXP":false}}'),
-  ('viewer', '{"Dashboard":{"CRE":false,"REA":true,"UPD":false,"DEL":false,"APR":false,"EXP":true},"Inventory":{"CRE":false,"REA":true,"UPD":false,"DEL":false,"APR":false,"EXP":true},"Sales":{"CRE":false,"REA":true,"UPD":false,"DEL":false,"APR":false,"EXP":true},"Finance":{"CRE":false,"REA":true,"UPD":false,"DEL":false,"APR":false,"EXP":true},"Handover":{"CRE":false,"REA":true,"UPD":false,"DEL":false,"APR":false,"EXP":true},"Settings":{"CRE":false,"REA":false,"UPD":false,"DEL":false,"APR":false,"EXP":false}}')
+  ('super_admin', '{"Dashboard":{"CRE":true,"REA":true,"UPD":true,"DEL":false,"APR":true,"EXP":true},"Inventory":{"CRE":true,"REA":true,"UPD":true,"DEL":true,"APR":true,"EXP":true},"Sales":{"CRE":true,"REA":true,"UPD":true,"DEL":true,"APR":true,"EXP":true},"Finance":{"CRE":true,"REA":true,"UPD":true,"DEL":true,"APR":true,"EXP":true},"Handover":{"CRE":true,"REA":true,"UPD":true,"DEL":true,"APR":true,"EXP":true},"Settings":{"CRE":true,"REA":true,"UPD":true,"DEL":true,"APR":true,"EXP":true},"Construction":{"CRE":true,"REA":true,"UPD":true,"DEL":true,"APR":true,"EXP":true}}'),
+  ('ops', '{"Dashboard":{"CRE":false,"REA":true,"UPD":false,"DEL":false,"APR":false,"EXP":true},"Inventory":{"CRE":false,"REA":true,"UPD":true,"DEL":false,"APR":false,"EXP":true},"Sales":{"CRE":true,"REA":true,"UPD":true,"DEL":false,"APR":false,"EXP":true},"Finance":{"CRE":false,"REA":false,"UPD":false,"DEL":false,"APR":false,"EXP":false},"Handover":{"CRE":false,"REA":true,"UPD":true,"DEL":false,"APR":false,"EXP":false},"Settings":{"CRE":false,"REA":false,"UPD":false,"DEL":false,"APR":false,"EXP":false},"Construction":{"CRE":false,"REA":true,"UPD":true,"DEL":false,"APR":false,"EXP":false}}'),
+  ('finance', '{"Dashboard":{"CRE":false,"REA":true,"UPD":false,"DEL":false,"APR":false,"EXP":true},"Inventory":{"CRE":false,"REA":true,"UPD":false,"DEL":false,"APR":false,"EXP":false},"Sales":{"CRE":false,"REA":true,"UPD":false,"DEL":false,"APR":false,"EXP":true},"Finance":{"CRE":true,"REA":true,"UPD":true,"DEL":false,"APR":true,"EXP":true},"Handover":{"CRE":false,"REA":true,"UPD":false,"DEL":false,"APR":false,"EXP":false},"Settings":{"CRE":false,"REA":false,"UPD":false,"DEL":false,"APR":false,"EXP":false},"Construction":{"CRE":false,"REA":true,"UPD":false,"DEL":false,"APR":false,"EXP":false}}'),
+  ('viewer', '{"Dashboard":{"CRE":false,"REA":true,"UPD":false,"DEL":false,"APR":false,"EXP":true},"Inventory":{"CRE":false,"REA":true,"UPD":false,"DEL":false,"APR":false,"EXP":true},"Sales":{"CRE":false,"REA":true,"UPD":false,"DEL":false,"APR":false,"EXP":true},"Finance":{"CRE":false,"REA":true,"UPD":false,"DEL":false,"APR":false,"EXP":true},"Handover":{"CRE":false,"REA":true,"UPD":false,"DEL":false,"APR":false,"EXP":true},"Settings":{"CRE":false,"REA":false,"UPD":false,"DEL":false,"APR":false,"EXP":false},"Construction":{"CRE":false,"REA":true,"UPD":false,"DEL":false,"APR":false,"EXP":false}}')
 ON CONFLICT (role) DO NOTHING;
 
 CREATE TABLE IF NOT EXISTS password_resets (
@@ -80,8 +80,13 @@ CREATE TABLE IF NOT EXISTS leads (
   budget_min NUMERIC,
   budget_max NUMERIC,
   agent TEXT,
-  stage_changed_at TIMESTAMPTZ DEFAULT now()
+  stage_changed_at TIMESTAMPTZ DEFAULT now(),
+  discount_pct NUMERIC,
+  days_to_close INT
 );
+
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS discount_pct NUMERIC;
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS days_to_close INT;
 
 CREATE TABLE IF NOT EXISTS receipts (
   id SERIAL PRIMARY KEY,
@@ -95,6 +100,24 @@ CREATE TABLE IF NOT EXISTS receipts (
   received_at TIMESTAMPTZ DEFAULT now()
 );
 
+ALTER TABLE receipts ADD COLUMN IF NOT EXISTS cheque_no TEXT;
+ALTER TABLE receipts ADD COLUMN IF NOT EXISTS cheque_date DATE;
+ALTER TABLE receipts ADD COLUMN IF NOT EXISTS bank_name TEXT;
+ALTER TABLE receipts ADD COLUMN IF NOT EXISTS pdc_status TEXT;
+
+-- Finance (PLINTH parity T11): bank-statement import queue for escrow reconciliation.
+CREATE TABLE IF NOT EXISTS bank_statements (
+  id SERIAL PRIMARY KEY,
+  value_date DATE,
+  reference TEXT,
+  amount NUMERIC DEFAULT 0,
+  description TEXT,
+  matched BOOLEAN DEFAULT false,
+  matched_receipt_id INT REFERENCES receipts(id),
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_bankstatements_matched ON bank_statements(matched);
+
 CREATE TABLE IF NOT EXISTS payment_milestones (
   id SERIAL PRIMARY KEY,
   unit_id INT REFERENCES units(id),
@@ -104,6 +127,96 @@ CREATE TABLE IF NOT EXISTS payment_milestones (
   amount NUMERIC DEFAULT 0,
   status TEXT DEFAULT 'scheduled'             -- paid / due / scheduled
 );
+
+-- Bookings (PLINTH parity T14): converts an available unit into a registered sale.
+CREATE TABLE IF NOT EXISTS bookings (
+  id SERIAL PRIMARY KEY,
+  project_id INT REFERENCES projects(id),
+  unit_id INT REFERENCES units(id) NOT NULL,
+  buyer_id INT REFERENCES buyers(id),
+  ref TEXT UNIQUE,                            -- BKG-2026-00891
+  buyer_name TEXT,
+  buyer_mobile TEXT,
+  buyer_email TEXT,
+  discount_pct NUMERIC DEFAULT 0,
+  discount_amt NUMERIC DEFAULT 0,
+  list_price NUMERIC DEFAULT 0,
+  net_price NUMERIC DEFAULT 0,
+  booking_amount NUMERIC DEFAULT 0,           -- token (default 10%)
+  dld_payer TEXT DEFAULT 'buyer',             -- buyer / developer
+  admin_fee NUMERIC DEFAULT 0,
+  broker_involved BOOLEAN DEFAULT false,
+  agency TEXT,
+  agent TEXT,
+  commission_pct NUMERIC DEFAULT 0,
+  expected_spa DATE,
+  status TEXT DEFAULT 'draft',                -- draft / pending_approval / confirmed / cancelled
+  payment_method TEXT,                        -- bank_transfer / cheque / card / cash
+  payment_bank TEXT,
+  payment_cheque_no TEXT,
+  payment_reference TEXT,
+  escrow_ref TEXT,                            -- mandatory for confirm
+  receipt_id INT REFERENCES receipts(id),
+  confirmed_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_bookings_unit ON bookings(unit_id);
+CREATE INDEX IF NOT EXISTS idx_bookings_status ON bookings(status);
+
+-- Brokers & agencies (T15): registered agencies, their agents, and the activity feed.
+CREATE TABLE IF NOT EXISTS broker_agencies (
+  id SERIAL PRIMARY KEY,
+  name TEXT NOT NULL UNIQUE,
+  orn TEXT,
+  alloc_units INT DEFAULT 0,
+  deals INT DEFAULT 0,
+  accrued NUMERIC DEFAULT 0,             -- AED commission accrued
+  paid NUMERIC DEFAULT 0,                -- AED commission paid out
+  commission_rate TEXT DEFAULT '2.0%',
+  status TEXT DEFAULT 'onboarding',      -- onboarding / active / suspended
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS broker_agents (
+  id SERIAL PRIMARY KEY,
+  name TEXT NOT NULL,
+  agency TEXT NOT NULL,                  -- agency display name
+  brn TEXT,
+  deals INT DEFAULT 0,
+  value NUMERIC DEFAULT 0,               -- AED value sold by this agent
+  discount_pct NUMERIC DEFAULT 0,
+  days_to_close INT DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS broker_activity (
+  id SERIAL PRIMARY KEY,
+  text TEXT NOT NULL,
+  meta TEXT,
+  kind TEXT DEFAULT 'note',              -- reservation / commission / clawback / download / suspend / onboard
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS documents (
+  id SERIAL PRIMARY KEY,
+  doc_type TEXT NOT NULL,
+  unit_no TEXT,
+  buyer TEXT,
+  ref TEXT NOT NULL UNIQUE,
+  media JSONB,
+  status TEXT DEFAULT 'generated',   -- generated / sent
+  generated_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_documents_ref ON documents(ref);
+
+CREATE TABLE IF NOT EXISTS document_templates (
+  id SERIAL PRIMARY KEY,
+  doc_type TEXT NOT NULL,
+  version TEXT NOT NULL,
+  status TEXT DEFAULT 'archived',    -- live / archived
+  changed_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE (doc_type, version)
+);
+CREATE INDEX IF NOT EXISTS idx_doc_templates_live ON document_templates(doc_type) WHERE status = 'live';
 
 CREATE TABLE IF NOT EXISTS escrow_ledger (
   id SERIAL PRIMARY KEY,
@@ -176,7 +289,9 @@ CREATE INDEX IF NOT EXISTS idx_audit_ts ON audit_log(ts);
 CREATE TABLE IF NOT EXISTS app_settings (
   id SMALLINT PRIMARY KEY,
   company JSONB NOT NULL DEFAULT '{}',
-  brand JSONB NOT NULL DEFAULT '{}'
+  brand JSONB NOT NULL DEFAULT '{}',
+  numbering JSONB NOT NULL DEFAULT '{}',
+  notif JSONB NOT NULL DEFAULT '{}'
 );
 
 -- Finance module (AUD-006): collections ageing ledger, escrow drawdowns, invoice ledger.
@@ -189,6 +304,9 @@ CREATE TABLE IF NOT EXISTS collections (
   stage TEXT DEFAULT 'Upcoming',        -- Upcoming / Reminder 1 / Reminder 2 / 30-day notice / Final notice
   action TEXT
 );
+ALTER TABLE collections ADD COLUMN IF NOT EXISTS last_contact DATE;
+ALTER TABLE collections ADD COLUMN IF NOT EXISTS promised_date DATE;
+ALTER TABLE collections ADD COLUMN IF NOT EXISTS promised_amount NUMERIC;
 CREATE INDEX IF NOT EXISTS idx_collections_stage ON collections(stage);
 
 CREATE TABLE IF NOT EXISTS drawdowns (
@@ -211,6 +329,26 @@ CREATE TABLE IF NOT EXISTS invoices (
   amount NUMERIC DEFAULT 0,
   paid BOOLEAN DEFAULT false
 );
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS issued_at DATE;
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS voided_at DATE;
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS void_reason TEXT;
+
+-- Construction module (PLINTH parity): work-package milestones with money release.
+CREATE TABLE IF NOT EXISTS construction_milestones (
+  id SERIAL PRIMARY KEY,
+  project_id INT REFERENCES projects(id),
+  milestone TEXT,
+  planned DATE,
+  forecast DATE,
+  actual DATE,
+  status TEXT DEFAULT 'pending',          -- certified / pending / forecast / scheduled
+  weight INT DEFAULT 0,                    -- contribution to overall completion
+  planned_pct INT DEFAULT 0,
+  actual_pct INT DEFAULT 0,
+  trigger_amt NUMERIC DEFAULT 0,           -- AED released to buyers when certified
+  trigger_buyers INT DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_construction_project ON construction_milestones(project_id);
 
 -- Seed handover data on first install (idempotent).
 DO $$
@@ -264,9 +402,11 @@ BEGIN
       (now() - interval '11 days 2 hours','Omar Saeed','Project Mgr','Updated','WPK · Milestone','Status','Pending','Certified',false);
   END IF;
   IF NOT EXISTS (SELECT 1 FROM app_settings) THEN
-    INSERT INTO app_settings (id, company, brand) VALUES (1,
+    INSERT INTO app_settings (id, company, brand, numbering, notif) VALUES (1,
       '{"Legal name":"Ellington Properties Development LLC","Trade licence":"CN-2847192","ORN":"21281","RERA":"1884","VAT TRN":"100234567800003"}'::jsonb,
-      '{"Primary color":"#4F46F5","Currency":"AED","Date format":"DD MMM YYYY","Timezone":"Asia/Dubai (GMT+4)","Fiscal year":"Jan – Dec"}'::jsonb);
+      '{"Primary color":"#4F46F5","Currency":"AED","Date format":"DD MMM YYYY","Timezone":"Asia/Dubai (GMT+4)","Fiscal year":"Jan – Dec"}'::jsonb,
+      '[{"object":"Unit","prefix":"{project}-T{tower}-{seq}","pattern":"WPK-T1-0402 — auto-increment per tower","next":403},{"object":"Receipt","prefix":"RCP-{project}-{seq}","pattern":"RCP-H21-004712 — sequential","next":4713},{"object":"Cheque","prefix":"CHQ-{seq}","pattern":"CHQ-884102 — sequential across all projects","next":884103},{"object":"Drawdown","prefix":"DDR-{seq}","pattern":"DDR-0004 — sequential per project","next":5},{"object":"Escrow ref","prefix":"ESC-{year}-{seq}","pattern":"ESC-2026-9014 — yearly reset","next":9015},{"object":"Notice","prefix":"NTC-{type}-{unit}","pattern":"NTC-30D-WPK-T1-0210","next":1}]'::jsonb,
+      '[{"event":"New booking created","inapp":true,"email":true,"slack":false},{"event":"Payment received","inapp":true,"email":true,"slack":true},{"event":"Milestone certified","inapp":true,"email":true,"slack":false},{"event":"Drawdown request","inapp":true,"email":true,"slack":true},{"event":"Snag raised","inapp":false,"email":true,"slack":false},{"event":"Title deed issued","inapp":true,"email":true,"slack":false},{"event":"Unit price changed","inapp":true,"email":true,"slack":false},{"event":"User invited","inapp":true,"email":false,"slack":false}]'::jsonb);
   END IF;
   IF NOT EXISTS (SELECT 1 FROM collections) THEN
     INSERT INTO collections (buyer, unit_no, amount, days_due, stage, action) VALUES
@@ -303,5 +443,25 @@ BEGIN
       ('RCP-H21-004689 · E. Petrova','in',1204000,false,true,false, now() - interval '21 days'),
       ('BLG-1602','in',84600,true,false,false, now() - interval '24 days'),
       ('CHQ-883964','in',268000,true,false,false, now() - interval '27 days');
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM construction_milestones) AND EXISTS (SELECT 1 FROM projects WHERE code = 'BLG') THEN
+    INSERT INTO construction_milestones (project_id, milestone, planned, forecast, actual, status, weight, planned_pct, actual_pct, trigger_amt, trigger_buyers)
+    SELECT p.id, mk.milestone, mk.planned, mk.forecast, mk.actual, mk.status, mk.weight, mk.planned_pct, mk.actual_pct,
+           ROUND(p.gdv * mk.share)::numeric, ROUND(p.units_total * 0.9)::int
+    FROM projects p
+    CROSS JOIN (VALUES
+      ('Enabling works'::text, date '2026-02-14', date '2026-02-11', date '2026-02-11', 'certified'::text, 6, 100, 100, 0.16),
+      ('Substructure complete', date '2026-05-18', date '2026-05-12', date '2026-05-12', 'certified', 14, 100, 100, 0.22),
+      ('Structure 40%', date '2026-04-12', date '2026-04-18', NULL, 'pending', 32, 62, 54, 0.28),
+      ('Structure 70%', date '2026-11-20', date '2026-11-28', NULL, 'forecast', 18, 24, 18, 0.20),
+      ('Facade complete', date '2027-06-14', date '2027-07-02', NULL, 'forecast', 14, 8, 4, 0.14),
+      ('Handover', date '2027-12-31', date '2027-12-31', NULL, 'forecast', 16, 0, 0, 0.00)
+    ) AS mk(milestone, planned, forecast, actual, status, weight, planned_pct, actual_pct, share);
+  END IF;
+IF NOT EXISTS (SELECT 1 FROM bank_statements) THEN
+    INSERT INTO bank_statements (value_date, reference, amount, description) VALUES
+      ('2026-08-24','RCP-H21-004712',367875,'MENON RM 3302'),
+      ('2026-08-24','RCP-H21-004711',512000,'AISHA AL MARRI'),
+      ('2026-08-23','CHQ-883964',268000,'CHQ BOUNCED · RE-PRESENTED');
   END IF;
 END $$;

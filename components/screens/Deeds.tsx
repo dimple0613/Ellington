@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { AC } from "../../lib/format";
 import { exportOaData, exportHandoverCert } from "../../lib/pdf";
 import { fetchJSON } from "../../lib/api";
+import { PanelSkeleton } from "../Loading";
 
 type DeedRow = { unit: string; buyer: string; oqood: string; dld: string; deed: string; issued: string; keys: string; oa: string };
 
@@ -38,11 +39,13 @@ export default function DeedsScreen() {
   const [certUnit, setCertUnit] = useState("WPK-T1-0402");
   const [rows, setRows] = useState<DeedRow[]>(ROWS);
   const [apiError, setApiError] = useState("");
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     let active = true;
     fetchJSON<{ deeds: { unit_no: string; buyer: string; oqood: string; dld: string; deed: string; issued: string; keys: string; oa: string }[] }>("/api/handover")
       .then((j) => {
+        if (active) setLoaded(true);
         if (!active || !Array.isArray(j.deeds)) return;
         const mapped: DeedRow[] = j.deeds.map((d) => ({
           unit: d.unit_no || "",
@@ -57,7 +60,7 @@ export default function DeedsScreen() {
         if (mapped.length) setRows(mapped);
       })
       .catch((e) => {
-        if (active) setApiError(e?.message || "Failed to load deeds");
+        if (active) { setLoaded(true); setApiError(e?.message || "Failed to load deeds"); }
       });
     return () => { active = false; };
   }, []);
@@ -75,6 +78,14 @@ export default function DeedsScreen() {
     setCertOpen(false);
     banner("Certificate issued \u00b7 " + row.unit + " \u00b7 " + row.buyer);
   };
+
+  if (!loaded) {
+    return (
+      <div>
+        <PanelSkeleton headerW={200} rows={6} cols={7} />
+      </div>
+    );
+  }
 
   return (
     <div>

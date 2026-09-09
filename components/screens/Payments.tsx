@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from "react";
 import { AC } from "../../lib/format";
 import { fetchJSON } from "../../lib/api";
+import { KpiSkeleton, PanelSkeleton } from "../Loading";
 
 type ReceiptRow = {
+  id?: number | string | null;
   rcp: string;
   date: string;
   buyer: string;
@@ -11,6 +13,11 @@ type ReceiptRow = {
   method: string;
   esc: string;
   recon: "Matched" | "Unmatched";
+  isCheque: boolean;
+  chequeNo: string;
+  chequeDate: string;
+  bank: string;
+  pdc: string;
 };
 
 type PdcRow = {
@@ -23,6 +30,16 @@ type PdcRow = {
   status: string;
 };
 
+type StmtRow = {
+  id: number;
+  date: string;
+  reference: string;
+  amount: number;
+  description: string;
+  matched: boolean;
+  receiptId: number | null;
+};
+
 type ApiReceipt = {
   id?: number | string | null;
   amount?: number | string | null;
@@ -32,26 +49,37 @@ type ApiReceipt = {
   date?: string | null;
   buyer?: string | null;
   unit?: string | null;
+  cheque_no?: string | null;
+  cheque_date?: string | null;
+  bank_name?: string | null;
+  pdc_status?: string | null;
 };
 
+const PDC_STATUSES = ["Held", "Presented", "Cleared", "Bounced"];
+
 export default function PaymentsScreen({ buyer }: { buyer?: string }) {
-  const [tab, setTab] = useState<"receipts" | "pdc">("receipts");
+  const [tab, setTab] = useState<"receipts" | "pdc" | "statement">("receipts");
   const [showForm, setShowForm] = useState(false);
+  const [showImport, setShowImport] = useState(false);
   const [formBuyer, setFormBuyer] = useState(buyer || "");
   const [formAmount, setFormAmount] = useState("");
   const [formMethod, setFormMethod] = useState("Bank transfer");
+  const [csvText, setCsvText] = useState("");
   const [saved, setSaved] = useState(false);
+  const [imported, setImported] = useState<{ imported: number; matched: number } | null>(null);
   const [extraRows, setExtraRows] = useState<ReceiptRow[]>([]);
   const [dbRows, setDbRows] = useState<ReceiptRow[]>([]);
+  const [stmtRows, setStmtRows] = useState<StmtRow[]>([]);
   const [apiError, setApiError] = useState("");
+  const [loaded, setLoaded] = useState(false);
 
-  useEffect(() => {
-    let active = true;
+  const loadReceipts = () =>
     fetchJSON<{ receipts: ApiReceipt[] }>("/api/receipts")
       .then((j) => {
-        if (!active || !Array.isArray(j.receipts)) return;
+        if (!Array.isArray(j.receipts)) return;
         setDbRows(
-          j.receipts.slice(0, 20).map((x: ApiReceipt) => ({
+          j.receipts.map((x: ApiReceipt) => ({
+            id: x.id,
             rcp: "RCP-" + String(x.id).padStart(6, "0"),
             date: x.date || "",
             buyer: x.buyer || "",
@@ -60,12 +88,24 @@ export default function PaymentsScreen({ buyer }: { buyer?: string }) {
             method: (x.method || "bank_transfer").replace("_", " "),
             esc: x.reference || "—",
             recon: x.matched ? "Matched" : "Unmatched",
+            isCheque: String(x.method || "").toLowerCase().includes("cheque") || !!x.pdc_status,
+            chequeNo: x.cheque_no || "",
+            chequeDate: x.cheque_date || "",
+            bank: x.bank_name || "",
+            pdc: x.pdc_status || "",
           }))
         );
       })
-      .catch((e) => {
-        if (active) setApiError(e?.message || "Failed to load receipts");
-      });
+      .catch((e) => setApiError(e?.message || "Failed to load receipts"));
+
+  const loadStmts = () =>
+    fetchJSON<{ statements: StmtRow[] }>("/api/receipts/import")
+      .then((j) => setStmtRows(Array.isArray(j.statements) ? j.statements : []))
+      .catch(() => setStmtRows([]));
+
+  useEffect(() => {
+    let active = true;
+    Promise.all([loadReceipts(), loadStmts()]).then(() => { if (active) setLoaded(true); }).catch(() => { if (active) setLoaded(true); });
     return () => { active = false; };
   }, []);
 
@@ -88,9 +128,9 @@ export default function PaymentsScreen({ buyer }: { buyer?: string }) {
     ["RCP-H21-004705", "21 Aug 26", "Fatima Al Hashimi", "H21-T1-3005", "415,750", "Bank transfer", "ESC-2026-8988", "Matched"],
     ["RCP-H21-004704", "20 Aug 26", "Wei Chen", "H21-T1-1602", "722,000", "Bank transfer", "ESC-2026-8981", "Matched"],
     ["RCP-H21-004703", "20 Aug 26", "Priya Nair", "H21-T1-0904", "234,500", "Card", "ESC-2026-8979", "Matched"],
-  ].map((r): ReceiptRow => ({ rcp: r[0], date: r[1], buyer: r[2], unit: r[3], amount: r[4], method: r[5], esc: r[6], recon: r[7] as ReceiptRow["recon"] }));
+  ].map((r): ReceiptRow => ({ rcp: r[0], date: r[1], buyer: r[2], unit: r[3], amount: r[4], method: r[5], esc: r[6], recon: r[7] as ReceiptRow["recon"], isCheque: r[5] === "Cheque", chequeNo: "", chequeDate: "", bank: "", pdc: "" }));
 
-  const pdcRows: PdcRow[] = [
+  const fallbackPdc: PdcRow[] = [
     ["CHQ-884102", "01 Sep 26", "Daniel Whitfield", "H21-T1-1905", "842,500", "Emirates NBD", "Held"],
     ["CHQ-884118", "05 Sep 26", "Marcus Lindqvist", "H21-T1-2404", "640,000", "ADCB", "Held"],
     ["CHQ-884120", "14 Sep 26", "Sunil Rathore", "H21-T1-3703", "415,000", "Mashreq", "Presented"],
@@ -98,6 +138,20 @@ export default function PaymentsScreen({ buyer }: { buyer?: string }) {
     ["CHQ-883964", "12 Aug 26", "Wei Chen", "H21-T1-1602", "268,000", "HSBC", "Bounced"],
     ["CHQ-884131", "22 Sep 26", "Priya Nair", "H21-T1-0904", "234,500", "Emirates NBD", "Held"],
   ].map((r): PdcRow => ({ no: r[0], date: r[1], buyer: r[2], unit: r[3], amount: r[4], bank: r[5], status: r[6] }));
+
+  const livePdc: PdcRow[] = [...dbRows, ...extraRows]
+    .filter((r) => r.isCheque)
+    .map((r) => ({
+      no: r.chequeNo || r.rcp.replace(/^RCP-/, "CHQ-"),
+      date: r.chequeDate || r.date,
+      buyer: r.buyer,
+      unit: r.unit,
+      amount: r.amount,
+      bank: r.bank || "—",
+      status: r.pdc || "Held",
+    }));
+
+  const pdcList = livePdc.length ? livePdc : fallbackPdc;
 
   const pillStyle = (m: string): React.CSSProperties => {
     let bg: string, col: string;
@@ -114,13 +168,18 @@ export default function PaymentsScreen({ buyer }: { buyer?: string }) {
     if (!formBuyer || !amt) return;
     const row: ReceiptRow = {
       rcp: "RCP-H21-" + String(4790 + extraRows.length).padStart(6, "0"),
-      date: new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "2-digit" }).replace(/ /g, " "),
+      date: new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "2-digit" }),
       buyer: formBuyer,
       unit: "H21-T1-1204",
       amount: amt.toLocaleString("en-US"),
       method: formMethod,
       esc: "ESC-2026-" + (9014 + extraRows.length),
       recon: "Matched",
+      isCheque: formMethod === "Cheque",
+      chequeNo: formMethod === "Cheque" ? "CHQ-" + (884200 + extraRows.length) : "",
+      chequeDate: formMethod === "Cheque" ? new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "2-digit" }) : "",
+      bank: formMethod === "Cheque" ? "—" : "",
+      pdc: formMethod === "Cheque" ? "Held" : "",
     };
     setExtraRows((r) => [row, ...r]);
     setSaved(true);
@@ -134,9 +193,61 @@ export default function PaymentsScreen({ buyer }: { buyer?: string }) {
         buyer_name: formBuyer,
         amount: amt,
         method: formMethod.toLowerCase().replace(" ", "_"),
+        ...(formMethod === "Cheque" ? { cheque_no: row.chequeNo, bank_name: "—", pdc_status: "Held" } : {}),
       }),
     }).catch(() => {});
   };
+
+  const setPdcStatus = (r: PdcRow, status: string) => {
+    if (!r.no || status === r.status) return;
+    const base = [...dbRows, ...extraRows].find((x) => (x.chequeNo || x.rcp) === r.no);
+    if (!base?.id) return;
+    fetch("/api/receipts?id=" + base.id, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "pdc", status }),
+    }).then((resp) => (resp.ok ? loadReceipts() : null)).catch(() => {});
+  };
+
+  const importCsv = () => {
+    if (!csvText.trim()) return;
+    setShowImport(false);
+    fetch("/api/receipts/import", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ csv: csvText }),
+    })
+      .then((resp) => (resp.ok ? resp.json() : null))
+      .then((j) => {
+        if (j) {
+          setImported({ imported: j.imported, matched: j.matched });
+          setTimeout(() => setImported(null), 5000);
+        }
+        loadStmts();
+        loadReceipts();
+      })
+      .catch(() => {});
+    setCsvText("");
+  };
+
+  const actStmt = (id: number, action: "confirm" | "reject") => {
+    fetch("/api/receipts/import?id=" + id, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action }),
+    }).then((resp) => (resp.ok ? loadStmts() : null)).catch(() => {});
+  };
+
+  if (!loaded) {
+    return (
+      <div>
+        <KpiSkeleton count={5} />
+        <div style={{ marginTop: 16 }}>
+          <PanelSkeleton headerW={180} rows={10} cols={7} />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -147,12 +258,17 @@ export default function PaymentsScreen({ buyer }: { buyer?: string }) {
       )}
       {buyer && (
         <div style={{ background: "#F0EFFE", color: AC, borderRadius: 12, padding: "11px 16px", fontSize: 12, fontWeight: 700, marginBottom: 16 }}>
-          Recording payment for <span style={{ fontWeight: 800 }}>{buyer}</span> \u00b7 sourced from Buyer 360 \u00b7 escrow deposit required
+          Recording payment for <span style={{ fontWeight: 800 }}>{buyer}</span> · sourced from Buyer 360 · escrow deposit required
         </div>
       )}
       {saved && (
         <div style={{ background: "#E9F8F1", color: "#1F9D6B", borderRadius: 12, padding: "11px 16px", fontSize: 12, fontWeight: 700, marginBottom: 16 }}>
-          Payment recorded \u00b7 {formBuyer} \u00b7 AED {parseFloat(formAmount).toLocaleString("en-US")} \u00b7 {formMethod} \u00b7 receipt issued \u00b7 escrow matched
+          Payment recorded · {formBuyer} · AED {parseFloat(formAmount).toLocaleString("en-US")} · {formMethod} · receipt issued · escrow matched
+        </div>
+      )}
+      {imported && (
+        <div style={{ background: "#E9F8F1", color: "#1F9D6B", borderRadius: 12, padding: "11px 16px", fontSize: 12, fontWeight: 700, marginBottom: 16 }}>
+          Bank statement imported · {imported.imported} rows · {imported.matched} auto-matched to receipts · {imported.imported - imported.matched} in review queue
         </div>
       )}
       <div style={{ display: "flex", alignItems: "flex-end", gap: 16, marginBottom: 18 }}>
@@ -160,7 +276,7 @@ export default function PaymentsScreen({ buyer }: { buyer?: string }) {
           <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: "-.03em", lineHeight: 1.15 }}>Payments &amp; receipts</div>
           <div style={{ fontSize: 13, color: "#6B7180", fontWeight: 500, marginTop: 5 }}>All buyer funds must be deposited to the project escrow account</div>
         </div>
-        <button style={{ height: 38, borderRadius: 12, border: "1px solid #EDEEF3", background: "#fff", padding: "0 14px", fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, color: "#4A5060", cursor: "pointer" }}>Import bank statement</button>
+        <button onClick={() => setShowImport(true)} style={{ height: 38, borderRadius: 12, border: "1px solid #EDEEF3", background: "#fff", padding: "0 14px", fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, color: "#4A5060", cursor: "pointer" }}>Import bank statement</button>
         <button onClick={() => setShowForm(true)} style={{ height: 38, borderRadius: 12, background: AC, color: "#fff", border: 0, padding: "0 16px", fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}>Record payment</button>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 14 }}>
@@ -173,48 +289,94 @@ export default function PaymentsScreen({ buyer }: { buyer?: string }) {
         ))}
       </div>
       <div style={{ display: "flex", gap: 4, background: "#fff", border: "1px solid #EDEEF3", borderRadius: 13, padding: 4, margin: "16px 0 14px", width: "fit-content" }}>
-        {(["receipts", "pdc"] as const).map((t) => (
+        {(["receipts", "pdc", "statement"] as const).map((t) => (
           <button key={t} onClick={() => setTab(t)} style={{ height: 32, border: 0, borderRadius: 10, padding: "0 15px", cursor: "pointer", fontFamily: "inherit", fontSize: 12, fontWeight: 700, background: tab === t ? "#F0EFFE" : "transparent", color: tab === t ? AC : "#9AA0AE" }}>
-            {t === "receipts" ? "Receipts" : "Post-dated cheques"}
+            {t === "receipts" ? "Receipts" : t === "pdc" ? "Post-dated cheques" : "Bank statement"}
           </button>
         ))}
       </div>
       <div style={{ background: "#fff", borderRadius: 20, boxShadow: "0 1px 3px rgba(20,22,31,.04)", overflow: "hidden" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "118px 86px 1.1fr 92px 96px 96px 104px 88px", gap: 8, padding: "14px 22px", fontSize: 9.5, fontWeight: 700, letterSpacing: ".07em", color: "#9AA0AE", textTransform: "uppercase", background: "#FAFBFD", borderBottom: "1px solid #EDEEF3" }}>
-          <span>Receipt</span><span>Date</span><span>Buyer</span><span>Unit</span><span style={{ textAlign: "right" }}>Amount</span><span>Method</span><span>Escrow ref</span><span>Recon</span>
-        </div>
-        {tab === "receipts" ? [...dbRows, ...extraRows, ...payRows].map((r, i) => (
-          <div key={i} style={{ display: "grid", gridTemplateColumns: "118px 86px 1.1fr 92px 96px 96px 104px 88px", gap: 8, alignItems: "center", padding: "0 22px", height: 40, borderBottom: "1px solid #F6F7FA" }}>
-            <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, fontWeight: 600 }}>{r.rcp}</span>
-            <span style={{ fontSize: 11.5, color: "#6B7180", fontWeight: 600 }}>{r.date}</span>
-            <span style={{ fontSize: 11.5, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.buyer}</span>
-            <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10.5, color: "#4A5060" }}>{r.unit}</span>
-            <span style={{ textAlign: "right", fontSize: 11.5, fontWeight: 700 }}>{r.amount}</span>
-            <span style={{ fontSize: 11, color: "#6B7180", fontWeight: 600 }}>{r.method}</span>
-            <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10, color: "#9AA0AE" }}>{r.esc}</span>
-            <span style={pillStyle(r.recon)}>{r.recon}</span>
-          </div>
-        )) : (
-          <div>
+        {tab === "receipts" && (
+          <>
+            <div style={{ display: "grid", gridTemplateColumns: "118px 86px 1.1fr 92px 96px 96px 104px 88px", gap: 8, padding: "14px 22px", fontSize: 9.5, fontWeight: 700, letterSpacing: ".07em", color: "#9AA0AE", textTransform: "uppercase", background: "#FAFBFD", borderBottom: "1px solid #EDEEF3" }}>
+              <span>Receipt</span><span>Date</span><span>Buyer</span><span>Unit</span><span style={{ textAlign: "right" }}>Amount</span><span>Method</span><span>Escrow ref</span><span>Recon</span>
+            </div>
+            {[...dbRows, ...extraRows, ...payRows].map((r, i) => (
+              <div key={i} style={{ display: "grid", gridTemplateColumns: "118px 86px 1.1fr 92px 96px 96px 104px 88px", gap: 8, alignItems: "center", padding: "0 22px", height: 40, borderBottom: "1px solid #F6F7FA" }}>
+                <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, fontWeight: 600 }}>{r.rcp}</span>
+                <span style={{ fontSize: 11.5, color: "#6B7180", fontWeight: 600 }}>{r.date}</span>
+                <span style={{ fontSize: 11.5, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.buyer}</span>
+                <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10.5, color: "#4A5060" }}>{r.unit}</span>
+                <span style={{ textAlign: "right", fontSize: 11.5, fontWeight: 700 }}>{r.amount}</span>
+                <span style={{ fontSize: 11, color: "#6B7180", fontWeight: 600 }}>{r.method}</span>
+                <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10, color: "#9AA0AE" }}>{r.esc}</span>
+                <span style={pillStyle(r.recon)}>{r.recon}</span>
+              </div>
+            ))}
+          </>
+        )}
+        {tab === "pdc" && (
+          <>
             <div style={{ padding: "20px 22px 6px" }}>
               <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: "-.015em" }}>Post-dated cheque register</div>
               <div style={{ fontSize: 11.5, color: "#9AA0AE", fontWeight: 500, marginTop: 3 }}>By presentation date · a bounced cheque raises a fee and a dunning event</div>
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "96px 96px 1.1fr 92px 104px 116px 96px", gap: 8, padding: "14px 22px", fontSize: 9.5, fontWeight: 700, letterSpacing: ".07em", color: "#9AA0AE", textTransform: "uppercase", borderBottom: "1px solid #EDEEF3" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "96px 96px 1.1fr 92px 104px 116px 96px", gap: 8, padding: "14px 22px", fontSize: 9.5, fontWeight: 700, letterSpacing: ".07em", color: "#9AA0AE", textTransform: "uppercase", borderBottom: "1px solid #EDEEF3", background: "#FAFBFD" }}>
               <span>Cheque</span><span>Present</span><span>Buyer</span><span>Unit</span><span style={{ textAlign: "right" }}>Amount</span><span>Bank</span><span>Status</span>
             </div>
-            {pdcRows.map((r, i) => (
-              <div key={i} style={{ display: "grid", gridTemplateColumns: "96px 96px 1.1fr 92px 104px 116px 96px", gap: 8, alignItems: "center", padding: "0 22px", height: 42, borderBottom: "1px solid #F6F7FA" }}>
+            {pdcList.map((r, i) => (
+              <div key={i} style={{ display: "grid", gridTemplateColumns: "96px 96px 1.1fr 92px 104px 116px 96px", gap: 8, alignItems: "center", padding: "0 22px", height: 44, borderBottom: "1px solid #F6F7FA" }}>
                 <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, fontWeight: 600 }}>{r.no}</span>
                 <span style={{ fontSize: 11.5, color: "#6B7180", fontWeight: 600 }}>{r.date}</span>
                 <span style={{ fontSize: 11.5, fontWeight: 600 }}>{r.buyer}</span>
                 <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10.5, color: "#4A5060" }}>{r.unit}</span>
                 <span style={{ textAlign: "right", fontSize: 11.5, fontWeight: 700 }}>{r.amount}</span>
                 <span style={{ fontSize: 11, color: "#6B7180", fontWeight: 600 }}>{r.bank}</span>
-                <span style={pillStyle(r.status)}>{r.status}</span>
+                <span>
+                  {livePdc.length && [...dbRows, ...extraRows].some((x) => (x.chequeNo || x.rcp) === r.no) ? (
+                    <select value={r.status} onChange={(e) => setPdcStatus(r, e.target.value)} style={{ width: 96, height: 28, borderRadius: 8, border: "1px solid #EDEEF3", background: "#fff", fontFamily: "inherit", fontSize: 11, fontWeight: 600, color: "#4A5060", outline: "none", padding: "0 4px" }}>
+                      {PDC_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  ) : (
+                    <span style={pillStyle(r.status)}>{r.status}</span>
+                  )}
+                </span>
               </div>
             ))}
-          </div>
+          </>
+        )}
+        {tab === "statement" && (
+          <>
+            <div style={{ padding: "20px 22px 6px" }}>
+              <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: "-.015em" }}>Bank statement · review queue</div>
+              <div style={{ fontSize: 11.5, color: "#9AA0AE", fontWeight: 500, marginTop: 3 }}>Imported lines auto-match to receipts · confirm or reject each suggestion</div>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "96px 1fr 104px 1.3fr 92px 132px", gap: 8, padding: "14px 22px", fontSize: 9.5, fontWeight: 700, letterSpacing: ".07em", color: "#9AA0AE", textTransform: "uppercase", borderBottom: "1px solid #EDEEF3", background: "#FAFBFD" }}>
+              <span>Value date</span><span>Reference</span><span style={{ textAlign: "right" }}>Amount</span><span>Description</span><span>Match</span><span style={{ textAlign: "right" }}>Action</span>
+            </div>
+            {stmtRows.length === 0 && (
+              <div style={{ padding: "26px 22px", fontSize: 12, color: "#9AA0AE", fontWeight: 600 }}>
+                No statement lines yet — use <strong>Import bank statement</strong> with CSV rows of date,reference,amount,description.
+              </div>
+            )}
+            {stmtRows.map((r, i) => (
+              <div key={i} style={{ display: "grid", gridTemplateColumns: "96px 1fr 104px 1.3fr 92px 132px", gap: 8, alignItems: "center", padding: "0 22px", height: 44, borderBottom: "1px solid #F6F7FA" }}>
+                <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, fontWeight: 600 }}>{r.date}</span>
+                <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, color: "#4A5060" }}>{r.reference}</span>
+                <span style={{ textAlign: "right", fontSize: 11.5, fontWeight: 700 }}>{(r.amount || 0).toLocaleString("en-US")}</span>
+                <span style={{ fontSize: 11, color: "#6B7180", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.description || "—"}</span>
+                <span style={pillStyle(r.matched ? "Matched" : "Unmatched")}>{r.matched ? "Matched" : "Unmatched"}</span>
+                <span style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
+                  {!r.matched && (
+                    <>
+                      <button onClick={() => actStmt(r.id, "confirm")} style={{ height: 28, borderRadius: 8, background: AC, color: "#fff", border: 0, padding: "0 10px", fontFamily: "inherit", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>Confirm</button>
+                      <button onClick={() => actStmt(r.id, "reject")} style={{ height: 28, borderRadius: 8, border: "1px solid #EDEEF3", background: "#fff", padding: "0 10px", fontFamily: "inherit", fontSize: 11, fontWeight: 700, color: "#9AA0AE", cursor: "pointer" }}>Reject</button>
+                    </>
+                  )}
+                </span>
+              </div>
+            ))}
+          </>
         )}
       </div>
 
@@ -247,6 +409,26 @@ export default function PaymentsScreen({ buyer }: { buyer?: string }) {
               <button onClick={() => setShowForm(false)} style={{ height: 40, borderRadius: 12, border: "1px solid #EDEEF3", background: "#fff", padding: "0 16px", fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, color: "#4A5060", cursor: "pointer" }}>Cancel</button>
               <div style={{ flex: 1 }} />
               <button onClick={record} style={{ height: 40, borderRadius: 12, background: AC, color: "#fff", border: 0, padding: "0 20px", fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}>Record &amp; issue receipt</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showImport && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(20,22,31,.35)", zIndex: 60, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ width: 520, background: "#fff", borderRadius: 22, padding: 24, boxShadow: "0 24px 60px rgba(20,22,31,.2)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+              <span style={{ flex: 1, fontSize: 17, fontWeight: 800, letterSpacing: "-.02em" }}>Import bank statement</span>
+              <button onClick={() => setShowImport(false)} style={{ width: 28, height: 28, borderRadius: 9, border: "1px solid #EDEEF3", background: "#fff", fontFamily: "inherit", fontSize: 13, fontWeight: 700, color: "#9AA0AE", cursor: "pointer" }}>&#10005;</button>
+            </div>
+            <div style={{ fontSize: 11.5, color: "#6B7180", fontWeight: 500, marginBottom: 12 }}>
+              Paste statement lines as CSV — <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10.5 }}>date,reference,amount,description</span>. Rows auto-match to receipts by amount &amp; reference.
+            </div>
+            <textarea value={csvText} onChange={(e) => setCsvText(e.target.value)} rows={8} placeholder={"date,reference,amount,description\n2026-09-01,RCP-H21-004789,1236000,MENON RM 3302"} style={{ width: "100%", borderRadius: 12, border: "1px solid #E4E6EE", padding: 12, fontSize: 12, fontWeight: 600, fontFamily: "'JetBrains Mono',monospace", boxSizing: "border-box", outline: "none", resize: "vertical", background: "#FAFBFD" }} />
+            <div style={{ display: "flex", gap: 10, marginTop: 18, paddingTop: 18, borderTop: "1px solid #F1F2F7" }}>
+              <button onClick={() => setShowImport(false)} style={{ height: 40, borderRadius: 12, border: "1px solid #EDEEF3", background: "#fff", padding: "0 16px", fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, color: "#4A5060", cursor: "pointer" }}>Cancel</button>
+              <div style={{ flex: 1 }} />
+              <button onClick={importCsv} style={{ height: 40, borderRadius: 12, background: AC, color: "#fff", border: 0, padding: "0 20px", fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}>Import &amp; auto-match</button>
             </div>
           </div>
         </div>

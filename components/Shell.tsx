@@ -193,6 +193,19 @@ export default function Shell({
   const [toast, setToast] = useState<string | null>(null);
   const [rtl, setRtl] = useState(false);
   const [notifs, setNotifs] = useState(NOTIFS);
+  const [live, setLive] = useState<{ receipts: any[]; docs: any[]; bookings: any[] }>({ receipts: [], docs: [], bookings: [] });
+  const [focusIdx, setFocusIdx] = useState(0);
+
+  useEffect(() => {
+    if (!cmdk) return;
+    let alive = true;
+    Promise.all([
+      fetch("/api/receipts").then((r) => r.ok ? r.json() : null).then((j) => (j && j.ok ? j.data.receipts : [])).catch(() => []),
+      fetch("/api/documents").then((r) => r.ok ? r.json() : null).then((j) => (j && j.ok ? j.data.docs : [])).catch(() => []),
+      fetch("/api/bookings").then((r) => r.ok ? r.json() : null).then((j) => (j && j.ok ? j.data.bookings : [])).catch(() => []),
+    ]).then(([receipts, docs, bookings]) => { if (alive) setLive({ receipts: receipts as any[], docs: docs as any[], bookings: bookings as any[] }); });
+    return () => { alive = false; };
+  }, [cmdk]);
 
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const showToast = useCallback((m: string) => {
@@ -206,6 +219,7 @@ export default function Shell({
   const closeCmdk = useCallback(() => {
     setCmdk(false);
     setQ("");
+    setFocusIdx(0);
   }, []);
 
   const closeMenus = useCallback(() => {
@@ -320,6 +334,8 @@ export default function Shell({
     { code: "ALL", name: "All projects (Portfolio)", pct: 68, units: 850 },
     ...PROJECTS.map((p) => ({ code: p.code, name: p.name, pct: Math.round((p.sold / p.units) * 100), units: p.units })),
   ];
+  const [swq, setSwq] = useState("");
+  const scopeHits = scopes.filter((s) => !swq || (s.code + " " + s.name).toLowerCase().includes(swq.toLowerCase()));
   const proj = PROJECTS.find((p) => p.code === scopeCode);
   const groupLabel = group === "project" ? "Project · " + (proj ? proj.code : scopeCode || "ALL") : NAV[group].label;
 
@@ -327,12 +343,32 @@ export default function Shell({
     (u) => !q || u.id.toLowerCase().includes(q.toLowerCase()) || u.typ.toLowerCase().includes(q.toLowerCase())
   ).slice(0, 4);
   const hitBuyers = BUYERS.filter((b) => !q || b.toLowerCase().includes(q.toLowerCase())).slice(0, 3);
+  const hitProjects = PROJECTS.filter((p) => !q || (p.code + " " + p.name + " " + p.loc).toLowerCase().includes(q.toLowerCase())).slice(0, 4);
+  const hitReceipts = (live.receipts || []).filter((r: any) => !q || (String(r.reference || "") + " " + (r.buyer || "") + " " + (r.unit || "")).toLowerCase().includes(q.toLowerCase())).slice(0, 4);
+  const hitDocs = (live.docs || []).filter((d: any) => !q || (String(d.ref || "") + " " + (d.type || "") + " " + (d.buyer || "")).toLowerCase().includes(q.toLowerCase())).slice(0, 4);
+  const hitBookings = (live.bookings || []).filter((b: any) => !q || (String(b.ref || "") + " " + String(b.unit_no || "") + " " + (b.buyer || "")).toLowerCase().includes(q.toLowerCase())).slice(0, 4);
   const hitActions = [
     { title: "Record payment", screen: "payments", group: "finance" as GroupId },
     { title: "New booking", screen: "booking", group: "sales" as GroupId },
     { title: "Escrow reconciliation", screen: "escrow", group: "finance" as GroupId },
     { title: "Collections worklist", screen: "collections", group: "finance" as GroupId },
+    { title: "Hold unit", screen: "inventory", group: "project" as GroupId },
+    { title: "Generate EOI", screen: "inventory", group: "project" as GroupId },
+    { title: "Export price list", screen: "inventory", group: "project" as GroupId },
   ].filter((a) => !q || a.title.toLowerCase().includes(q.toLowerCase()));
+
+  type PalItem = { group: string; key: string; title: string; sub: string; trail: string; icon: string; bg: string; fg: string; onClick: () => void };
+  const palette: PalItem[] = [
+    ...hitUnits.map((u) => ({ group: "Units", key: u.id, title: u.id, sub: u.typ + " · L" + u.f + " · " + u.area + " sq.ft", trail: money(u.price), icon: "⌗", bg: ST[u.status][1], fg: ST[u.status][0], onClick: () => { closeCmdk(); navigate("unit", "project", { unit: u.id }); } })),
+    ...hitBuyers.map((b, i) => ({ group: "Buyers", key: b, title: b, sub: "H21-B-00" + (147 + i) + " · 2 units", trail: "AED " + (1.9 - i * 0.4).toFixed(1) + "M out", icon: b[0], bg: "#E7E9F0", fg: "#4A5060", onClick: () => { closeCmdk(); navigate("buyer", "sales", { name: b }); } })),
+    ...hitProjects.map((p) => ({ group: "Projects", key: p.code, title: p.name, sub: p.code + " · " + p.loc, trail: Math.round((p.sold / p.units) * 100) + "% sold", icon: p.code[0], bg: "#EDECFE", fg: AC, onClick: () => { closeCmdk(); onScope && onScope(p.code); } })),
+    ...hitReceipts.map((r: any) => ({ group: "Receipts", key: "R" + r.id + (r.reference || ""), title: r.reference || "RCP-…", sub: (r.buyer || "—") + " · " + (r.unit || r.project || "") + " · " + r.date, trail: money(r.amount), icon: "₪", bg: "#E9F8F1", fg: "#1F9D6B", onClick: () => { closeCmdk(); navigate("payments", "finance"); } })),
+    ...hitDocs.map((d: any) => ({ group: "Documents", key: d.ref + d.type, title: d.ref, sub: (d.type || "") + " · " + (d.buyer || ""), trail: d.status || "", icon: "◳", bg: "#FDF4E5", fg: "#B07B14", onClick: () => { closeCmdk(); navigate("documents", "sales"); } })),
+    ...hitBookings.map((b: any) => ({ group: "Bookings", key: b.ref + b.unit_no, title: b.ref || "BKG-…", sub: (b.unit_no || "") + " · " + (b.buyer || ""), trail: money(b.net_price || 0), icon: "▤", bg: "#F1EEFE", fg: AC, onClick: () => { closeCmdk(); navigate("booking", "sales"); } })),
+    ...hitActions.map((a) => ({ group: "Actions", key: a.title, title: a.title, sub: "Action", trail: "↵", icon: "›", bg: "#EDECFE", fg: AC, onClick: () => { closeCmdk(); navigate(a.screen, a.group); } })),
+  ];
+  const palGroups = Array.from(new Set(palette.map((i) => i.group))).map((label) => ({ label, items: palette.filter((i) => i.group === label) }));
+  const totalItems = Math.max(palette.length, 1);
 
   const sideInFlow = win.bp === "laptop" || win.bp === "desktop";
   const railVisible = win.bp !== "mobile";
@@ -365,7 +401,11 @@ export default function Shell({
       </button>
       {switcher && (
         <div style={{ marginTop: 8, background: "#fff", border: "1px solid #EDEEF3", borderRadius: 14, boxShadow: "0 12px 32px rgba(20,22,31,.10)", padding: 6, display: "flex", flexDirection: "column", gap: 2 }}>
-          {scopes.map((s) => {
+          <div style={{ position: "relative", display: "flex", alignItems: "center", margin: "2px 2px 4px" }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#9AA0AE" strokeWidth="2" style={{ position: "absolute", left: 10 }}><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
+            <input value={swq} onChange={(e) => setSwq(e.target.value)} placeholder="Search projects…" style={{ width: "100%", height: 32, border: "1px solid #EDEEF3", borderRadius: 10, background: "#F8F9FB", padding: "0 28px", fontFamily: "inherit", fontSize: 11.5, outline: "none", color: "#14161F" }} />
+          </div>
+          {scopeHits.map((s) => {
             const on = (scopeCode || "ALL") === s.code;
             return (
               <button key={s.code} onClick={() => { onScope && onScope(s.code); setSwitcher(false); }} style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 8px", border: 0, borderRadius: 11, cursor: "pointer", fontFamily: "inherit", background: on ? "#F5F6FA" : "transparent" }}>
@@ -512,16 +552,42 @@ export default function Shell({
               <input
                 ref={inputRef}
                 value={q}
-                onChange={(e) => setQ(e.target.value)}
+                onChange={(e) => { setQ(e.target.value); setFocusIdx(0); }}
+                onKeyDown={(e) => {
+                  if (e.key === "ArrowDown") { e.preventDefault(); setFocusIdx((a) => (a + 1) % totalItems); }
+                  else if (e.key === "ArrowUp") { e.preventDefault(); setFocusIdx((a) => (a - 1 + totalItems) % totalItems); }
+                  else if ((e.key === "Enter") && palette[focusIdx]) { e.preventDefault(); palette[focusIdx].onClick(); }
+                }}
                 placeholder="Search units, buyers, receipts…"
                 style={{ flex: 1, border: 0, outline: "none", fontFamily: "inherit", fontSize: 13.5, color: "#14161F", background: "transparent" }}
               />
               <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10, fontWeight: 600, background: "#F5F6FA", border: "1px solid #E4E6EE", borderRadius: 6, padding: "2px 6px", color: "#6B7180" }}>Esc</span>
             </div>
             <div style={{ maxHeight: 360, overflow: "auto", padding: "8px" }}>
-              {hitUnits.length > 0 && <Group label="Units" items={hitUnits.map((u) => ({ key: u.id, title: u.id, sub: u.typ + " · L" + u.f + " · " + u.area + " sq.ft", trail: money(u.price), icon: "⌗", bg: ST[u.status][1], fg: ST[u.status][0], onClick: () => { closeCmdk(); navigate("unit", "project", { unit: u.id }); } }))} />}
-              {hitBuyers.length > 0 && <Group label="Buyers" items={hitBuyers.map((b, i) => ({ key: b, title: b, sub: "H21-B-00" + (147 + i) + " · 2 units", trail: "AED " + (1.9 - i * 0.4).toFixed(1) + "M out", icon: b[0], bg: "#E7E9F0", fg: "#4A5060", onClick: () => { closeCmdk(); navigate("buyer", "sales", { name: b }); } }))} />}
-              {hitActions.length > 0 && <Group label="Actions" items={hitActions.map((a) => ({ key: a.title, title: a.title, sub: "Action", trail: "↵", icon: "›", bg: "#EDECFE", fg: AC, onClick: () => { closeCmdk(); navigate(a.screen, a.group); } }))} />}
+              {palette.length === 0 && <div style={{ padding: "28px 12px", textAlign: "center", fontSize: 12.5, color: "#9AA0AE", fontWeight: 500 }}>No results for “{q}”</div>}
+              {palGroups.map((grp) => (
+                <div key={grp.label}>
+                  <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: ".09em", color: "#9AA0AE", textTransform: "uppercase", padding: "8px 10px 4px" }}>{grp.label}</div>
+                  {grp.items.map((it) => {
+                    const gi = palette.indexOf(it);
+                    return (
+                      <button
+                        key={it.key}
+                        onClick={it.onClick}
+                        onMouseEnter={() => setFocusIdx(gi)}
+                        style={{ width: "100%", display: "flex", alignItems: "center", gap: 11, padding: "8px 10px", border: 0, background: focusIdx === gi ? "#F5F6FA" : "transparent", borderRadius: 11, cursor: "pointer", fontFamily: "inherit", textAlign: "left" }}
+                      >
+                        <span style={{ width: 30, height: 30, flex: "none", borderRadius: 10, background: it.bg, color: it.fg, display: "grid", placeItems: "center", fontSize: 13, fontWeight: 700 }}>{it.icon}</span>
+                        <span style={{ flex: 1, minWidth: 0 }}>
+                          <span style={{ display: "block", fontSize: 12.5, fontWeight: 600 }}>{it.title}</span>
+                          <span style={{ display: "block", fontSize: 10.5, color: "#9AA0AE" }}>{it.sub}</span>
+                        </span>
+                        <span style={{ fontSize: 11.5, fontWeight: 700, color: "#6B7180", whiteSpace: "nowrap" }}>{it.trail}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              ))}
             </div>
           </div>
         </div>
@@ -833,23 +899,5 @@ function TopbarFloating({
         </div>
       )}
     </>
-  );
-}
-
-function Group({ label, items }: { label: string; items: { key: string; title: string; sub: string; trail: string; icon: string; bg: string; fg: string; onClick: () => void }[] }) {
-  return (
-    <div>
-      <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: ".09em", color: "#9AA0AE", textTransform: "uppercase", padding: "8px 10px 4px" }}>{label}</div>
-      {items.map((it) => (
-        <button key={it.key} onClick={it.onClick} style={{ width: "100%", display: "flex", alignItems: "center", gap: 11, padding: "8px 10px", border: 0, background: "transparent", borderRadius: 11, cursor: "pointer", fontFamily: "inherit", textAlign: "left" }}>
-          <span style={{ width: 30, height: 30, flex: "none", borderRadius: 10, background: it.bg, color: it.fg, display: "grid", placeItems: "center", fontSize: 13, fontWeight: 700 }}>{it.icon}</span>
-          <span style={{ flex: 1, minWidth: 0 }}>
-            <span style={{ display: "block", fontSize: 12.5, fontWeight: 600 }}>{it.title}</span>
-            <span style={{ display: "block", fontSize: 10.5, color: "#9AA0AE" }}>{it.sub}</span>
-          </span>
-          <span style={{ fontSize: 11.5, fontWeight: 700, color: "#6B7180", whiteSpace: "nowrap" }}>{it.trail}</span>
-        </button>
-      ))}
-    </div>
   );
 }

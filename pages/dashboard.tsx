@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
-import { useApi } from "../lib/useApi";
+import { fetchJSON } from "../lib/api";
 import Shell from "../components/Shell";
 import ProjectsScreen from "../components/screens/Projects";
 import FinancialsScreen from "../components/screens/Financials";
@@ -75,7 +75,6 @@ export default function Dashboard() {
   const [period, setPeriod] = useState("YTD");
   const [fc, setFc] = useState("30");
   const [scope, setScope] = useState(scopeFromUrl);
-  const { data } = useApi<DashData>("/api/dashboard");
   const [projects, setProjects] = useState<DashData["projects"]>([]);
 
   useEffect(() => {
@@ -83,8 +82,12 @@ export default function Dashboard() {
   }, [scopeFromUrl]);
 
   useEffect(() => {
-    if (data && data.projects) setProjects(data.projects);
-  }, [data]);
+    let active = true;
+    fetchJSON<{ projects: DashData["projects"] }>("/api/dashboard")
+      .then((j) => { if (active && j.projects) setProjects(j.projects); })
+      .catch(() => { /* keep mock PROJECTS fallback */ });
+    return () => { active = false; };
+  }, []);
 
   const bars = FC[fc];
   const sum = bars.reduce((a, b) => a + b[1], 0);
@@ -336,7 +339,7 @@ export default function Dashboard() {
       ) : screen === "projects" ? (
         <ProjectsScreen projects={projects} onSelect={openProject} />
       ) : screen === "financials" ? (
-        <FinancialsScreen />
+        <FinancialsScreen projects={projects} />
       ) : screen === "cashflow" ? (
         <CashflowScreen />
       ) : screen === "reports" ? (

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { AC } from "../../lib/format";
 import { fetchJSON } from "../../lib/api";
+import { KpiSkeleton, PanelSkeleton } from "../Loading";
 
 type SnagRow = { unit: string; loc: string; trade: string; desc: string; sev: string; contractor: string; status: string; reinspect: string };
 
@@ -39,11 +40,13 @@ export default function SnaggingScreen() {
   const [contractor, setContractor] = useState("ALEC \u00b7 MEP");
   const [err, setErr] = useState("");
   const [apiError, setApiError] = useState("");
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     let active = true;
     fetchJSON<{ snagging: { unit_no: string; loc: string; trade: string; desc: string; sev: string; contractor: string; status: string; reinspect: string }[] }>("/api/handover")
       .then((j) => {
+        if (active) setLoaded(true);
         if (!active || !Array.isArray(j.snagging)) return;
         const mapped: SnagRow[] = j.snagging.map((s) => ({
           unit: s.unit_no || "",
@@ -58,7 +61,7 @@ export default function SnaggingScreen() {
         if (mapped.length) setRows(mapped);
       })
       .catch((e) => {
-        if (active) setApiError(e?.message || "Failed to load snags");
+        if (active) { setLoaded(true); setApiError(e?.message || "Failed to load snags"); }
       });
     return () => { active = false; };
   }, []);
@@ -96,6 +99,17 @@ export default function SnaggingScreen() {
 
   const selPill = (on: boolean) => ({ fontSize: 11.5, fontWeight: 700, padding: "7px 12px", borderRadius: 10, cursor: "pointer", background: on ? AC : "#F1F2F6", color: on ? "#fff" : "#4A5060" });
   const label = (t: string) => <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".05em", color: "#9AA0AE", textTransform: "uppercase", marginBottom: 6 }}>{t}</div>;
+
+  if (!loaded) {
+    return (
+      <div>
+        <KpiSkeleton count={6} />
+        <div style={{ marginTop: 16 }}>
+          <PanelSkeleton headerW={180} rows={8} cols={7} />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>
