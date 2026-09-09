@@ -4,6 +4,8 @@ import { AC, money } from "../../lib/format";
 import { exportBuyerStatement, exportDocument } from "../../lib/pdf";
 import { fetchJSON } from "../../lib/api";
 import { KpiSkeleton, PanelSkeleton } from "../Loading";
+import BuyerPortalInvite from "../portal/BuyerPortalInvite";
+import BrokerPortalEnable from "../portal/BrokerPortalEnable";
 
 const pill = (s: string, ok: boolean) =>
   ({ fontSize:10,fontWeight:700,borderRadius:7,padding:"3px 8px",textAlign:"center" as const,background:ok?"#E9F8F1":"#F1F2F6",color:ok?"#1F9D6B":"#6B7180" });
@@ -1380,7 +1382,6 @@ function BuyersDirectory({ onOpen }: { onOpen: (id: number) => void }) {
 function Buyer360({ btab, setBtab, goUnit }: { btab:string; setBtab:(v:any)=>void; goUnit:(id:string)=>void }) {
   const router = useRouter();
   const [sent, setSent] = useState(false);
-  const [portalOn, setPortalOn] = useState(true);
   const [extraDocs, setExtraDocs] = useState<{ doc_type: string; ref: string }[]>([]);
   const [chan, setChan] = useState("Email");
   const [msgSubject, setMsgSubject] = useState("");
@@ -1664,12 +1665,11 @@ function Buyer360({ btab, setBtab, goUnit }: { btab:string; setBtab:(v:any)=>voi
                 </div>
               ))}
             </div>
-            <div style={{ marginTop:16, background:"#F7F8FB", borderRadius:14, padding:"14px 16px", display:"flex", alignItems:"center", gap:12 }}>
-              <span style={{ flex:1, fontSize:12.5, fontWeight:700 }}>Buyer portal access</span>
+            <div style={{ marginTop:16, background:"#F7F8FB", borderRadius:14, padding:"14px 16px" }}>
               {live ? (
-                <button onClick={() => setPortalOn(!portalOn)} style={{ height:32, borderRadius:10, border:0, cursor:"pointer", fontFamily:"inherit", fontSize:11.5, fontWeight:700, padding:"0 14px", background:portalOn ? "#E9F8F1" : "#F1F2F6", color:portalOn ? "#1F9D6B" : "#9AA0AE" }}>{portalOn ? "Enabled" : "Disabled"}</button>
+                <BuyerPortalInvite buyerId={live.id} buyerName={live.name} buyerEmail={live.email} />
               ) : (
-                <span style={{ fontSize:11.5, fontWeight:700, color:"#9AA0AE" }}>Staging \u00b7 no portal seats</span>
+                <span style={{ fontSize:12.5, fontWeight:700, color:"#9AA0AE" }}>Staging \u00b7 portal invite available once the buyer is linked</span>
               )}
             </div>
           </div>
@@ -1824,6 +1824,7 @@ function Brokers({ brtab, setBrtab, brstep, setBrstep }: { brtab:string; setBrta
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [portalAgency, setPortalAgency] = useState<BrokAgency | null>(null);
 
   const banner = (m: string) => { setNotice(m); setTimeout(() => setNotice(""), 3800); };
 
@@ -1933,6 +1934,7 @@ function Brokers({ brtab, setBrtab, brstep, setBrstep }: { brtab:string; setBrta
                 <span style={{textAlign:"right",fontSize:11.5,fontWeight:700}}>{a.rate}</span>
                 <span style={{fontSize:10,fontWeight:700,borderRadius:7,padding:"3px 8px",textAlign:"center",background:pill.bg,color:pill.color}}>{brokLabel(a.status)}</span>
                 <span style={{display:"flex",gap:6,justifyContent:"flex-end"}}>
+                  <button onClick={() => setPortalAgency(portalAgency && portalAgency.id === a.id ? null : a)} style={{height:28,borderRadius:9,border:"1px solid #EDEEF3",background:portalAgency && portalAgency.id === a.id ? "#F0EFFE" : "#fff",padding:"0 10px",fontFamily:"inherit",fontSize:10.5,fontWeight:700,color:portalAgency && portalAgency.id === a.id ? AC : "#4A5060",cursor:"pointer"}}>Portal</button>
                   <button style={{height:28,borderRadius:9,border:"1px solid #EDEEF3",background:"#fff",padding:"0 10px",fontFamily:"inherit",fontSize:10.5,fontWeight:700,color:"#4A5060",cursor:"pointer"}}>Allocation</button>
                   <button onClick={() => toggleStatus(a)} disabled={busy} style={{height:28,borderRadius:9,border:0,background:"#F0EFFE",padding:"0 10px",fontFamily:"inherit",fontSize:10.5,fontWeight:700,color:AC,cursor:"pointer"}}>{a.status === "active" ? "Suspend" : a.status === "suspended" ? "Reinstate" : "Go live"}</button>
                 </span>
@@ -1940,6 +1942,10 @@ function Brokers({ brtab, setBrtab, brstep, setBrstep }: { brtab:string; setBrta
             );
           })}
         </div>
+      )}
+
+      {portalAgency && (
+        <BrokerPortalEnable agencyId={portalAgency.id} agencyName={portalAgency.name} onDone={() => {}} />
       )}
 
       {/* agents table */}

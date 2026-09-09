@@ -32,7 +32,9 @@ function requireSecret(): string {
   throw new Error("JWT_SECRET is not set");
 }
 
-export async function sign(payload: Omit<Session, "exp"> & { exp?: number }): Promise<string> {
+export async function sign(
+  payload: { exp?: number } & Record<string, unknown>
+): Promise<string> {
   const SECRET = requireSecret();
   const exp = payload.exp ?? Date.now() + 86400000;
   const body = btoa(JSON.stringify({ ...payload, exp }));
@@ -40,7 +42,7 @@ export async function sign(payload: Omit<Session, "exp"> & { exp?: number }): Pr
   return `${body}.${sig}`;
 }
 
-export async function verify(token: string | undefined | null): Promise<Session | null> {
+export async function verify<T = Session>(token: string | undefined | null): Promise<T | null> {
   if (!token) return null;
   let SECRET: string;
   try {
@@ -55,7 +57,7 @@ export async function verify(token: string | undefined | null): Promise<Session 
   try {
     const payload = JSON.parse(atob(body)) as Session;
     if (payload.exp && payload.exp < Date.now()) return null;
-    return payload;
+    return payload as unknown as T;
   } catch {
     return null;
   }
