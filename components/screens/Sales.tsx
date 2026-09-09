@@ -347,7 +347,14 @@ function Leads({ onNewBooking, onBookLead, goRegister }: { onNewBooking: () => v
   const [dragId, setDragId] = useState<number | null>(null);
   const [sel, setSel] = useState<Card | null>(null);
   const [notice, setNotice] = useState("");
+  const [view, setView] = useState<"kanban" | "table">("kanban");
   const warn = (m: string) => { setNotice(m); setTimeout(() => setNotice(""), 4000); };
+
+  const allCards = cols.flatMap((c) => c.cards.map((k) => ({ ...k, stage: c.label })));
+  const sourceCounts: Record<string, number> = {};
+  allCards.forEach((k) => { sourceCounts[k.src] = (sourceCounts[k.src] || 0) + 1; });
+  const sourceRows = Object.entries(sourceCounts).sort((a, b) => b[1] - a[1]);
+  const viewings = allCards.filter((k) => k.stage === "Viewing" || k.stage === "Qualified" || k.stage === "EOI signed");
 
   const moveLead = (targetLabel: string) => {
     if (dragId == null || !dbCols) return;
@@ -435,7 +442,75 @@ function Leads({ onNewBooking, onBookLead, goRegister }: { onNewBooking: () => v
         <button onClick={goRegister} style={{height:38,borderRadius:12,border:"1px solid #EDEEF3",background:"#fff",padding:"0 16px",fontFamily:"inherit",fontSize:12.5,fontWeight:700,color:"#4A5060",cursor:"pointer"}}>Bookings register</button>
       </div>
 
-      {/* funnel */}
+      <div style={{display:"flex",gap:4,background:"#fff",border:"1px solid #EDEEF3",borderRadius:12,padding:4,marginBottom:16,width:"fit-content"}}>
+        {([["kanban", "Kanban"], ["table", "Table"]] as const).map(([k, label]) => (
+          <button key={k} onClick={() => setView(k)} style={tabBtn(view === k)}>{label}</button>
+        ))}
+      </div>
+
+      {view === "table" ? (
+        <div style={{ background:"#fff", borderRadius:20, boxShadow:"0 1px 3px rgba(20,22,31,.04)", overflow:"hidden", marginBottom:16 }}>
+          <div style={{ display:"grid", gridTemplateColumns:"1.5fr 1.1fr 1.3fr 0.9fr 1fr 1.5fr 0.9fr", gap:10, padding:"14px 22px", fontSize:9.5, fontWeight:700, letterSpacing:".07em", color:"#9AA0AE", textTransform:"uppercase", background:"#FAFBFD", borderBottom:"1px solid #EDEEF3" }}>
+            <span>Lead</span><span>Source</span><span>Budget</span><span>Stage</span><span>Agent</span><span>Chips</span><span style={{textAlign:"right"}}>Status</span>
+          </div>
+          {allCards.map((k) => (
+            <div key={k.id ?? k.name} onClick={() => setSel(k)} style={{ display:"grid", gridTemplateColumns:"1.5fr 1.1fr 1.3fr 0.9fr 1fr 1.5fr 0.9fr", gap:10, alignItems:"center", padding:"0 22px", height:56, borderBottom:"1px solid #F6F7FA", cursor:"pointer" }}>
+              <span style={{ display:"flex", alignItems:"center", gap:10, minWidth:0 }}>
+                <span style={{ width:26, height:26, flex:"none", borderRadius:8, background:"#EDECFE", display:"grid", placeItems:"center", fontSize:9, fontWeight:800, color:AC }}>{k.agent}</span>
+                <span style={{ fontSize:12.5, fontWeight:700, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{k.name}</span>
+              </span>
+              <span style={{ fontSize:11.5, fontWeight:600, color:"#6B7180" }}>{k.src}</span>
+              <span style={{ fontSize:12, fontWeight:800 }}>{k.budget}</span>
+              <span style={{ fontSize:11.5, fontWeight:700 }}>{k.stage}</span>
+              <span style={{ fontSize:11.5, fontWeight:600, color:"#6B7180" }}>{k.agent}</span>
+              <span style={{ fontSize:11.5, fontWeight:600, color:"#6B7180" }}>{k.chips.join(" \u00b7 ") || "\u2014"}</span>
+              <span style={{ textAlign:"right", display:"flex", justifyContent:"flex-end", gap:6 }}>
+                <span style={{ width:7, height:7, borderRadius:5, background:k.live?"#34C08A":"#E2A33C", marginTop:2 }} />
+                <span style={{ fontSize:10.5, fontWeight:700, color:"#9AA0AE" }}>{k.live ? "active" : "inactive"}</span>
+              </span>
+            </div>
+          ))}
+          {allCards.length === 0 && <div style={{ padding:"18px 22px", textAlign:"center", fontSize:12.5, color:"#9AA0AE", fontWeight:600 }}>No leads in the pipeline yet</div>}
+        </div>
+      ) : (
+      <>
+      {/* source strip */}
+      <div style={{background:"#fff",borderRadius:20,padding:"16px 20px",boxShadow:"0 1px 3px rgba(20,22,31,.04)",marginBottom:16}}>
+        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
+          <div style={{fontSize:13,fontWeight:800,letterSpacing:"-.02em"}}>Source attribution</div>
+          <span style={{fontSize:10.5,fontWeight:600,color:"#9AA0AE"}}>Leads by origin \u00b7 share of pipeline</span>
+        </div>
+        <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
+          {sourceRows.map(([src, n]) => (
+            <span key={src} style={{display:"inline-flex",alignItems:"center",gap:7,borderRadius:10,border:"1px solid #EDEEF3",background:"#fff",padding:"6px 11px",fontSize:11.5,fontWeight:700}}>
+              <span style={{width:7,height:7,borderRadius:4,background:AC}} />
+              {src}
+              <span style={{color:"#9AA0AE",fontWeight:600}}>{n}</span>
+            </span>
+          ))}
+          {sourceRows.length === 0 && <span style={{fontSize:12,color:"#9AA0AE",fontWeight:600}}>No source attribution yet</span>}
+        </div>
+      </div>
+
+      {/* viewings */}
+      <div style={{background:"#fff",borderRadius:20,padding:"18px 20px",boxShadow:"0 1px 3px rgba(20,22,31,.04)",marginBottom:16}}>
+        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
+          <div style={{fontSize:13,fontWeight:800,letterSpacing:"-.02em"}}>Next viewings</div>
+          <span style={{fontSize:10.5,fontWeight:600,color:"#9AA0AE"}}>Qualified leads awaiting site visits \u00b7 times TBC</span>
+        </div>
+        <div style={{display:"flex",gap:9,overflowX:"auto",paddingBottom:4}}>
+          {viewings.slice(0, 12).map((k, i) => (
+            <div key={k.id ?? k.name} onClick={() => setSel(k)} style={{flex:"none",width:150,borderRadius:14,border:"1px solid #EDEEF3",padding:"11px 13px",cursor:"pointer"}}>
+              <div style={{fontSize:10,fontWeight:700,color:AC}}>{"\u203a"} {k.stage}</div>
+              <div style={{fontSize:12.5,fontWeight:800,marginTop:6}}>{k.name}</div>
+              <div style={{fontSize:11,color:"#9AA0AE",fontWeight:600,marginTop:3}}>{k.agent} \u00b7 {k.src}</div>
+              <div style={{display:"inline-flex",alignItems:"center",gap:6,marginTop:9,fontSize:10.5,fontWeight:700,color:"#6B7180",background:"#F1F2F6",borderRadius:7,padding:"3px 8px"}}>day +{i} \u00b7 slot TBC</div>
+            </div>
+          ))}
+          {viewings.length === 0 && <span style={{fontSize:12,color:"#9AA0AE",fontWeight:600}}>No viewings scheduled yet</span>}
+        </div>
+      </div>
+
       <div style={{background:"#fff",borderRadius:20,padding:"20px 24px",boxShadow:"0 1px 3px rgba(20,22,31,.04)",marginBottom:16}}>
         <div style={{display:"flex",alignItems:"flex-end",gap:6}}>
           {funnelRows.map(([label,val,days],i) => (
@@ -522,6 +597,8 @@ function Leads({ onNewBooking, onBookLead, goRegister }: { onNewBooking: () => v
           </div>
         ))}
       </div>
+      </>
+      )}
       {sel && (() => {
         const col = cols.find((c) => c.cards.some((k) => k === sel));
         return (
@@ -538,6 +615,8 @@ function Leads({ onNewBooking, onBookLead, goRegister }: { onNewBooking: () => v
    LEAD DRAWER
    ═══════════════════════════════════════════════════════════════════ */
 function LeadDrawer({ lead, stage, color, onClose, onBook }: { lead: Card; stage: string; color: string; onClose: () => void; onBook: () => void }) {
+  const [notes, setNotes] = useState<string[]>([]);
+  const [noteText, setNoteText] = useState("");
   const disc = lead.disc != null ? lead.disc + "%" : "\u2014";
   const days = lead.days != null ? lead.days + " days" : "\u2014";
   const row = (l: string, v: string, mono = false) => (
@@ -573,6 +652,33 @@ function LeadDrawer({ lead, stage, color, onClose, onBook }: { lead: Card; stage
             {row("Budget", lead.budget || "\u2014", true)}
             {row("Discount", disc)}
             {row("Days to close", days)}
+          </div>
+          <div style={{ marginTop: 16 }}>
+            <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".05em", color: "#9AA0AE", textTransform: "uppercase", marginBottom: 6 }}>Documents</div>
+            {(["Unit sales offer", "Reservation form", "SPA draft"] as const).map((d) => (
+              <div key={d} style={{ display: "flex", justifyContent: "space-between", gap: 12, padding: "9px 0", borderBottom: "1px solid #F3F4F8" }}>
+                <span style={{ fontSize: 11.5, fontWeight: 600 }}>{d}</span>
+                <span style={pill("pending", false)}>to generate</span>
+              </div>
+            ))}
+          </div>
+          <div style={{ marginTop: 16 }}>
+            <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".05em", color: "#9AA0AE", textTransform: "uppercase", marginBottom: 6 }}>Notes</div>
+            {notes.length > 0 && (
+              <div style={{ marginBottom: 10 }}>
+                {notes.map((n, i) => (
+                  <div key={i} style={{ display: "flex", justifyContent: "space-between", gap: 12, padding: "9px 0", borderBottom: "1px solid #F3F4F8" }}>
+                    <span style={{ fontSize: 11.5, fontWeight: 600 }}>{n}</span>
+                    <span style={{ fontSize: 10, color: "#9AA0AE", fontWeight: 600, whiteSpace: "nowrap" }}>just now</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div style={{ display: "flex", gap: 8 }}>
+              <input value={noteText} onChange={(e) => setNoteText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && noteText.trim()) { setNotes((n) => [...n, noteText.trim()]); setNoteText(""); } }} placeholder="Add a follow-up note\u2026"
+                style={{ flex: 1, height: 34, borderRadius: 10, border: "1px solid #E4E6EE", background: "#fff", padding: "0 12px", fontSize: 12, fontWeight: 600, fontFamily: "inherit", outline: "none" }} />
+              <button onClick={() => { if (noteText.trim()) { setNotes((n) => [...n, noteText.trim()]); setNoteText(""); } }} style={{ height: 34, borderRadius: 10, border: 0, background: "#F0EFFE", color: AC, padding: "0 14px", fontFamily: "inherit", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>Add</button>
+            </div>
           </div>
           <div style={{ marginTop: 16 }}>
             <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".05em", color: "#9AA0AE", textTransform: "uppercase", marginBottom: 6 }}>Activity</div>
