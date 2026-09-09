@@ -193,6 +193,7 @@ export default function Shell({
   const [toast, setToast] = useState<string | null>(null);
   const [rtl, setRtl] = useState(false);
   const [notifs, setNotifs] = useState(NOTIFS);
+  const [ticker, setTicker] = useState("AED 4.2M");
   const [live, setLive] = useState<{ receipts: any[]; docs: any[]; bookings: any[] }>({ receipts: [], docs: [], bookings: [] });
   const [focusIdx, setFocusIdx] = useState(0);
 
@@ -206,6 +207,34 @@ export default function Shell({
     ]).then(([receipts, docs, bookings]) => { if (alive) setLive({ receipts: receipts as any[], docs: docs as any[], bookings: bookings as any[] }); });
     return () => { alive = false; };
   }, [cmdk]);
+
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/finance")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => {
+        if (!alive || !j || !j.ok) return;
+        const d = j.data || {};
+        const collections: any[] = d.collections || [];
+        const escrow: any[] = (d.escrow && d.escrow.queue) || [];
+        const drawdowns: any[] = (d.escrow && d.escrow.drawdowns) || [];
+        const fmtM = (v: number) => (v >= 1e6 ? "AED " + (v / 1e6).toFixed(1).replace(/\.0$/, "") + "M" : money(Math.round(v)));
+        const due = collections.reduce((a: number, c: any) => a + (Number(c.amount) || 0), 0);
+        const over90 = collections.filter((c: any) => (Number(c.days_due) || 0) >= 90);
+        const variance = escrow.reduce((a: number, e: any) => a + (Number(e.amount) || 0), 0);
+        const awaiting = drawdowns.filter((x: any) => String(x.status || "") === "Awaiting trustee").length;
+        if (due > 0) setTicker(fmtM(due));
+        const ns: typeof NOTIFS = [];
+        const note = (who: string, what: string, unread: boolean) => { ns.push({ id: "n" + (ns.length + 1), who, what, time: unread ? "now" : "today", unread }); };
+        if (over90.length) note("Collections", over90.length + " units overdue >90 days \u2014 " + fmtM(over90.reduce((a: number, c: any) => a + (Number(c.amount) || 0), 0)), true);
+        if (escrow.length) note("Escrow", escrow.length + " escrow entries unmatched \u2014 " + fmtM(variance), true);
+        if (awaiting) note("Drawdowns", awaiting + " drawdowns awaiting trustee approval", false);
+        if (collections.length) note("Collections", collections.length + " items on the collections worklist", false);
+        if (ns.length) setNotifs(ns);
+      })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, []);
 
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const showToast = useCallback((m: string) => {
@@ -384,7 +413,7 @@ export default function Shell({
   const renderSidebar = () => (
     <>
       <div style={{ fontSize: 15, fontWeight: 800, letterSpacing: "-.02em", padding: "0 8px" }}>Ellington</div>
-      <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: ".06em", color: "#9AA0AE", textTransform: "uppercase", padding: "3px 8px 0" }}>ORN 21281 · H21</div>
+      <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: ".06em", color: "#9AA0AE", textTransform: "uppercase", padding: "3px 8px 0" }}>ORN 21281 \u00b7 {scopeCode || "ALL"}</div>
       <button
         onClick={() => {
           closeMenus();
@@ -492,6 +521,7 @@ export default function Shell({
           onHelp={() => { closeMenus(); setHelp((h) => !h); }}
           onMenu={dlg || win.bp === "tablet" ? () => setDrawer(true) : undefined}
           group={group}
+          ticker={ticker}
           user={user}
         /> 
 
@@ -700,6 +730,7 @@ function Topbar({
   onHelp,
   onMenu,
   group,
+  ticker,
   user,
 }: {
   crumbs: string[];
@@ -714,6 +745,7 @@ function Topbar({
   onHelp: () => void;
   onMenu?: () => void;
   group?: GroupId;
+  ticker?: string;
   user: SessionUser | null | undefined;
 }) {
   const name = user?.full_name || "";
@@ -747,7 +779,7 @@ function Topbar({
         <button onClick={() => { onCollections(); }} style={{ height: 34, border: "1px solid #EDEEF3", background: "#F5F6FA", borderRadius: 11, padding: "0 12px", display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontFamily: "inherit" }}>
           <span style={{ width: 6, height: 6, borderRadius: 6, background: "#34C08A" }} />
           <span style={{ fontSize: 11.5, fontWeight: 600, color: "#6B7180" }}>Due today</span>
-          <span style={{ fontSize: 12, fontWeight: 800, letterSpacing: "-.01em" }}>AED 4.2M</span>
+          <span style={{ fontSize: 12, fontWeight: 800, letterSpacing: "-.01em" }}>{ticker || "AED 0"}</span>
         </button>
         <button
           onClick={() => { onHelp(); }}
