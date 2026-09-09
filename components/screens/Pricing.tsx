@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { AC, money } from "../../lib/format";
 import { ramp } from "../../lib/data";
-import { PROJECTS } from "../../lib/data";
 import { fetchJSON } from "../../lib/api";
 
 const BANDS = ["L1-10", "L11-20", "L21-30", "L31-40", "L41-45"];
@@ -59,8 +58,6 @@ function isSold(r: InvRow): boolean {
 }
 
 export default function PricingScreen({ scope = "ALL" }: { scope?: string }) {
-  const proj = PROJECTS.find((p) => p.code === scope);
-  const projName = proj ? proj.name : "Belgravia Heights III";
   const [sel, setSel] = useState("Unsold \u00b7 floors 38\u201345");
   const [selOpen, setSelOpen] = useState(false);
   const [chg, setChg] = useState("Increase by 3.0%");
@@ -70,12 +67,17 @@ export default function PricingScreen({ scope = "ALL" }: { scope?: string }) {
   const [submitted, setSubmitted] = useState(false);
   const [histOpen, setHistOpen] = useState(false);
   const [rows, setRows] = useState<InvRow[]>([]);
+  const [meta, setMeta] = useState<{ projects: { code: string; name: string }[] } | null>(null);
+
+  const projName = meta?.projects?.find((p) => p.code === scope)?.name
+    || (scope && scope !== "ALL" ? scope : "All projects");
 
   useEffect(() => {
     let active = true;
-    fetchJSON<{ units: InvRow[] }>("/api/inventory" + (scope && scope !== "ALL" ? "?project=" + encodeURIComponent(scope) : ""))
+    fetchJSON<{ units: InvRow[]; projects?: { code: string; name: string }[] }>("/api/inventory" + (scope && scope !== "ALL" ? "?project=" + encodeURIComponent(scope) : ""))
       .then((j) => {
         if (active && Array.isArray(j.units)) setRows(j.units);
+        if (active && Array.isArray(j.projects)) setMeta({ projects: j.projects });
       })
       .catch(() => {});
     return () => {
@@ -138,11 +140,15 @@ export default function PricingScreen({ scope = "ALL" }: { scope?: string }) {
   ];
 
   const exportCsv = () => {
+    const esc = (v: string) => {
+      const s = /^[=+\-@]/.test(v) ? "'" + v : v;
+      return '"' + s.replace(/"/g, '""') + '"';
+    };
     const head = "Typology,Band,Rate (AED/sq.ft)";
-    const rows = matrix.flatMap((m) =>
-      m.cells.map((c) => `${m.typ},${c.key.replace(m.typ, "")},${c.psf}`)
+    const body = matrix.flatMap((m) =>
+      m.cells.map((c) => [m.typ, c.key.replace(m.typ, ""), c.psf].map(esc).join(","))
     );
-    const csv = [head, ...rows].join("\n");
+    const csv = [head, ...body].join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");

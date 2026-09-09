@@ -95,9 +95,13 @@ function heatColor(psf: number): string {
 
 export function exportedRows(units: Unit[]) {
   const head = ["Unit", "Typology", "Floor", "Sq.ft", "AED/ft", "Price", "View", "Status", "Buyer"];
+  const esc = (v: string) => {
+    const s = /^[=+\-@]/.test(v) ? "'" + v : v;
+    return '"' + s.replace(/"/g, '""') + '"';
+  };
   const body = units.map((u) =>
     [u.id, u.typ, "L" + u.f, u.area.toLocaleString("en-US"), u.psf.toLocaleString("en-US"), u.price.toLocaleString("en-US"), u.view, u.status, u.buyer]
-      .map((v) => '"' + v.replace(/"/g, '"') + '"')
+      .map((v) => esc(v))
       .join(",")
   );
   return head.join(",") + "\n" + body.join("\n");
@@ -210,13 +214,14 @@ export default function InventoryScreen({
 
   const order = { Available: 0, Held: 1, Reserved: 2, Booked: 3, Sold: 4, Blocked: 5, Overdue: 6 };
   const ordered = [...units].sort((a, b) => order[a.status] - order[b.status]);
+  const unitCode = (u: Unit) => u.id.includes("-") ? u.id.slice(u.id.lastIndexOf("-") + 1) : u.no || u.id;
 
   const exportCsv = () => {
-    const blob = new Blob([exportedRows(units)], { type: "text/csv;charset=utf-8;" });
+    const blob = new Blob([exportedRows(source)], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "ellington-price-list.csv";
+    a.download = "ellington-inventory.csv";
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -486,7 +491,7 @@ export default function InventoryScreen({
               const b = cellBtn(u);
               return (
                 <button key={u.id} onClick={b.onClick} title={b.title} style={{ ...b.style, height: 62, borderLeftWidth: 3 }}>
-                  <span style={{ fontSize: 12.5, fontWeight: 800, letterSpacing: "-.01em" }}>{u.id.replace("H21-T1-", "")}</span>
+                  <span style={{ fontSize: 12.5, fontWeight: 800, letterSpacing: "-.01em" }}>{unitCode(u)}</span>
                   <span style={{ fontSize: 10, fontWeight: 600, color: "#14161F" }}>{u.typ}</span>
                   <span style={{ fontSize: 9.5, fontWeight: 600, color: "#14161F", opacity: 0.75 }}>{b.meta} \u00b7 {money(u.price)}</span>
                 </button>
@@ -534,7 +539,7 @@ export default function InventoryScreen({
                 style={{ textAlign: "left", background: "#fff", borderRadius: 16, padding: "16px 18px", boxShadow: "0 1px 3px rgba(20,22,31,.04)", border: "1px solid #EDEEF3", cursor: "pointer", fontFamily: "inherit" }}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 13, fontWeight: 700 }}>{u.id.replace("H21-T1-", "")}</span>
+                  <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 13, fontWeight: 700 }}>{unitCode(u)}</span>
                   <span style={{ marginLeft: "auto", fontSize: 10, fontWeight: 700, borderRadius: 7, padding: "3px 8px", background: ST[u.status][1], color: ST[u.status][0] }}>{u.status}</span>
                 </div>
                 <div style={{ fontSize: 11.5, color: "#6B7180", fontWeight: 600, marginTop: 8 }}>

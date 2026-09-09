@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { AC } from "../../lib/format";
-import { PROJECTS } from "../../lib/data";
+import { AC, MONTHS_ABBR } from "../../lib/format";
 import { fetchJSON } from "../../lib/api";
 
 const PKG = [
@@ -120,12 +119,14 @@ const toMileView = (m: CMilestone): MileView => {
 };
 
 export default function ConstructionScreen({ scope = "ALL" }: { scope?: string }) {
-  const proj = PROJECTS.find((p) => p.code === scope);
-  const projName = proj ? proj.name : "Belgravia Heights III";
   const [certified, setCertified] = useState(false);
   const [uploaded, setUploaded] = useState(false);
   const [photoDates, setPhotoDates] = useState(PHOTOS);
   const [rows, setRows] = useState<CMilestone[]>([]);
+  const [meta, setMeta] = useState<{ projects: { code: string; name: string }[] } | null>(null);
+
+  const projName = meta?.projects?.find((p) => p.code === scope)?.name
+    || (scope && scope !== "ALL" ? scope : "All projects");
 
   useEffect(() => {
     let active = true;
@@ -140,6 +141,18 @@ export default function ConstructionScreen({ scope = "ALL" }: { scope?: string }
       active = false;
     };
   }, [scope]);
+
+  useEffect(() => {
+    let active = true;
+    fetchJSON<{ projects?: { code: string; name: string }[] }>("/api/inventory")
+      .then((j) => {
+        if (active && Array.isArray(j.projects)) setMeta({ projects: j.projects });
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const live = rows.length > 0;
 
@@ -195,7 +208,7 @@ export default function ConstructionScreen({ scope = "ALL" }: { scope?: string }
           <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: "-.03em", lineHeight: 1.15 }}>Construction progress</div>
           <div style={{ fontSize: 13, color: "#6B7180", fontWeight: 500, marginTop: 5 }}>{projName} \u00b7 ALEC Engineering \u00b7 certified by WSP Middle East</div>
         </div>
-        <button onClick={() => { setUploaded(true); setPhotoDates([new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }), ...photoDates]); }} style={{ height: 38, borderRadius: 12, border: "1px solid #EDEEF3", background: "#fff", padding: "0 14px", fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, color: "#4A5060", cursor: "pointer" }}>Upload photo set</button>
+        <button onClick={() => { const now = new Date(); setUploaded(true); setPhotoDates([String(now.getDate()).padStart(2, "0") + " " + MONTHS_ABBR[now.getMonth()] + " " + String(now.getFullYear()), ...photoDates]); }} style={{ height: 38, borderRadius: 12, border: "1px solid #EDEEF3", background: "#fff", padding: "0 14px", fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, color: "#4A5060", cursor: "pointer" }}>Upload photo set</button>
         <button onClick={() => { const i = certIdx(); if (i >= 0) cert(i); }} style={{ height: 38, borderRadius: 12, background: AC, color: "#fff", border: 0, padding: "0 16px", fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}>Certify milestone</button>
       </div>
 

@@ -4,6 +4,8 @@ import InventoryScreen from "../components/screens/Inventory";
 import UnitScreen from "../components/screens/Unit";
 import PricingScreen from "../components/screens/Pricing";
 import ConstructionScreen from "../components/screens/Construction";
+import { Stub } from "../components/app/Stub";
+import { SCR_TITLES } from "../lib/screens";
 
 export default function Project() {
   const router = useRouter();
@@ -27,7 +29,7 @@ export default function Project() {
         if (screen === "unit") return <UnitScreen scope={scope} unitId={unitId} onSelectUnit={openUnit} />;
         if (screen === "pricing") return <PricingScreen scope={scope} />;
         if (screen === "construction") return <ConstructionScreen scope={scope} />;
-        return null;
+        return <Stub title={SCR_TITLES[screen] || "Module"} onBack={() => router.push("/dashboard")} />;
       }}
     />
   );
