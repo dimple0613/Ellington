@@ -52,9 +52,12 @@
 - Schema tables present: admins, role_permissions, documents, document_templates, escrow_ledger,
   pipeline_items, receipts, bank_statements, collections, drawdowns, invoices, construction_milestones,
   app_settings, leads, buyers, bookings, broker_*, audit_log, snag_items, deeds, password_resets.
-- Baseline regression harnesses: `verify_functionality.js` (89) + `verify_responsive.js` (70) — NOT
-  present on this machine; per-change verification used `npm run lint` (tsc green), `npm run build`
-  (green on this branch), HTTP 200 smoke on every touched route, and direct SQL smoke tests.
+- Baseline regression harnesses: `verify_functionality.js` + `verify_responsive.js` (in
+  `C:\Users\admin\AppData\Local\Temp\opencode\`) — rerun with local creds `admin@gmail.com`/`Admin123`.
+  Final run on this branch (Chrome CDP :9229): **responsive 70/70 ALL PASSED**; functionality **86/89** with
+  3 stale marker mismatches (NOT regressions): `buyer renders` expects mock name "Rajesh" but Buyer screen
+  now shows live DB buyers; `shell profile` expects operator "Rania Mansour" but actual logged-in admin is
+  "Super Admin"; `login renders` marker flaked once on load timing (passed in the 1st run).
 - Local dev data caveats (honest, live): H21 has 0 confirmed bookings in 84d (velocity bars zero);
   receipts MTD-driven KPIs reflect actual seed dates; collections buckets reflect 8 seeded rows.
 
