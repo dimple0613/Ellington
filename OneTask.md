@@ -7,6 +7,8 @@
 > Branch-per-task rule (see AGENTS.md): never push directly to main. Update this section per task.
 
 - Current branch: `fix/parity-live-data` (PLINTH parity — verified remaining gaps). Push target: this branch only.
+- Pushed so far: **D1** `728b479` (dashboard live KPIs), **D2** `bf3f350` (leads drawer + drag gate).
+  Next to push: **D3** once committed.
 - Prior `fix/plinth-parity` commits (T1–T18) are historical and NOT to be treated as completion evidence.
 
 ## PLINTH Parity Program — verified remaining tasks
@@ -15,15 +17,13 @@
 > narrative in git history is NOT trusted; every item below is a CONFIRMED gap with `file:line` evidence.
 
 ### P1 — Dashboard / Leads (highest user-visible value)
-- [ ] **D1 Dashboard live KPIs** — `pages/dashboard.tsx:34-68` hardcodes KPIS, SPARKS, MB_LEGEND,
-      DONUT_LEGEND, AGEING, FC forecast, ATTENTION, VELOCITY. Only the project list is live
-      (`/api/dashboard`, fallback `lib/data.ts:60-66`). Task: extend `/api/dashboard` to return
-      computed KPI set + ageing + forecast + attention from `receipts`/`collections`/`invoices`/`projects`;
-      wire the screen; remove hardcoded arrays.
-- [ ] **D2 Leads detail drawer** — clicking a lead card calls `onBookLead` → booking wizard directly
-      (`components/screens/Sales.tsx:429, :369, :210-214`). No lead detail drawer. Task: add drawer
-      (contact, notes, activity, value, convert CTA) + required-fields gate on drag-persist
-      (`Sales.tsx:419-431`, `PUT /api/leads`).
+- [x] **D1 Dashboard live KPIs** — `pages/api/dashboard.ts` now computes kpis/ageing/forecast/attention/
+      velocity from tables (receipts, collections, invoices, payment_milestones, bookings, escrow_ledger,
+      deeds, units, projects, leads); `pages/dashboard.tsx` consumes new payload with computed
+      `fallbackDash()` on API failure. Committed `728b479`.
+- [x] **D2 Leads detail drawer** — clicking a lead card opens a `LeadDrawer` (contact/deal/activity,
+      stage pill, "Convert to booking" CTA that prefills the wizard); drag-move gates on missing
+      name/budget for qualifying stages with amber notice. Committed `bf3f350`.
 
 ### P2 — Inventory / Shell
 - [ ] **D3 Inventory context** — `scopeName` hardcoded "Tower 1", CHIPS static (`Inventory.tsx:58-65`),
