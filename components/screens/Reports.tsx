@@ -65,11 +65,37 @@ function pdfFor(name: string, title: string, sub: string) {
   import("../../lib/pdf").then(({ reportPdf }) => reportPdf(name, title, sub));
 }
 
+const PIVOT_FIELDS = [
+  "Project", "Tower", "Unit type", "Unit", "Status", "Buyer", "Broker",
+  "Booked at", "Handover date", "Typology",
+];
+
+const PIVOT_MEASURES = [
+  "List price", "Net price", "Collected", "Outstanding", "Discount %", "Commission",
+];
+
+type Zone = { id: string; label: string; hint: string };
+
+const ZONES: Zone[] = [
+  { id: "rows", label: "Rows", hint: "Drag fields to group rows" },
+  { id: "cols", label: "Columns", hint: "Drag a field to fan columns" },
+  { id: "values", label: "Values", hint: "Drag measures to aggregate" },
+];
+
+const CHANNELS = ["Email", "Slack", "WhatsApp", "S3 archive"];
+
 export default function ReportsScreen() {
   const [open, setOpen] = useState(false);
+  const [step, setStep] = useState<"base" | "pivot" | "schedule">("base");
   const [report, setReport] = useState(ALL_REPORTS[0]);
   const [format, setFormat] = useState("CSV");
   const [err, setErr] = useState("");
+  const [dragField, setDragField] = useState<string | null>(null);
+  const [zones, setZones] = useState<Record<string, string[]>>({ rows: [], cols: [], values: [] });
+  const [pivotName, setPivotName] = useState("Sales by project & typology");
+  const [sched, setSched] = useState(SCHEDULED);
+  const [schedOpen, setSchedOpen] = useState(false);
+  const [sForm, setSForm] = useState({ report: ALL_REPORTS[0], recipients: "", freq: "Weekly", weekday: "Mon", time: "08:00", channel: "Email", format: "PDF" });
 
   useEffect(() => {
     if (!open) return;
@@ -100,15 +126,65 @@ export default function ReportsScreen() {
 
   const generate = async () => {
     if (!report) { setErr("Choose a report."); return; }
-    if (format === "PDF") pdfFor(report, "Custom report", "Generated 25 Aug 2026 · All projects");
-    else if (format === "XLSX") download(new Blob([xlsFor(report)], { type: "application/vnd.ms-excel" }), "ellington-" + bullet(report) + ".xls");
+    const title = pivotName || report;
+    const subtitle = "Rows: " + (zones.rows.length ? zones.rows.join(", ") : "—") + " · Columns: " + (zones.cols.length ? zones.cols.join(", ") : "—") + " · Values: " + (zones.values.length ? zones.values.join(", ") : "—");
+    if (format === "PDF") pdfFor(report, title, subtitle);
+    else if (format === "XLSX") download(new Blob([xlsFor(report)], { type: "application/vnd.ms-excel" }), "ellington-" + bullet(title) + ".xls");
     else {
       const text = await liveCsv(report);
-      download(new Blob([text], { type: "text/csv;charset=utf-8;" }), "ellington-" + bullet(report) + ".csv");
+      download(new Blob([text], { type: "text/csv;charset=utf-8;" }), "ellington-" + bullet(title) + ".csv");
     }
     setOpen(false);
+    setStep("base");
     setErr("");
   };
+
+  const onDropField = (zone: string) => {
+    if (!dragField) return;
+    setZones((prev) => {
+      const next: Record<string, string[]> = { rows: [...prev.rows], cols: [...prev.cols], values: [...prev.values] };
+      if (next[zone].includes(dragField)) return prev;
+      next[zone].push(dragField);
+      return next;
+    });
+    setDragField(null);
+  };
+
+  const removeFromZone = (zone: string, field: string) => {
+    setZones((prev) => ({ ...prev, [zone]: prev[zone].filter((f) => f !== field) }));
+  };
+
+  const saveSchedule = () => {
+    if (!sForm.recipients.trim()) { setErr("Add at least one recipient."); return; }
+    const row: [string, string, string, string, string] = [
+      sForm.report,
+      sForm.recipients,
+      (sForm.freq === "Daily" ? "Daily · " + sForm.time : sForm.freq + " · " + sForm.weekday + " " + sForm.time),
+      sForm.format + " · " + sForm.channel,
+      "Queued",
+    ];
+    setSched((prev) => [row, ...prev]);
+    setSchedOpen(false);
+    setErr("");
+  };
+
+  const dropZone = (z: Zone) => (
+    <div
+      onDragOver={(e) => e.preventDefault()}
+      onDrop={() => onDropField(z.id)}
+      style={{ flex: 1, minHeight: 64, borderRadius: 12, border: dragField ? "2px dashed " + AC : "1px dashed #D5D8E2", background: dragField ? "#F2F4FD" : "#FAFBFD", padding: 8, display: "flex", flexDirection: "column", gap: 6 }}
+    >
+      <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: ".06em", color: "#9AA0AE", textTransform: "uppercase" }}>{z.label}</div>
+      <div style={{ fontSize: 10, color: "#B8BDC9", fontWeight: 500 }}>{z.hint}</div>
+      {zones[z.id].map((f) => (
+        <span key={f} onClick={() => removeFromZone(z.id, f)} title="Click to remove" style={{ cursor: "pointer", fontSize: 11, fontWeight: 700, color: AC, background: "#EDECFE", border: "1px solid #E2E0FB", borderRadius: 8, padding: "5px 9px", alignSelf: "flex-start" }}>{f} ×</span>
+      ))}
+    </div>
+  );
+
+  const chip = (f: string) => (
+    <span key={f} draggable onDragStart={() => setDragField(f)} onDragEnd={() => setDragField(null)} style={{ cursor: "grab", fontSize: 11, fontWeight: 700, color: "#4A5060", background: "#fff", border: "1px solid #EDEEF3", borderRadius: 8, padding: "6px 10px" }}>{f} ⠿</span>
+  );
 
   return (
     <div>
@@ -140,12 +216,15 @@ export default function ReportsScreen() {
       ))}
 
       <div style={{ background: "#fff", borderRadius: 20, boxShadow: "0 1px 3px rgba(20,22,31,.04)", overflow: "hidden" }}>
-        <div style={{ padding: "20px 24px 4px", fontSize: 15, fontWeight: 700, letterSpacing: "-.015em" }}>Scheduled deliveries</div>
+        <div style={{ padding: "20px 24px 12px", display: "flex", alignItems: "center", gap: 12 }}>
+          <span style={{ flex: 1, fontSize: 15, fontWeight: 700, letterSpacing: "-.015em" }}>Scheduled deliveries</span>
+          <button onClick={() => { setSchedOpen(true); setErr(""); }} style={{ height: 32, borderRadius: 10, border: 0, background: AC, color: "#fff", padding: "0 14px", fontFamily: "inherit", fontSize: 11.5, fontWeight: 700, cursor: "pointer" }}>+ Schedule new</button>
+        </div>
         <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1.2fr 1fr 140px 110px", gap: 12, padding: "14px 24px", fontSize: 9.5, fontWeight: 700, letterSpacing: ".07em", color: "#9AA0AE", textTransform: "uppercase", borderBottom: "1px solid #EDEEF3" }}>
           <span>Report</span><span>Recipients</span><span>Frequency</span><span>Format</span><span>Next run</span>
         </div>
-        {SCHEDULED.map((r) => (
-          <div key={r[0]} style={{ display: "grid", gridTemplateColumns: "1.2fr 1.2fr 1fr 140px 110px", gap: 12, alignItems: "center", padding: "0 24px", height: 44, borderBottom: "1px solid #F6F7FA" }}>
+        {sched.map((r) => (
+          <div key={r[0] + r[4]} style={{ display: "grid", gridTemplateColumns: "1.2fr 1.2fr 1fr 140px 110px", gap: 12, alignItems: "center", padding: "0 24px", height: 44, borderBottom: "1px solid #F6F7FA" }}>
             <span style={{ fontSize: 12, fontWeight: 700 }}>{r[0]}</span>
             <span style={{ fontSize: 11.5, color: "#6B7180", fontWeight: 600 }}>{r[1]}</span>
             <span style={{ fontSize: 11.5, color: "#6B7180", fontWeight: 600 }}>{r[2]}</span>
@@ -155,43 +234,111 @@ export default function ReportsScreen() {
         ))}
       </div>
 
-      {open && (
-        <div onMouseDown={() => { setOpen(false); setErr(""); }} style={{ position: "fixed", inset: 0, background: "rgba(20,22,31,.42)", display: "grid", placeItems: "center", zIndex: 80, padding: 24 }}>
-          <div onMouseDown={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: 22, padding: "26px 28px", width: "100%", maxWidth: 520, boxShadow: "0 24px 60px rgba(20,22,31,.25)" }}>
-            <div style={{ fontSize: 18, fontWeight: 800, letterSpacing: "-.02em" }}>Custom report builder</div>
-            <div style={{ fontSize: 12.5, color: "#6B7180", fontWeight: 500, marginTop: 4, lineHeight: 1.5 }}>Pick any standard report and an output format. The file downloads instantly.</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 14, marginTop: 20 }}>
+      {schedOpen && (
+        <div onMouseDown={() => { setSchedOpen(false); setErr(""); }} style={{ position: "fixed", inset: 0, background: "rgba(20,22,31,.42)", display: "grid", placeItems: "center", zIndex: 90, padding: 24 }}>
+          <div onMouseDown={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: 22, padding: "26px 28px", width: "100%", maxWidth: 480, boxShadow: "0 24px 60px rgba(20,22,31,.25)" }}>
+            <div style={{ fontSize: 18, fontWeight: 800, letterSpacing: "-.02em" }}>Schedule auto-delivery</div>
+            <div style={{ fontSize: 12.5, color: "#6B7180", fontWeight: 500, marginTop: 4, lineHeight: 1.5 }}>Deliver a report on a recurring schedule to a set of recipients.</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 13, marginTop: 18 }}>
               <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                 <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".06em", color: "#9AA0AE", textTransform: "uppercase" }}>Report</span>
-                <select
-                  value={report}
-                  onChange={(e) => setReport(e.target.value)}
-                  style={{ height: 38, borderRadius: 10, border: "1px solid #EDEEF3", background: "#FAFBFD", padding: "0 12px", fontFamily: "inherit", fontSize: 13, fontWeight: 600, outline: "none" }}
-                >
+                <select value={sForm.report} onChange={(e) => setSForm((s) => ({ ...s, report: e.target.value }))} style={{ height: 38, borderRadius: 10, border: "1px solid #EDEEF3", background: "#FAFBFD", padding: "0 12px", fontFamily: "inherit", fontSize: 13, fontWeight: 600, outline: "none" }}>
                   {ALL_REPORTS.map((n) => <option key={n} value={n}>{n}</option>)}
                 </select>
               </label>
               <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".06em", color: "#9AA0AE", textTransform: "uppercase" }}>Format</span>
-                <select
-                  value={format}
-                  onChange={(e) => setFormat(e.target.value)}
-                  style={{ height: 38, borderRadius: 10, border: "1px solid #EDEEF3", background: "#FAFBFD", padding: "0 12px", fontFamily: "inherit", fontSize: 13, fontWeight: 600, outline: "none" }}
-                >
-                  {["CSV", "XLSX", "PDF"].map((f) => <option key={f} value={f}>{f}</option>)}
-                </select>
+                <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".06em", color: "#9AA0AE", textTransform: "uppercase" }}>Recipients</span>
+                <input value={sForm.recipients} onChange={(e) => setSForm((s) => ({ ...s, recipients: e.target.value }))} placeholder="e.g. board@ellington.ae, sales@…" style={{ height: 38, borderRadius: 10, border: "1px solid #EDEEF3", background: "#FAFBFD", padding: "0 12px", fontFamily: "inherit", fontSize: 13, fontWeight: 600, outline: "none" }} />
               </label>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".06em", color: "#9AA0AE", textTransform: "uppercase" }}>Frequency</span>
+                  <select value={sForm.freq} onChange={(e) => setSForm((s) => ({ ...s, freq: e.target.value }))} style={{ height: 38, borderRadius: 10, border: "1px solid #EDEEF3", background: "#FAFBFD", padding: "0 12px", fontFamily: "inherit", fontSize: 13, fontWeight: 600, outline: "none" }}>
+                    {["Daily", "Weekly", "Monthly"].map((f) => <option key={f} value={f}>{f}</option>)}
+                  </select>
+                </label>
+                <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".06em", color: "#9AA0AE", textTransform: "uppercase" }}>Day</span>
+                  <select value={sForm.weekday} disabled={sForm.freq === "Daily"} onChange={(e) => setSForm((s) => ({ ...s, weekday: e.target.value }))} style={{ height: 38, borderRadius: 10, border: "1px solid #EDEEF3", background: "#FAFBFD", padding: "0 12px", fontFamily: "inherit", fontSize: 13, fontWeight: 600, outline: "none" }}>
+                    {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => <option key={d} value={d}>{d}</option>)}
+                  </select>
+                </label>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+                <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".06em", color: "#9AA0AE", textTransform: "uppercase" }}>Time</span>
+                  <input type="time" value={sForm.time} onChange={(e) => setSForm((s) => ({ ...s, time: e.target.value }))} style={{ height: 38, borderRadius: 10, border: "1px solid #EDEEF3", background: "#FAFBFD", padding: "0 12px", fontFamily: "inherit", fontSize: 13, fontWeight: 600, outline: "none" }} />
+                </label>
+                <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".06em", color: "#9AA0AE", textTransform: "uppercase" }}>Format</span>
+                  <select value={sForm.format} onChange={(e) => setSForm((s) => ({ ...s, format: e.target.value }))} style={{ height: 38, borderRadius: 10, border: "1px solid #EDEEF3", background: "#FAFBFD", padding: "0 12px", fontFamily: "inherit", fontSize: 13, fontWeight: 600, outline: "none" }}>
+                    {["PDF", "XLSX", "CSV"].map((f) => <option key={f} value={f}>{f}</option>)}
+                  </select>
+                </label>
+                <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".06em", color: "#9AA0AE", textTransform: "uppercase" }}>Channel</span>
+                  <select value={sForm.channel} onChange={(e) => setSForm((s) => ({ ...s, channel: e.target.value }))} style={{ height: 38, borderRadius: 10, border: "1px solid #EDEEF3", background: "#FAFBFD", padding: "0 12px", fontFamily: "inherit", fontSize: 13, fontWeight: 600, outline: "none" }}>
+                    {CHANNELS.map((c) => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </label>
+              </div>
               {err && <div style={{ fontSize: 11.5, fontWeight: 600, color: "#E5484D" }}>{err}</div>}
             </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
+              <button onClick={() => { setSchedOpen(false); setErr(""); }} style={{ height: 38, borderRadius: 12, border: "1px solid #EDEEF3", background: "#fff", padding: "0 16px", fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, color: "#4A5060", cursor: "pointer" }}>Cancel</button>
+              <button onClick={saveSchedule} style={{ height: 38, borderRadius: 12, background: AC, color: "#fff", border: 0, padding: "0 20px", fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}>Create schedule</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {open && (
+        <div onMouseDown={() => { setOpen(false); setErr(""); setStep("base"); }} style={{ position: "fixed", inset: 0, background: "rgba(20,22,31,.42)", display: "grid", placeItems: "center", zIndex: 80, padding: 24 }}>
+          <div onMouseDown={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: 22, padding: "26px 28px", width: "100%", maxWidth: step === "pivot" ? 680 : 520, boxShadow: "0 24px 60px rgba(20,22,31,.25)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <button onClick={() => { setStep(step === "pivot" ? "base" : "pivot"); setErr(""); }} style={{ height: 30, borderRadius: 9, border: "1px solid #EDEEF3", background: "#fff", padding: "0 11px", fontFamily: "inherit", fontSize: 11.5, fontWeight: 700, color: "#4A5060", cursor: "pointer" }}>{step === "base" ? "⚙ Pivot builder" : "← Back"}</button>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 18, fontWeight: 800, letterSpacing: "-.02em" }}>{step === "pivot" ? "Custom report builder" : "Custom report"}</div>
+                <div style={{ fontSize: 12.5, color: "#6B7180", fontWeight: 500, marginTop: 3, lineHeight: 1.5 }}>{step === "pivot" ? "Drag fields & measures into Rows, Columns and Values to pivot a report." : "Pick a standard report and output format, or open the pivot builder."}</div>
+              </div>
+            </div>
+
+            {step === "base" && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 14, marginTop: 20 }}>
+                <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".06em", color: "#9AA0AE", textTransform: "uppercase" }}>Report</span>
+                  <select value={report} onChange={(e) => setReport(e.target.value)} style={{ height: 38, borderRadius: 10, border: "1px solid #EDEEF3", background: "#FAFBFD", padding: "0 12px", fontFamily: "inherit", fontSize: 13, fontWeight: 600, outline: "none" }}>
+                    {ALL_REPORTS.map((n) => <option key={n} value={n}>{n}</option>)}
+                  </select>
+                </label>
+                <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".06em", color: "#9AA0AE", textTransform: "uppercase" }}>Format</span>
+                  <select value={format} onChange={(e) => setFormat(e.target.value)} style={{ height: 38, borderRadius: 10, border: "1px solid #EDEEF3", background: "#FAFBFD", padding: "0 12px", fontFamily: "inherit", fontSize: 13, fontWeight: 600, outline: "none" }}>
+                    {["CSV", "XLSX", "PDF"].map((f) => <option key={f} value={f}>{f}</option>)}
+                  </select>
+                </label>
+              </div>
+            )}
+
+            {step === "pivot" && (
+              <div style={{ marginTop: 18 }}>
+                <label style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 16 }}>
+                  <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".06em", color: "#9AA0AE", textTransform: "uppercase" }}>Report name</span>
+                  <input value={pivotName} onChange={(e) => setPivotName(e.target.value)} style={{ height: 38, borderRadius: 10, border: "1px solid #EDEEF3", background: "#FAFBFD", padding: "0 12px", fontFamily: "inherit", fontSize: 13, fontWeight: 600, outline: "none" }} />
+                </label>
+                <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".06em", color: "#9AA0AE", textTransform: "uppercase", marginBottom: 8 }}>Dimensions (drag)</div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginBottom: 12 }}>{PIVOT_FIELDS.map(chip)}</div>
+                <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".06em", color: "#9AA0AE", textTransform: "uppercase", marginBottom: 8 }}>Measures (drag)</div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginBottom: 16 }}>{PIVOT_MEASURES.map(chip)}</div>
+                <div style={{ display: "flex", gap: 10 }}>{ZONES.map(dropZone)}</div>
+                <div style={{ fontSize: 11, color: "#9AA0AE", fontWeight: 500, marginTop: 10 }}>Preview: {zones.rows.length || zones.cols.length || zones.values.length ? "rows by " + (zones.rows.join(", ") || "—") + " · cols " + (zones.cols.join(", ") || "—") + " · sum " + (zones.values.join(", ") || "—") : "Add at least one value to aggregate."}</div>
+              </div>
+            )}
+
+            {err && <div style={{ fontSize: 11.5, fontWeight: 600, color: "#E5484D", marginTop: 12 }}>{err}</div>}
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 22 }}>
-              <button
-                onClick={() => { setOpen(false); setErr(""); }}
-                style={{ height: 38, borderRadius: 12, border: "1px solid #EDEEF3", background: "#fff", padding: "0 16px", fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, color: "#4A5060", cursor: "pointer" }}
-              >Cancel</button>
-              <button
-                onClick={generate}
-                style={{ height: 38, borderRadius: 12, background: AC, color: "#fff", border: 0, padding: "0 20px", fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}
-              >Generate report</button>
+              <button onClick={() => { setOpen(false); setErr(""); setStep("base"); }} style={{ height: 38, borderRadius: 12, border: "1px solid #EDEEF3", background: "#fff", padding: "0 16px", fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, color: "#4A5060", cursor: "pointer" }}>Cancel</button>
+              <button onClick={generate} style={{ height: 38, borderRadius: 12, background: AC, color: "#fff", border: 0, padding: "0 20px", fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}>Generate report</button>
             </div>
           </div>
         </div>

@@ -38,7 +38,8 @@ const FIELDS = [
   { field: "Issue notice", override: "Legal counsel", locked: false },
 ];
 
-const THRESHOLDS = [
+type Threshold = { label: string; approver: string; auto: boolean };
+const THRESHOLDS_BASE: Threshold[] = [
   { label: "Discount up to 3%", approver: "Sales Agent", auto: true },
   { label: "Discount 3\u20137%", approver: "Sales Director", auto: false },
   { label: "Discount > 7%", approver: "CEO", auto: false },
@@ -71,6 +72,11 @@ export default function UsersScreen() {
   const [permByRole, setPermByRole] = useState<Record<string, PermRow[]>>(() => {
     const init: Record<string, PermRow[]> = {};
     for (const r of ROLES) init[r] = ROLE_PERMS.map((row) => ({ ...row, perm: { ...row.perm } }));
+    return init;
+  });
+  const [thresholdsByRole, setThresholdsByRole] = useState<Record<string, Threshold[]>>(() => {
+    const init: Record<string, Threshold[]> = {};
+    for (const r of ROLES) init[r] = THRESHOLDS_BASE.map((t) => ({ ...t }));
     return init;
   });
   const [dbUsers, setDbUsers] = useState<UserRow[] | null>(null);
@@ -111,6 +117,17 @@ export default function UsersScreen() {
     setNotice(perm + " toggled " + (matrix.find((m) => m.module === module)?.perm[perm] ? "off" : "on") + " for " + module + " \u00b7 role: " + role);
     setTimeout(() => setNotice(""), 3000);
   };
+
+  const setThreshold = (label: string, approver: string) => {
+    setThresholdsByRole((prev) => ({
+      ...prev,
+      [role]: prev[role].map((t) => (t.label === label ? { ...t, approver } : t)),
+    }));
+    setNotice("Approval threshold \u00b7 " + label + " \u2192 " + approver);
+    setTimeout(() => setNotice(""), 3000);
+  };
+
+  const effectiveThresholds = thresholdsByRole[role] || THRESHOLDS_BASE;
 
   const invite = () => {
     if (!iName.trim() || !iEmail.trim()) { setErr("Enter both name and work email"); return; }
@@ -200,13 +217,15 @@ export default function UsersScreen() {
           </div>
 
           <div style={{ marginTop: 18, paddingTop: 14, borderTop: "1px solid #F1F2F7" }}>
-            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".05em", color: "#9AA0AE", textTransform: "uppercase", marginBottom: 8 }}>Approval thresholds</div>
-            {THRESHOLDS.map((t) => (
-              <div key={t.label} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: "1px solid #F6F7FA" }}>
+            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".05em", color: "#9AA0AE", textTransform: "uppercase", marginBottom: 8 }}>Approval thresholds · {role}</div>
+            {effectiveThresholds.map((t) => (
+              <div key={t.label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, padding: "6px 0", borderBottom: "1px solid #F6F7FA" }}>
                 <span style={{ fontSize: 11.5, fontWeight: 600 }}>{t.label}</span>
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <span style={{ fontSize: 10.5, fontWeight: 700 }}>{t.approver}</span>
                   {t.auto && <span style={{ fontSize: 9, fontWeight: 800, background: "#E9F8F1", color: "#1F9D6B", borderRadius: 6, padding: "2px 6px" }}>Auto</span>}
+                  <select value={t.approver} onChange={(e) => setThreshold(t.label, e.target.value)} disabled={t.auto} style={{ height: 28, borderRadius: 8, border: "1px solid " + (t.auto ? "#EDEEF3" : "#E4E6EE"), background: t.auto ? "#F7F8FB" : "#fff", padding: "0 8px", fontFamily: "inherit", fontSize: 10.5, fontWeight: 600, color: t.auto ? "#9AA0AE" : "#14161F" }}>
+                    {ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
+                  </select>
                 </div>
               </div>
             ))}

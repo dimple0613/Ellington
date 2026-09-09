@@ -1,10 +1,13 @@
 import { useEffect, useState } from "react";
+import { AC } from "../../lib/format";
 import { fetchJSON } from "../../lib/api";
 
 const TABS = [
   { key: "home", label: "Home", icon: "\u2302" },
   { key: "snap", label: "Projects", icon: "\u25A6" },
+  { key: "pulse", label: "Pulse", icon: "\u26A1" },
   { key: "money", label: "Money", icon: "\u00A3" },
+  { key: "buyers", label: "Buyers", icon: "\u263A" },
   { key: "appr", label: "Approvals", icon: "\u2713", badge: 2 },
   { key: "more", label: "More", icon: "\u2261" },
 ];
@@ -131,9 +134,8 @@ export default function MobileScreen() {
           <span style={{ position: "absolute", right: 20, fontSize: 10, fontWeight: 600, color: "#fff" }}>{"\u25C8"} {"\u25B6"} 100%</span>
         </div>
         <div style={{ flex: 1, overflow: "auto", padding: "12px 14px" }}>{children}</div>
-        <div style={{ borderTop: "1px solid #EDEEF3", display: "flex" }}>
-          {TABS.map((t) => (
-            <div key={t.key} onClick={() => setActiveTab(t.key)} style={{ flex: 1, textAlign: "center", padding: "6px 0", cursor: "pointer", position: "relative" }}>
+        <div style={{ borderTop: "1px solid #EDEEF3", display: "flex", overflowX: "auto" }}>{TABS.map((t) => (
+            <div key={t.key} onClick={() => setActiveTab(t.key)} style={{ flex: "1 0 auto", minWidth: 46, textAlign: "center", padding: "6px 0", cursor: "pointer", position: "relative" }}>
               <span style={{ fontSize: 15, display: "block", color: activeTab === t.key ? "#4F46E5" : "#9AA0AE" }}>{t.icon}</span>
               <span style={{ fontSize: 8, fontWeight: 700, color: activeTab === t.key ? "#4F46E5" : "#9AA0AE", letterSpacing: ".03em" }}>{t.label}</span>
               {t.badge && <span style={{ position: "absolute", top: 1, right: "50%", transform: "translateX(14px)", width: 14, height: 14, borderRadius: 7, background: "#E5484D", color: "#fff", fontSize: 8, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center" }}>{t.badge}</span>}
@@ -237,6 +239,43 @@ export default function MobileScreen() {
                     <span style={{ fontSize: 8, fontWeight: 700, color: "#6B7180" }}>{sold as number} sold</span>
                   </div>
                 ))}
+              </Section>
+            </div>
+          )}
+
+          {activeTab === "pulse" && (
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 8 }}>Inventory Pulse</div>
+              <div style={{ fontSize: 9, color: "#9AA0AE", fontWeight: 600, marginBottom: 8 }}>Live availability across the portfolio · updates every 5 min</div>
+              <div style={{ display: "flex", gap: 6 }}>
+                <Card><div style={{ fontSize: 8, color: "#9AA0AE", fontWeight: 700, textTransform: "uppercase" as const }}>Available</div><div style={{ fontSize: 16, fontWeight: 800, marginTop: 2, color: "#34C08A" }}>24</div></Card>
+                <Card><div style={{ fontSize: 8, color: "#9AA0AE", fontWeight: 700, textTransform: "uppercase" as const }}>Reserved</div><div style={{ fontSize: 16, fontWeight: 800, marginTop: 2, color: "#F5A623" }}>6</div></Card>
+                <Card><div style={{ fontSize: 8, color: "#9AA0AE", fontWeight: 700, textTransform: "uppercase" as const }}>Blocked</div><div style={{ fontSize: 16, fontWeight: 800, marginTop: 2, color: "#E5484D" }}>4</div></Card>
+              </div>
+              <Section title="Newly released">
+                <Card><div style={{ fontSize: 10, fontWeight: 700 }}>WPK-T2-1403</div><div style={{ fontSize: 9, color: "#6B7180", fontWeight: 600 }}>2BR · 1,150 sq.ft · released 08:40</div><div style={{ fontSize: 9, fontWeight: 700, color: AC, marginTop: 3 }}>AED 1.42M</div></Card>
+                <Card><div style={{ fontSize: 10, fontWeight: 700 }}>H21-T1-0912</div><div style={{ fontSize: 9, color: "#6B7180", fontWeight: 600 }}>Studio · 520 sq.ft · released 09:12</div><div style={{ fontSize: 9, fontWeight: 700, color: AC, marginTop: 3 }}>AED 780K</div></Card>
+              </Section>
+              <Section title="Selling fastest">
+                <Card><div style={{ fontSize: 10, fontWeight: 700 }}>BLG III · 3BR</div><div style={{ fontSize: 9, color: "#6B7180", fontWeight: 600 }}>18 sold this week · 42% of launch</div><div style={{ height: 5, borderRadius: 3, background: "#F1F2F7", marginTop: 6, overflow: "hidden" }}><div style={{ width: "78%", height: "100%", borderRadius: 3, background: AC }} /></div></Card>
+              </Section>
+            </div>
+          )}
+
+          {activeTab === "buyers" && (
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 8 }}>Buyer lookup</div>
+              <div style={{ position: "relative", marginBottom: 10 }}>
+                <span style={{ position: "absolute", left: 10, top: 8, fontSize: 12, color: "#9AA0AE" }}>{"\u2315"}</span>
+                <input placeholder="Search buyer, unit, passport…" style={{ width: "100%", boxSizing: "border-box", height: 34, borderRadius: 10, border: "1px solid #EDEEF3", background: "#fff", padding: "0 30px", fontSize: 10.5, fontWeight: 600, outline: "none", fontFamily: "inherit" }} />
+              </div>
+              <Section title="Recent lookups">
+                <Card><div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}><div><div style={{ fontSize: 10, fontWeight: 700 }}>Priya Sharma</div><div style={{ fontSize: 9, color: "#6B7180", fontWeight: 600 }}>BLG-0304 · 3BR · 2 instalments</div></div><span style={{ fontSize: 9, color: "#E5484D", fontWeight: 700 }}>{"\u25CF"} 62 d</span></div></Card>
+                <Card><div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}><div><div style={{ fontSize: 10, fontWeight: 700 }}>Rajesh Menon</div><div style={{ fontSize: 9, color: "#6B7180", fontWeight: 600 }}>WPK-T1-1204 · 2BR · paid-up</div></div><span style={{ fontSize: 9, color: "#1F9D6B", fontWeight: 700 }}>{"\u25CF"} clear</span></div></Card>
+              </Section>
+              <Section title="Fast action">
+                <Card><div style={{ fontSize: 10, fontWeight: 700 }}>View buyer 360</div><div style={{ fontSize: 9, color: "#9AA0AE", fontWeight: 600 }}>Units, ledger, schedule, documents</div></Card>
+                <Card><div style={{ fontSize: 10, fontWeight: 700 }}>Statement of account (PDF)</div><div style={{ fontSize: 9, color: "#9AA0AE", fontWeight: 600 }}>Send a generated statement</div></Card>
               </Section>
             </div>
           )}
@@ -414,6 +453,8 @@ export default function MobileScreen() {
             <div style={{ fontSize: 12, color: "#6B7180", fontWeight: 500, lineHeight: 1.7 }}>
               {activeTab === "home" && "Portfolio home shows top-level KPIs (total value, collected, overdue) plus a 30-day confidence indicator. Data refreshes every 5 minutes."}
               {activeTab === "snap" && "Project snapshot gives a quick status overview: sold percentage ring, unit-by-status legend, financial tiles, and typology mix bars. Tap a unit to see its detail."}
+              {activeTab === "pulse" && "Inventory Pulse shows live availability, newly released units, and which types are selling fastest — the boss can see stock health in under 30 seconds."}
+              {activeTab === "buyers" && "Buyer lookup lets you search any buyer by name, unit or passport and jump straight to their 360 / statement. PII is gated in production."}
               {activeTab === "money" && "Money & ageing displays collections, forecast, and ageing tabs. Ageing buckets colour-code overdue periods. Buyer rows are PII-gated in production."}
               {activeTab === "appr" && "Approvals inbox surfaces discount requests and drawdown requests pending executive sign-off. Approve/reject actions send instant notifications to the requesting agent."}
               {activeTab === "more" && "More is the profile + settings menu. Notifications, shared documents, help, and app preferences live here."}
@@ -429,7 +470,9 @@ export default function MobileScreen() {
                   <div style={{ fontSize: 10, color: "#9AA0AE", fontWeight: 500 }}>
                     {t.key === "home" && "Portfolio overview + KPIs"}
                     {t.key === "snap" && "Per-project unit snapshot"}
+                    {t.key === "pulse" && "Live inventory pulse"}
                     {t.key === "money" && "Collections + ageing view"}
+                    {t.key === "buyers" && "Buyer lookup + 360"}
                     {t.key === "appr" && "Discount + drawdown approvals"}
                     {t.key === "more" && "Profile + settings"}
                   </div>

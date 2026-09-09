@@ -1,12 +1,18 @@
-export const AC = "#4F46F5";
+export const AC = "#3B6EF6";
+
+const trim0 = (s: string) => s.replace(/\.0+$/, "").replace(/\.(\d)0$/, ".$1");
 
 export const money = (n: number) =>
   "AED " + Math.round(n).toLocaleString("en-US");
 
-export const compact = (n: number) =>
-  n >= 1000
-    ? "AED " + (n / 1000).toFixed(2) + "B"
-    : "AED " + n.toFixed(1) + "M";
+export const compact = (n: number) => {
+  const v = Number(n) || 0;
+  const abs = Math.abs(v);
+  if (abs >= 1e9) return "AED " + trim0((v / 1e9).toFixed(1)) + "B";
+  if (abs >= 1e6) return "AED " + trim0((v / 1e6).toFixed(1)) + "M";
+  if (abs >= 1e3) return "AED " + trim0((v / 1e3).toFixed(1)) + "K";
+  return money(v);
+};
 
 export const stableIdx = (seed: number, i: number) =>
   (seed * 31 + (i + 1) * 17 + 7) % 100;

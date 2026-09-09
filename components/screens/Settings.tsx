@@ -8,15 +8,16 @@ const TABS: [Tab, string][] = [
   ["notif", "Notifications"], ["integr", "Integrations"], ["data", "Data"],
 ];
 
-const NOTIF_ROWS: [string, boolean, boolean, boolean][] = [
-  ["New booking created", true, true, false],
-  ["Payment received", true, true, true],
-  ["Milestone certified", true, true, false],
-  ["Drawdown request", true, true, true],
-  ["Snag raised", false, true, false],
-  ["Title deed issued", true, true, false],
-  ["Unit price changed", true, true, false],
-  ["User invited", true, false, false],
+type NotifRow = [string, boolean, boolean, boolean, string];
+const NOTIF_ROWS: NotifRow[] = [
+  ["New booking created", true, true, false, "Sales director · agent"],
+  ["Payment received", true, true, true, "Finance · buyer"],
+  ["Milestone certified", true, true, false, "Project manager · CEO"],
+  ["Drawdown request", true, true, true, "CEO · Finance"],
+  ["Snag raised", false, true, false, "Contractor · PM"],
+  ["Title deed issued", true, true, false, "Legal · buyer"],
+  ["Unit price changed", true, true, false, "Sales · CEO"],
+  ["User invited", true, false, false, "New user"],
 ];
 
 type NumRow = { object: string; prefix: string; pattern: string; next: number };
@@ -99,7 +100,7 @@ const PII_DEFAULT: PiiRow[] = [
 export default function SettingsScreen() {
   const [tab, setTab] = useState<Tab>("company");
   const [notice, setNotice] = useState("");
-  const [notif, setNotif] = useState<[string, boolean, boolean, boolean][]>(NOTIF_ROWS);
+  const [notif, setNotif] = useState<NotifRow[]>(NOTIF_ROWS);
   const [numbering, setNumbering] = useState<NumRow[]>(NUMBERING_ROWS);
   const [integrations, setIntegrations] = useState(INTEGRATIONS);
   const [company, setCompany] = useState<Record<string, string>>({
@@ -112,7 +113,7 @@ export default function SettingsScreen() {
     "Address": "Level 8, Boulevard Plaza Tower 1, Downtown Dubai, UAE",
   });
   const [brand, setBrand] = useState<Record<string, string>>({
-    "Primary color": "#4F46F5",
+    "Primary color": "#3B6EF6",
     "Currency": "AED",
     "Date format": "DD MMM YYYY",
     "Timezone": "Asia/Dubai (GMT+4)",
@@ -140,7 +141,7 @@ export default function SettingsScreen() {
 
   useEffect(() => {
     let active = true;
-    fetchJSON<{ settings: { company: Record<string, string>; brand: Record<string, string>; numbering: NumRow[]; notif: { event: string; inapp: boolean; email: boolean; slack: boolean }[]; fx: [string, string, string, string][]; vat: Record<string, string>; banks: BankRow[]; templates: Tpl[]; retention: RetentionRow[]; pii: PiiRow[]; integrations: { name: string; status: string; note: string; ok: boolean }[] } }>("/api/system")
+    fetchJSON<{ settings: { company: Record<string, string>; brand: Record<string, string>; numbering: NumRow[]; notif: { event: string; inapp: boolean; email: boolean; slack: boolean; who?: string }[]; fx: [string, string, string, string][]; vat: Record<string, string>; banks: BankRow[]; templates: Tpl[]; retention: RetentionRow[]; pii: PiiRow[]; integrations: { name: string; status: string; note: string; ok: boolean }[] } }>("/api/system")
       .then((j) => {
         if (!active || !j?.settings) return;
         if (j.settings.company && Object.keys(j.settings.company).length) setCompany((prev) => ({ ...prev, ...j.settings.company }));
@@ -149,7 +150,7 @@ export default function SettingsScreen() {
           const byObj = new Map(j.settings.numbering.map((r) => [r.object, r]));
           setNumbering(NUMBERING_ROWS.map((row) => byObj.get(row.object) ? { object: row.object, prefix: byObj.get(row.object)!.prefix, pattern: byObj.get(row.object)!.pattern, next: byObj.get(row.object)!.next || 1 } : row));
         }
-        if (j.settings.notif && j.settings.notif.length) setNotif(j.settings.notif.map((r) => [r.event, !!r.inapp, !!r.email, !!r.slack]));
+        if (j.settings.notif && j.settings.notif.length) setNotif(j.settings.notif.map((r) => [r.event, !!r.inapp, !!r.email, !!r.slack, r.who || ""] as NotifRow));
         if (j.settings.fx && j.settings.fx.length) setFx(j.settings.fx.map((r) => [String(r[0]), String(r[1]), String(r[2]), String(r[3])]));
         if (j.settings.vat && Object.keys(j.settings.vat).length) setVat((prev) => ({ ...prev, ...j.settings.vat }));
         if (j.settings.banks && j.settings.banks.length) setBanks(j.settings.banks);
@@ -171,7 +172,7 @@ export default function SettingsScreen() {
       company,
       brand,
       numbering,
-      notif: notif.map(([event, inapp, email, slack]) => ({ event, inapp, email, slack })),
+      notif: notif.map(([event, inapp, email, slack, who]) => ({ event, inapp, email, slack, who })),
       fx,
       vat,
       banks,
@@ -190,7 +191,7 @@ export default function SettingsScreen() {
   };
 
   const flipNotif = (rowIdx: number, colIdx: number) => {
-    setNotif((prev) => prev.map((row, ri) => ri !== rowIdx ? row : [row[0], colIdx === 0 ? !row[1] : row[1], colIdx === 1 ? !row[2] : row[2], colIdx === 2 ? !row[3] : row[3]] as [string, boolean, boolean, boolean]));
+    setNotif((prev) => prev.map((row, ri) => ri !== rowIdx ? row : [row[0], colIdx === 0 ? !row[1] : row[1], colIdx === 1 ? !row[2] : row[2], colIdx === 2 ? !row[3] : row[3], row[4]] as NotifRow));
     banner("Notification " + (["In-app", "Email", "Slack"][colIdx]) + " toggled for " + notif[rowIdx][0]);
   };
 
@@ -432,12 +433,13 @@ export default function SettingsScreen() {
           <div style={{ padding: "18px 22px", borderBottom: "1px solid #EDEEF3" }}>
             <span style={{ fontSize: 15, fontWeight: 700, letterSpacing: "-.015em" }}>Notification matrix</span>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1.5fr 100px 100px 100px", gap: 8, padding: "12px 22px", fontSize: 9.5, fontWeight: 700, letterSpacing: ".07em", color: "#9AA0AE", textTransform: "uppercase", borderBottom: "1px solid #F6F7FA" }}>
-            <span>Event</span><span style={{ textAlign: "center" }}>In-app</span><span style={{ textAlign: "center" }}>Email</span><span style={{ textAlign: "center" }}>Slack</span>
+          <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr 80px 80px 80px", gap: 8, padding: "12px 22px", fontSize: 9.5, fontWeight: 700, letterSpacing: ".07em", color: "#9AA0AE", textTransform: "uppercase", borderBottom: "1px solid #F6F7FA" }}>
+            <span>Event</span><span>Who is notified</span><span style={{ textAlign: "center" }}>In-app</span><span style={{ textAlign: "center" }}>Email</span><span style={{ textAlign: "center" }}>Slack</span>
           </div>
           {notif.map((row, ri) => (
-            <div key={row[0]} style={{ display: "grid", gridTemplateColumns: "1.5fr 100px 100px 100px", gap: 8, alignItems: "center", padding: "0 22px", height: 44, borderBottom: "1px solid #F6F7FA" }}>
+            <div key={row[0]} style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr 80px 80px 80px", gap: 8, alignItems: "center", padding: "0 22px", height: 48, borderBottom: "1px solid #F6F7FA" }}>
               <span style={{ fontSize: 12, fontWeight: 600 }}>{row[0]}</span>
+              <input value={row[4]} onChange={(e) => { const v = e.target.value; setNotif((prev) => prev.map((r, i2) => i2 === ri ? [r[0], r[1], r[2], r[3], v] as NotifRow : r)); }} placeholder="Recipients…" style={{ height: 26, borderRadius: 8, border: "1px solid #EDEEF3", background: "#FAFBFD", padding: "0 8px", fontFamily: "inherit", fontSize: 10.5, fontWeight: 600, color: "#14161F", boxSizing: "border-box", width: "100%" }} />
               {[row[1], row[2], row[3]].map((on, i) => (
                 <span key={i} style={{ display: "flex", justifyContent: "center" }}>
                   {toggleSwitch(on, () => flipNotif(ri, i))}
