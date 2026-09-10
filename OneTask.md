@@ -7,12 +7,12 @@
 > Branch-per-task rule (see AGENTS.md): never push directly to main. Update this section per task.
 
 - Current branch: **`refactor/purge-static-data`** (made from `feat/audit-halfdone-completion`). Push target: this branch only.
-- PUSH THIS (next commit, purge batch 1):
-  - **All UI screen static/mock row purges** (14 screens): `components/screens/{AuditLog,Cashflow,Collections,Construction,Deeds,Escrow,Financials,Invoices,Payments,Pipeline,Reports,Sales,Snagging,Users}.tsx`.
-  - **Mobile Executive App fixes** (UI Analysis 10 Sep): `pages/api/mobile.ts` (test-project filter + live `total`/`sold` from units) + `components/screens/Mobile.tsx` (live approvals badge, live greeting/date, zeroed home fallbacks).
-- Also on branch (already committed, not pushed): wizard rewire commit `11a015c`, remaining-fabricated-data commit `0e53c6e`, and notification fix (Shell tray live-only, ticker dynamic, Preferences → Settings ?tab=notif, Mobile "Notifications" sub honest).
+- PUSH THIS (next commit, purge batch 2 — Mobile phone-frame mock-to-live bind):
+  - **`components/screens/Mobile.tsx`**: removed hardcoded "▲ 2.4% vs last month" → live "% collected"; snap tab: replaced static `Overdue AED 0` / `Net margin 28.4%` → live portfolio overdue + computed collect-rate%; pulse tab: bound Available/Reserved/Blocked to live project counts, replaced static "newly released"/"selling fastest" with live milestones + honest empty state; buyers tab: replaced static Priya Sharma/Rajesh Menon with live top-overdue buyer + empty state; approval drawdown amount bound to `agg.approvals.valueM`; profile avatar initials now derive from live `me.name`.
+  - **`pages/api/mobile.ts`** (already committed in `9034d3e`): test-project filter + live total/sold from units.
+- Also on branch (already committed, not pushed): wizard rewire commit `11a015c`, remaining-fabricated-data commit `0e53c6e`, notification fix commit, and UI-analysis-round-2 commit `9034d3e` (mobile test-project filter, live badges, SSR tabs, handover scope, WKP→WPK rename).
 - NOT in commit (never): `docs/ARCHITECTURE.md`, `auto-push.ps1`, `test-*.mjs`, `dev.log`.
-- Status: `npm run lint` (tsc --noEmit) **green**; `next build` **green** (dev server stopped during build, restarted, up on :3000).
+- Status: `npx tsc --noEmit` **green** (no errors); `next build` blocked by dev server lock on `.next/trace` — code is type-safe.
 - Prior task `feat/audit-halfdone-completion` (portals/unit-builder/pricing) is fully shipped on its own branch — historical, NOT in this commit. Demo portal logins: `buyer@example.com` / `broker@example.com`, `Portal123!`.
 
 ## Static data purge (purge-static-data)

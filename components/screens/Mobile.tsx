@@ -178,7 +178,7 @@ export default function MobileScreen() {
               <Card>
                 <div style={{ fontSize: 9, fontWeight: 700, color: "#9AA0AE", letterSpacing: ".05em", textTransform: "uppercase" as const }}>Portfolio value</div>
                 <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: "-.03em", marginTop: 4 }}>{aedM(ao ? ao.value : 0)}</div>
-                <div style={{ fontSize: 9.5, color: "#1F9D6B", fontWeight: 700, marginTop: 2 }}>{"\u25B2"} 2.4% vs last month</div>
+                <div style={{ fontSize: 9, color: "#9AA0AE", fontWeight: 600, marginTop: 2 }}>{ao ? Math.round(((ao.collected) / ao.target) * 100) + "% collected" : "Loading…"}</div>
               </Card>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
                 <Card>
@@ -227,10 +227,10 @@ export default function MobileScreen() {
                 </div>
               </Card>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
-                <Card><div style={{ fontSize: 8, color: "#9AA0AE", fontWeight: 700, textTransform: "uppercase" as const }}>Collected</div><div style={{ fontSize: 13, fontWeight: 800, marginTop: 2 }}>{aedM(proj0 ? proj0.collected : 52100000)}</div></Card>
-                <Card><div style={{ fontSize: 8, color: "#9AA0AE", fontWeight: 700, textTransform: "uppercase" as const }}>Outstanding</div><div style={{ fontSize: 13, fontWeight: 800, marginTop: 2 }}>{aedM(proj0 ? Math.max(0, proj0.gdv - proj0.collected) : 31800000)}</div></Card>
-                <Card><div style={{ fontSize: 8, color: "#9AA0AE", fontWeight: 700, textTransform: "uppercase" as const }}>Overdue</div><div style={{ fontSize: 13, fontWeight: 800, marginTop: 2, color: "#E5484D" }}>{proj0 ? "AED 0" : "AED 1.2M"}</div></Card>
-                <Card><div style={{ fontSize: 8, color: "#9AA0AE", fontWeight: 700, textTransform: "uppercase" as const }}>Net margin</div><div style={{ fontSize: 13, fontWeight: 800, marginTop: 2 }}>28.4%</div></Card>
+                <Card><div style={{ fontSize: 8, color: "#9AA0AE", fontWeight: 700, textTransform: "uppercase" as const }}>Collected</div><div style={{ fontSize: 13, fontWeight: 800, marginTop: 2 }}>{aedM(proj0 ? proj0.collected : 0)}</div></Card>
+                <Card><div style={{ fontSize: 8, color: "#9AA0AE", fontWeight: 700, textTransform: "uppercase" as const }}>Outstanding</div><div style={{ fontSize: 13, fontWeight: 800, marginTop: 2 }}>{proj0 ? aedM(Math.max(0, proj0.gdv - proj0.collected)) : "—"}</div></Card>
+                <Card><div style={{ fontSize: 8, color: "#9AA0AE", fontWeight: 700, textTransform: "uppercase" as const }}>Portfolio overdue</div><div style={{ fontSize: 13, fontWeight: 800, marginTop: 2, color: ao && ao.overdue > 0 ? "#E5484D" : undefined }}>{ao ? aedM(ao.overdue) : "—"}</div></Card>
+                <Card><div style={{ fontSize: 8, color: "#9AA0AE", fontWeight: 700, textTransform: "uppercase" as const }}>Collect rate</div><div style={{ fontSize: 13, fontWeight: 800, marginTop: 2 }}>{proj0 ? Math.round((proj0.collected / Math.max(1, proj0.gdv)) * 100) + "%" : "—"}</div></Card>
               </div>
               <Section title="Typology mix">
                 {mix.map(([t, sold, pct]) => (
@@ -250,18 +250,25 @@ export default function MobileScreen() {
             <div>
               <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 8 }}>Inventory Pulse</div>
               <div style={{ fontSize: 9, color: "#9AA0AE", fontWeight: 600, marginBottom: 8 }}>Live availability across the portfolio · updates every 5 min</div>
-              <div style={{ display: "flex", gap: 6 }}>
-                <Card><div style={{ fontSize: 8, color: "#9AA0AE", fontWeight: 700, textTransform: "uppercase" as const }}>Available</div><div style={{ fontSize: 16, fontWeight: 800, marginTop: 2, color: "#34C08A" }}>24</div></Card>
-                <Card><div style={{ fontSize: 8, color: "#9AA0AE", fontWeight: 700, textTransform: "uppercase" as const }}>Reserved</div><div style={{ fontSize: 16, fontWeight: 800, marginTop: 2, color: "#F5A623" }}>6</div></Card>
-                <Card><div style={{ fontSize: 8, color: "#9AA0AE", fontWeight: 700, textTransform: "uppercase" as const }}>Blocked</div><div style={{ fontSize: 16, fontWeight: 800, marginTop: 2, color: "#E5484D" }}>4</div></Card>
-              </div>
-              <Section title="Newly released">
-                <Card><div style={{ fontSize: 10, fontWeight: 700 }}>WPK-T2-1403</div><div style={{ fontSize: 9, color: "#6B7180", fontWeight: 600 }}>2BR · 1,150 sq.ft · released 08:40</div><div style={{ fontSize: 9, fontWeight: 700, color: AC, marginTop: 3 }}>AED 1.42M</div></Card>
-                <Card><div style={{ fontSize: 10, fontWeight: 700 }}>H21-T1-0912</div><div style={{ fontSize: 9, color: "#6B7180", fontWeight: 600 }}>Studio · 520 sq.ft · released 09:12</div><div style={{ fontSize: 9, fontWeight: 700, color: AC, marginTop: 3 }}>AED 780K</div></Card>
-              </Section>
-              <Section title="Selling fastest">
-                <Card><div style={{ fontSize: 10, fontWeight: 700 }}>BLG III · 3BR</div><div style={{ fontSize: 9, color: "#6B7180", fontWeight: 600 }}>18 sold this week · 42% of launch</div><div style={{ height: 5, borderRadius: 3, background: "#F1F2F7", marginTop: 6, overflow: "hidden" }}><div style={{ width: "78%", height: "100%", borderRadius: 3, background: AC }} /></div></Card>
-              </Section>
+              {(() => { const projs = agg?.projects || []; const ta = projs.reduce((a, p) => a + p.counts.available, 0);
+                const tr = projs.reduce((a, p) => a + p.counts.reserved + p.counts.held, 0); const tb = projs.reduce((a, p) => a + p.counts.blocked, 0);
+                return (
+                <div style={{ display: "flex", gap: 6 }}>
+                  <Card><div style={{ fontSize: 8, color: "#9AA0AE", fontWeight: 700, textTransform: "uppercase" as const }}>Available</div><div style={{ fontSize: 16, fontWeight: 800, marginTop: 2, color: "#34C08A" }}>{agg ? ta : "—"}</div></Card>
+                  <Card><div style={{ fontSize: 8, color: "#9AA0AE", fontWeight: 700, textTransform: "uppercase" as const }}>Reserved</div><div style={{ fontSize: 16, fontWeight: 800, marginTop: 2, color: "#F5A623" }}>{agg ? tr : "—"}</div></Card>
+                  <Card><div style={{ fontSize: 8, color: "#9AA0AE", fontWeight: 700, textTransform: "uppercase" as const }}>Blocked</div><div style={{ fontSize: 16, fontWeight: 800, marginTop: 2, color: "#E5484D" }}>{agg ? tb : "—"}</div></Card>
+                </div>); })()}
+              {aM && aM.milestones.length > 0 ? (
+                <Section title="Next milestones">{aM.milestones.slice(0, 2).map((m) => (
+                  <Card key={m.project + m.milestone}><div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div><div style={{ fontSize: 10, fontWeight: 700 }}>{m.project + " · " + m.milestone}</div>
+                    <div style={{ fontSize: 9, color: "#6B7180", fontWeight: 600 }}>{shortDate(m.due)}</div></div>
+                    <div style={{ fontSize: 9, fontWeight: 700, color: AC }}>{aedM(m.amount)}</div>
+                  </div></Card>
+                ))}</Section>
+              ) : (
+                <Section title="Newly released"><Card><div style={{ fontSize: 10, color: "#9AA0AE", fontWeight: 600 }}>No recently released units</div></Card></Section>
+              )}
             </div>
           )}
 
@@ -272,9 +279,10 @@ export default function MobileScreen() {
                 <span style={{ position: "absolute", left: 10, top: 8, fontSize: 12, color: "#9AA0AE" }}>{"\u2315"}</span>
                 <input placeholder="Search buyer, unit, passport…" style={{ width: "100%", boxSizing: "border-box", height: 34, borderRadius: 10, border: "1px solid #EDEEF3", background: "#fff", padding: "0 30px", fontSize: 10.5, fontWeight: 600, outline: "none", fontFamily: "inherit" }} />
               </div>
-              <Section title="Recent lookups">
-                <Card><div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}><div><div style={{ fontSize: 10, fontWeight: 700 }}>Priya Sharma</div><div style={{ fontSize: 9, color: "#6B7180", fontWeight: 600 }}>BLG-0304 · 3BR · 2 instalments</div></div><span style={{ fontSize: 9, color: "#E5484D", fontWeight: 700 }}>{"\u25CF"} 62 d</span></div></Card>
-                <Card><div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}><div><div style={{ fontSize: 10, fontWeight: 700 }}>Rajesh Menon</div><div style={{ fontSize: 9, color: "#6B7180", fontWeight: 600 }}>WPK-T1-1204 · 2BR · paid-up</div></div><span style={{ fontSize: 9, color: "#1F9D6B", fontWeight: 700 }}>{"\u25CF"} clear</span></div></Card>
+              <Section title="Most overdue">
+                {buyerInfo.name ? (
+                <Card><div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}><div><div style={{ fontSize: 10, fontWeight: 700 }}>{buyerInfo.name}</div><div style={{ fontSize: 9, color: "#6B7180", fontWeight: 600 }}>{buyerInfo.sub}</div></div><span style={{ fontSize: 9, color: "#E5484D", fontWeight: 700 }}>{"\u25CF"} {buyerInfo.days} d</span></div></Card>
+                ) : <Card><div style={{ fontSize: 10, color: "#9AA0AE", fontWeight: 600 }}>No overdue buyers</div></Card>}
               </Section>
               <Section title="Fast action">
                 <Card><div style={{ fontSize: 10, fontWeight: 700 }}>View buyer 360</div><div style={{ fontSize: 9, color: "#9AA0AE", fontWeight: 600 }}>Units, ledger, schedule, documents</div></Card>
@@ -392,9 +400,8 @@ export default function MobileScreen() {
                   <Card>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start" }}>
                       <div>
-                        <div style={{ fontSize: 11, fontWeight: 700 }}>BLG-0304</div>
-                        <div style={{ fontSize: 9, color: "#6B7180", fontWeight: 600, marginTop: 2 }}>Buyer: Priya Sharma {"\u00b7"} Agent: Sarah M.</div>
-                        <div style={{ fontSize: 9, color: "#6B7180", fontWeight: 600, marginTop: 1 }}>Discount: 5% {"\u00b7"} AED 85,000</div>
+                        <div style={{ fontSize: 11, fontWeight: 700 }}>Discount request</div>
+                        <div style={{ fontSize: 9, color: "#6B7180", fontWeight: 600, marginTop: 2 }}>Demo card · no discount currently pending</div>
                       </div>
                       <span style={{ fontSize: 9, fontWeight: 800, background: "#FFF3E0", color: "#F5A623", borderRadius: 6, padding: "3px 8px" }}>Pending</span>
                     </div>
@@ -411,9 +418,9 @@ export default function MobileScreen() {
                   <Card>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start" }}>
                       <div>
-                        <div style={{ fontSize: 11, fontWeight: 700 }}>DDR-0003</div>
-                        <div style={{ fontSize: 9, color: "#6B7180", fontWeight: 600, marginTop: 2 }}>Milestone: Structure 40% {"\u00b7"} WPK</div>
-                        <div style={{ fontSize: 9, color: "#6B7180", fontWeight: 600, marginTop: 1 }}>AED 1,200,000</div>
+                        <div style={{ fontSize: 11, fontWeight: 700 }}>Drawdown request</div>
+                        <div style={{ fontSize: 9, color: "#6B7180", fontWeight: 600, marginTop: 2 }}>Structure milestone · pending trustee release</div>
+                        <div style={{ fontSize: 9, color: "#6B7180", fontWeight: 600, marginTop: 1 }}>AED {agg ? agg.approvals.valueM : "—"}M</div>
                       </div>
                       <span style={{ fontSize: 9, fontWeight: 800, background: "#FFF3E0", color: "#F5A623", borderRadius: 6, padding: "3px 8px" }}>Pending</span>
                     </div>
@@ -431,7 +438,7 @@ export default function MobileScreen() {
             <div>
               <Card>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <div style={{ width: 40, height: 40, borderRadius: 20, background: "#4F46E5", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 800, color: "#fff" }}>KA</div>
+                  <div style={{ width: 40, height: 40, borderRadius: 20, background: "#4F46E5", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 800, color: "#fff" }}>{agg ? (agg.me.name || "E").split(" ").map((w: string) => w[0] || "").join("").slice(0, 2) : "E"}</div>
                   <div>
                     <div style={{ fontSize: 12, fontWeight: 700 }}>{agg ? agg.me.name : "Khalid Al Fahim"}</div>
                     <div style={{ fontSize: 9, color: "#9AA0AE", fontWeight: 600 }}>{agg ? (agg.me.role || "CEO").replace(/_/g, " ") : "CEO"} {"\u00b7"} Ellington Properties</div>
