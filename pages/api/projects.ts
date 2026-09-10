@@ -17,7 +17,7 @@ export default withPerm("Inventory", "CRE", async function (req: NextApiRequest,
               COALESCE(escrow_iban, '') AS escrow_iban,
               COALESCE(escrow_bank, '') AS escrow_bank,
               COALESCE(setup, '{}'::jsonb) AS setup
-       FROM projects ORDER BY code`
+       FROM projects WHERE lower(name) NOT LIKE '%test%' ORDER BY code`
     );
     return ok(res, { projects: rows.rows });
   }

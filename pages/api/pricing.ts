@@ -126,7 +126,7 @@ const settings = await query<{ pricing: any }>("SELECT pricing FROM app_settings
     const pricing = (settings.rows[0]?.pricing) || { discount_rules: [], leakage: [] };
     const projects = code
       ? { rows: [] as { code: string; name: string }[] }
-      : await query<any>("SELECT code, name FROM projects ORDER BY code");
+      : await query<any>("SELECT code, name FROM projects WHERE lower(name) NOT LIKE '%test%' ORDER BY code");
 
     return ok(res, {
       matrix,

@@ -13,3 +13,5 @@ export default function System() {
     }} />
   );
 }
+
+export const getServerSideProps = async () => ({ props: {} });

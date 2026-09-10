@@ -14,7 +14,7 @@ const PROJECTS = [
   { code: "OCH", name: "Opera Court 2", location: "Downtown", units_total: 30, gdv: 58000000, sold: 52200000, collected: 41400000, due_date: "2026-04-30" },
   { code: "SMW", name: "Stratum 3", location: "JVC", units_total: 26, gdv: 47000000, sold: 44650000, collected: 37800000, due_date: "2026-03-15" },
   { code: "BKP", name: "The Bunker 4", location: "JVC", units_total: 22, gdv: 44000000, sold: 41800000, collected: 29700000, due_date: "2026-02-28" },
-  { code: "WKP", name: "West Kenn ", location: "Business Bay", units_total: 20, gdv: 39000000, sold: 35100000, collected: 23800000, due_date: "2026-01-20" },
+  { code: "WPK", name: "West Kenn ", location: "Business Bay", units_total: 20, gdv: 39000000, sold: 35100000, collected: 23800000, due_date: "2026-01-20" },
 ];
 
 const BUYERS = ["Adam", "Fatima Al Mulla", "Khalid Rahman", "Priya Nair", "Omar Haddad", "Sara Bennett", "Ravi Menon", "Layla Hassan"];

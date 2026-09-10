@@ -7,11 +7,13 @@ import DeedsScreen from "../components/screens/Deeds";
 export default function Handover() {
   const router = useRouter();
   return (
-    <GroupPage group="handover" render={(screen) => {
-      if (screen === "pipeline") return <PipelineScreen />;
-      if (screen === "snagging") return <SnaggingScreen />;
-      if (screen === "deeds") return <DeedsScreen />;
-      return <PipelineScreen />;
+    <GroupPage group="handover" render={(screen, scope) => {
+      if (screen === "pipeline") return <PipelineScreen scope={scope} />;
+      if (screen === "snagging") return <SnaggingScreen scope={scope} />;
+      if (screen === "deeds") return <DeedsScreen scope={scope} />;
+      return <PipelineScreen scope={scope} />;
     }} />
   );
 }
+
+export const getServerSideProps = async () => ({ props: {} });

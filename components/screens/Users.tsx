@@ -72,14 +72,17 @@ export default function UsersScreen() {
     return init;
   });
   const [dbUsers, setDbUsers] = useState<UserRow[] | null>(null);
+  const [loaded, setLoaded] = useState(false);
   const [apiError, setApiError] = useState("");
 
   useEffect(() => {
     let active = true;
     fetchJSON<{ users: AdminRow[] }>("/api/admins")
       .then((j) => {
+        if (!active) return;
+        setLoaded(true);
         const users = j.users;
-        if (!active || !Array.isArray(users)) return;
+        if (!Array.isArray(users)) return;
         const rows: UserRow[] = users.map((u: AdminRow) => ({
           name: u.name || u.email,
           email: u.email,
@@ -92,7 +95,7 @@ export default function UsersScreen() {
         if (rows.length) setDbUsers(rows);
       })
       .catch((e) => {
-        if (active) setApiError(e?.message || "Failed to load users");
+        if (active) { setLoaded(true); setApiError(e?.message || "Failed to load users"); }
       });
     return () => { active = false; };
   }, []);
@@ -154,7 +157,7 @@ export default function UsersScreen() {
           <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1.4fr 96px 1.1fr 82px 72px 72px", gap: 8, padding: "13px 20px", fontSize: 9.5, fontWeight: 700, letterSpacing: ".07em", color: "#9AA0AE", textTransform: "uppercase", background: "#FAFBFD", borderBottom: "1px solid #EDEEF3" }}>
             <span>Name</span><span>Email</span><span>Role</span><span>Projects</span><span>Last active</span><span>2FA</span><span>Status</span>
           </div>
-          {effectiveUsers.length === 0 && <div style={{ padding: 32, textAlign: "center", fontSize: 13, color: "#9AA0AE", fontWeight: 600 }}>No users loaded yet — invite one or wait for the user list.</div>}
+          {effectiveUsers.length === 0 && <div style={{ padding: 32, textAlign: "center", fontSize: 13, color: "#9AA0AE", fontWeight: 600 }}>{loaded ? "No users loaded yet — invite one or wait for the user list." : "Loading users…"}</div>}
           {effectiveUsers.map((u, i) => (
             <div key={i} onClick={() => { setSel(i); setRole(u.role); }} style={{ display: "grid", gridTemplateColumns: "1.2fr 1.4fr 96px 1.1fr 82px 72px 72px", gap: 8, alignItems: "center", padding: "0 20px", height: 46, borderBottom: "1px solid #F6F7FA", cursor: "pointer", background: i === sel ? "#F0EFFE" : undefined }}>
               <span style={{ fontSize: 12, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{u.name}</span>

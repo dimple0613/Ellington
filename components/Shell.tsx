@@ -105,7 +105,7 @@ const railBtn = (on: boolean, color: string) =>
     width: 42,
     height: 42,
     border: 0,
-    background: "transparent",
+    background: on ? "#14161F" : "transparent",
     borderRadius: 13,
     cursor: "pointer",
     display: "grid",
@@ -157,7 +157,7 @@ export default function Shell({
     return roleHasPerm(role, mod, "REA");
   };
   const visibleGroups = RAIL.filter((g) => canRead(g.id));
-  const gi = visibleGroups.findIndex((g) => g.id === group);
+  const [hoverIdx, setHoverIdx] = useState<number | null>(null);
   const authChecked = useRef(false);
   useEffect(() => {
     if (!ready || authChecked.current) return;
@@ -193,18 +193,34 @@ export default function Shell({
   const [focusIdx, setFocusIdx] = useState(0);
   const [inv, setInv] = useState<{ units: any[]; projects: { code: string; name: string }[] }>({ units: [], projects: [] });
   const [buyerNames, setBuyerNames] = useState<string[]>([]);
+  const [badgeCounts, setBadgeCounts] = useState<Record<string, string>>({});
 
   useEffect(() => {
     let alive = true;
     Promise.all([
       fetch("/api/inventory").then((r) => r.ok ? r.json() : null).then((j) => (j && j.ok ? j.data : null)).catch(() => null),
       fetch("/api/buyers").then((r) => r.ok ? r.json() : null).then((j) => (j && j.ok ? j.data.buyers : [])).catch(() => []),
-    ]).then(([data, buyers]) => {
+      fetch("/api/leads").then((r) => r.ok ? r.json() : null).then((j) => (j && j.ok && Array.isArray(j.data.leads) ? j.data.leads : null)).catch(() => null),
+      fetch("/api/finance").then((r) => r.ok ? r.json() : null).then((j) => (j && j.ok ? j.data : null)).catch(() => null),
+    ]).then(([data, buyers, leads, fin]) => {
       if (!alive) return;
       if (data && Array.isArray(data.units)) setInv({ units: data.units, projects: data.projects || [] });
       const names: string[] = [];
       (buyers || []).forEach((b: any) => { if (b && b.name) names.push(String(b.name)); });
       setBuyerNames(names);
+      const c: Record<string, string> = {};
+      if (leads) {
+        const n = leads.filter((l: any) => l && l.live !== false).length;
+        if (n > 0) c.leads = String(n);
+      }
+      if (fin) {
+        const escrowQueue = (fin.escrow && Array.isArray(fin.escrow.queue) ? fin.escrow.queue : []).length;
+        const escrowDdrs = (fin.escrow && Array.isArray(fin.escrow.drawdowns) ? fin.escrow.drawdowns : []).length;
+        if (escrowQueue + escrowDdrs > 0) c.escrow = String(escrowQueue + escrowDdrs);
+        const collectionsDue = (fin.collections || []).reduce((a: number, x: any) => a + (x && x.days_due > 0 ? 1 : 0), 0);
+        if (collectionsDue > 0) c.collections = String(collectionsDue);
+      }
+      setBadgeCounts(c);
     });
     return () => { alive = false; };
   }, []);
@@ -377,14 +393,15 @@ export default function Shell({
   const scopeLocked = (scopeCode || "ALL") === "ALL";
   const groupLocked = (group === "project" || group === "sales") && scopeLocked;
 
-  const navItems = NAV[group].items.map((it) => {
+  const navItems = NAV[group].items.map((it, i) => {
     const on = active === it.screen;
     const red = it.label === "Collections" || it.label === "Escrow";
     const locked = groupLocked && it.screen !== "buyer";
+    const hover = !locked && !on && hoverIdx === i;
     return {
       screen: it.screen,
       label: it.label,
-      count: it.screen === "inventory" && liveAvailable > 0 ? String(liveAvailable) : (it.count || ""),
+      count: it.screen === "inventory" && liveAvailable > 0 ? String(liveAvailable) : (badgeCounts[it.screen] || ""),
       locked,
       btn: {
         display: "flex",
@@ -398,7 +415,7 @@ export default function Shell({
         fontSize: "12.5px",
         fontWeight: on ? "700" : "500",
         color: locked ? "#B8BDC9" : on ? "#14161F" : "#6B7180",
-        background: on && !locked ? "#F0EFFE" : "transparent",
+        background: on && !locked ? "#F0EFFE" : hover ? "#F5F6FA" : "transparent",
         width: "100%",
         opacity: locked ? 0.7 : 1,
       } as CSSProperties,
@@ -530,8 +547,8 @@ export default function Shell({
       )}
       <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 2 }}>
         <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: ".09em", color: "#9AA0AE", textTransform: "uppercase", padding: "6px 10px 8px" }}>{groupLabel}</div>
-        {navItems.map((n) => (
-          <button key={n.screen} title={n.locked ? "Select a project to access" : undefined} disabled={n.locked} onClick={() => { if (n.locked) { showToast("Select a project to access the " + n.label + " screen"); return; } navigate(n.screen, group); }} style={n.btn} onMouseEnter={(e) => { if (!n.locked) e.currentTarget.style.background = "#F5F6FA"; }} onMouseLeave={(e) => { if (!n.locked) e.currentTarget.style.background = n.btn.background as string; }}>
+        {navItems.map((n, i) => (
+          <button key={n.screen} title={n.locked ? "Select a project to access" : undefined} disabled={n.locked} onClick={() => { if (n.locked) { showToast("Select a project to access the " + n.label + " screen"); return; } navigate(n.screen, group); }} style={n.btn} onMouseEnter={() => { if (!n.locked) setHoverIdx(i); }} onMouseLeave={() => { if (!n.locked) setHoverIdx(null); }}>
             <span style={n.dot} />
             <span style={{ flex: 1, textAlign: "left" }}>{n.label}</span>
             <span style={n.badge}>{n.count}</span>
@@ -565,7 +582,6 @@ export default function Shell({
       <Rail
         groups={visibleGroups}
         group={group}
-        gi={gi}
         locked={scopeLocked}
         onGo={(id) => {
           if ((id === "project" || id === "sales") && scopeLocked) {
@@ -735,12 +751,11 @@ function MenuRow({ icon, label, sub, onClick }: { icon: string; label: string; s
   );
 }
 
-function Rail({ groups, group, gi, locked, onGo, onSignOut }: { groups: RailDef[]; group: GroupId; gi: number; locked: boolean; onGo: (id: GroupId) => void; onSignOut: () => void }) {
+function Rail({ groups, group, locked, onGo, onSignOut }: { groups: RailDef[]; group: GroupId; locked: boolean; onGo: (id: GroupId) => void; onSignOut: () => void }) {
   return (
     <div style={{ width: 76, flex: "none", background: "#fff", display: "flex", flexDirection: "column", alignItems: "center", padding: "18px 0 14px", borderRight: "1px solid #EDEEF3" }}>
       <div style={{ width: 40, height: 40, borderRadius: 13, background: "#14161F", color: "#fff", display: "grid", placeItems: "center", fontWeight: 800, fontSize: 14, letterSpacing: "-.02em", marginBottom: 22 }}>EH</div>
       <div style={{ position: "relative", display: "flex", flexDirection: "column", gap: 10 }}>
-        <div style={{ position: "absolute", left: 0, top: gi * 52, width: 42, height: 42, borderRadius: 13, background: "#14161F", transition: "top 200ms cubic-bezier(.2,0,0,1)", zIndex: 1 }} />
         {groups.map((g) => {
           const isLocked = (g.id === "project" || g.id === "sales") && locked;
           return (

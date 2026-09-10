@@ -16,10 +16,23 @@ export default withPerm("Sales", "REA", async function (req: NextApiRequest, res
   }
 });
 
-async function listDocuments(_: NextApiRequest, res: NextApiResponse) {
+async function listDocuments(req: NextApiRequest, res: NextApiResponse) {
+  const project = (req.query.project as string) || "";
+  const conds: string[] = [];
+  const params: any[] = [];
+  if (project && project !== "all") {
+    params.push(project);
+    conds.push(`p.code = $${params.length}`);
+  }
+  const where = conds.length ? " WHERE " + conds.join(" AND ") : "";
   const docs = await query<any>(
-    `SELECT id, doc_type, unit_no, buyer, ref, status, generated_at
-     FROM documents ORDER BY generated_at DESC, id DESC LIMIT 20`
+    `SELECT d.id, d.doc_type, d.unit_no, d.buyer, d.ref, d.status, d.generated_at
+     FROM documents d
+     LEFT JOIN units u ON u.no = d.unit_no
+     LEFT JOIN projects p ON p.id = u.project_id
+     ${where}
+     ORDER BY d.generated_at DESC, d.id DESC LIMIT 20`,
+    params
   );
   const templates = await query<any>(
     `SELECT doc_type, version, status, blocks, changed_at

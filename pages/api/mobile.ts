@@ -8,7 +8,9 @@ export default withPerm("Dashboard", "REA", async function (req: NextApiRequest,
 
   const [proj, receipts, coll, mixes, topMiles, draw, ageing, topBuyer] = await Promise.all([
     query<any>(
-      `SELECT p.code, p.name, p.units_total, p.gdv, p.sold, p.collected,
+      `SELECT p.code, p.name, p.gdv, p.collected,
+              COUNT(u.id)::int AS total_u,
+              COALESCE(SUM(u.price) FILTER (WHERE u.status IN ('sold','booked')),0)::numeric AS sold_v,
               COUNT(u.id) FILTER (WHERE u.status = 'available') AS available,
               COUNT(u.id) FILTER (WHERE u.status = 'booked') AS booked,
               COUNT(u.id) FILTER (WHERE u.status = 'reserved') AS reserved,
@@ -16,6 +18,7 @@ export default withPerm("Dashboard", "REA", async function (req: NextApiRequest,
               COUNT(u.id) FILTER (WHERE u.status = 'blocked') AS blocked,
               COUNT(u.id) FILTER (WHERE u.status = 'sold') AS sold_u
        FROM projects p LEFT JOIN units u ON u.project_id = p.id
+       WHERE lower(p.name) NOT LIKE '%test%'
        GROUP BY p.id ORDER BY p.code`
     ),
     query<any>(`SELECT method, COALESCE(SUM(amount),0)::numeric AS total, COUNT(*)::int AS n FROM receipts GROUP BY method`),
@@ -47,7 +50,8 @@ export default withPerm("Dashboard", "REA", async function (req: NextApiRequest,
   ]);
 
   const pRows = proj.rows as {
-    code: string; name: string; units_total: number; gdv: number; sold: number; collected: number;
+    code: string; name: string; gdv: number; collected: number;
+    total_u: number; sold_v: number;
     available: number; booked: number; reserved: number; held: number; blocked: number; sold_u: number;
   }[];
   const totalGdv = pRows.reduce((a, p) => a + Number(p.gdv), 0);
@@ -69,9 +73,9 @@ export default withPerm("Dashboard", "REA", async function (req: NextApiRequest,
   const projects = pRows.map((p) => ({
     code: p.code,
     name: p.name,
-    total: p.units_total || 0,
+    total: Number(p.total_u) || 0,
     gdv: Number(p.gdv),
-    sold: Number(p.sold),
+    sold: Number(p.sold_v) || 0,
     collected: Number(p.collected),
     counts: {
       available: Number(p.available) || 0,

@@ -39,10 +39,10 @@ export default withPerm("Dashboard", "REA", async function (_req: NextApiRequest
     fc90,
     fc180,
   ] = await Promise.all([
-    query<any>(`SELECT id, code, name, location, status, units_total, gdv, sold, collected, due_date FROM projects ORDER BY code`),
+    query<any>(`SELECT id, code, name, location, status, units_total, gdv, sold, collected, due_date FROM projects WHERE lower(name) NOT LIKE '%test%' ORDER BY code`),
     query<any>(
       `SELECT
-         (SELECT COALESCE(SUM(units_total),0) FROM projects)::float AS total,
+         (SELECT COALESCE(SUM(units_total),0) FROM projects WHERE lower(name) NOT LIKE '%test%')::float AS total,
          (SELECT COUNT(*)::float FROM units)::float AS live,
          (SELECT COUNT(*)::float FROM units WHERE status='available')::float AS avail,
          (SELECT COALESCE(SUM(price),0) FROM units WHERE status='available')::float AS inv_val,
@@ -52,6 +52,7 @@ export default withPerm("Dashboard", "REA", async function (_req: NextApiRequest
     query<any>(
       `SELECT p.code, COUNT(u.id)::int AS n
        FROM projects p LEFT JOIN units u ON u.project_id = p.id AND u.status IN ('sold','booked')
+       WHERE lower(p.name) NOT LIKE '%test%'
        GROUP BY p.code`
     ),
     query<any>(
@@ -159,7 +160,7 @@ export default withPerm("Dashboard", "REA", async function (_req: NextApiRequest
   const kpis = [
     {
       label: "Gross development value",
-      value: compact(its(gdv)),
+      value: compact(gdv),
       chip: rnd((soldV / (gdv || 1)) * 100, 1) + "% sold",
       dir: "up",
       sub: projects.length + " projects",
@@ -168,7 +169,7 @@ export default withPerm("Dashboard", "REA", async function (_req: NextApiRequest
     },
     {
       label: "Total sold value",
-      value: compact(its(soldV)),
+      value: compact(soldV),
       chip: rnd((collected / (soldV || 1)) * 100, 1) + "% collected",
       dir: "up",
       sub: rnd((soldV / (gdv || 1)) * 100, 1) + "% of GDV",
@@ -177,7 +178,7 @@ export default withPerm("Dashboard", "REA", async function (_req: NextApiRequest
     },
     {
       label: "Collected to date",
-      value: compact(its(collected)),
+      value: compact(collected),
       chip: rnd(its(Number(receiptsTot.rows[0]?.s) || 0), 1) + "M banked",
       dir: "up",
       sub: rnd((collected / (soldV || 1)) * 100, 1) + "% of sold",
@@ -186,7 +187,7 @@ export default withPerm("Dashboard", "REA", async function (_req: NextApiRequest
     },
     {
       label: "Outstanding receivable",
-      value: compact(its(outstanding)),
+      value: compact(outstanding),
       chip: buyers + " buyers",
       dir: "down",
       sub: rnd((outstanding / (soldV || 1)) * 100, 1) + "% of sold",
@@ -195,7 +196,7 @@ export default withPerm("Dashboard", "REA", async function (_req: NextApiRequest
     },
     {
       label: "Overdue",
-      value: compact(its(overdue)),
+      value: compact(overdue),
       chip: overdueCount + " instalments",
       dir: "bad",
       sub: rnd((overdue / (outstanding || 1)) * 100, 1) + "% of outstanding",
@@ -205,7 +206,7 @@ export default withPerm("Dashboard", "REA", async function (_req: NextApiRequest
     {
       label: "Units available",
       value: availUnits + " of " + totalUnits,
-      chip: "AED " + compact(its(Number(un.inv_val) || 0)).replace("AED ", "") + " inventory",
+      chip: "AED " + compact(Number(un.inv_val) || 0).replace("AED ", "") + " inventory",
       dir: "down",
       sub: rnd(((totalUnits - availUnits) / (totalUnits || 1)) * 100, 1) + "% sold through",
       target: { screen: "inventory", group: "project" },
@@ -224,19 +225,19 @@ export default withPerm("Dashboard", "REA", async function (_req: NextApiRequest
       100,
     ],
     legend: [
-      ["Collected", compact(its(collected)), "#4F46F5"],
-      ["Outstanding", compact(its(slow)), "#B9B4FA"],
-      ["Overdue", compact(its(overdue)), "#E5484D"],
+      ["Collected", compact(collected), "#4F46F5"],
+      ["Outstanding", compact(slow), "#B9B4FA"],
+      ["Overdue", compact(overdue), "#E5484D"],
     ] as [string, string, string][],
   };
 
   const ag = agingRes.rows[0] || {};
   const ageing: [string, number, number, number][] = [
-    ["Current", its(Math.max(0, outstanding - Q(ag.overdue_total))), 0, 0],
-    ["1–30", its(Q(ag.c30)), Number(ag.n30) || 0, 1],
-    ["31–60", its(Q(ag.c60)), Number(ag.n60) || 0, 1],
-    ["61–90", its(Q(ag.c90)), Number(ag.n90) || 0, 1],
-    ["90+", its(Q(ag.c90p)), Number(ag.n90p) || 0, 1],
+    ["Current", Math.max(0, outstanding - Q(ag.overdue_total)), 0, 0],
+    ["1–30", Q(ag.c30), Number(ag.n30) || 0, 1],
+    ["31–60", Q(ag.c60), Number(ag.n60) || 0, 1],
+    ["61–90", Q(ag.c90), Number(ag.n90) || 0, 1],
+    ["90+", Q(ag.c90p), Number(ag.n90p) || 0, 1],
   ];
   const ageingMax = Math.max(...ageing.map((a) => a[1]), 1);
   const ageingPct = ageing.map((a) => {
@@ -263,7 +264,7 @@ export default withPerm("Dashboard", "REA", async function (_req: NextApiRequest
 
   const attention: { text: string; meta: string; value: string; tone: "red" | "amber"; target: { screen: string; group: string } }[] = [];
   if ((attMap.overdue90?.n || 0) > 0)
-    attention.push({ text: `${attMap.overdue90.n} instalments overdue beyond 90 days`, meta: "Across projects", value: compact(its(attMap.overdue90.s)), tone: "red", target: { screen: "collections", group: "finance" } });
+    attention.push({ text: `${attMap.overdue90.n} instalments overdue beyond 90 days`, meta: "Across projects", value: compact(attMap.overdue90.s), tone: "red", target: { screen: "collections", group: "finance" } });
   if ((attMap.escrow?.n || 0) > 0)
     attention.push({ text: `${attMap.escrow.n} escrow variances unmatched`, meta: "Reconciliation queue", value: String(attMap.escrow.n), tone: "red", target: { screen: "escrow", group: "finance" } });
   if ((attMap.approvals?.n || 0) > 0)
@@ -300,6 +301,8 @@ export default withPerm("Dashboard", "REA", async function (_req: NextApiRequest
 
   const metaDate = new Date().toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
 
+  const collectionRate = soldV > 0 ? collected / soldV : 0;
+
   ok(res, {
     meta: {
       projects: projects.length,
@@ -313,6 +316,7 @@ export default withPerm("Dashboard", "REA", async function (_req: NextApiRequest
     forecast: { bars: buckets },
     attention,
     velocity,
+    collectionRate,
     escrowBalance: its(Number(escrowRes.rows[0]?.bal) || 0),
   });
 });

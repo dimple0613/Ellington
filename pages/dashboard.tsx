@@ -28,12 +28,12 @@ type DashData = {
   forecast: { bars: Record<string, [string, number][]> };
   attention: AttRow[];
   velocity: { stats: { label: string; value: string }[]; bars: number[] };
+  collectionRate: number;
 };
 
 const PERIODS = ["MTD", "QTD", "YTD", "Custom"];
 const FC_TABS = ["7", "30", "90", "180"];
 
-const its = (n: number) => Math.round(n / 1e6 * 10) / 10;
 const rnd = (n: number, d = 1) => Math.round(n * Math.pow(10, d)) / Math.pow(10, d);
 const spark = (vals: number[], pts = 6): string => {
   if (!vals.length) return "0,9 6,9 12,9 18,9 24,9 30,9";
@@ -97,6 +97,7 @@ function fallbackDash(): DashData {
       ],
       bars: [],
     },
+    collectionRate: 0,
   };
 }
 
@@ -262,7 +263,7 @@ export default function Dashboard() {
                   <span style={{ flex: 1, height: 7, borderRadius: 5, background: "#F1F2F7", overflow: "hidden" }}>
                     <span style={{ display: "block", height: "100%", width: Math.min(100, a[3]) + "%", background: "rgba(229,72,77," + (0.18 + a[3] / 140).toFixed(3) + ")" }} />
                   </span>
-                  <span style={{ width: 78, flex: "none", textAlign: "right", fontSize: 11.5, fontWeight: 700 }}>{compact(a[1] * 1e6)}</span>
+                  <span style={{ width: 78, flex: "none", textAlign: "right", fontSize: 11.5, fontWeight: 700 }}>{compact(a[1])}</span>
                   <span style={{ width: 56, flex: "none", textAlign: "right", fontSize: 10.5, fontWeight: 600, color: "#9AA0AE" }}>{a[2]} buyers</span>
                 </button>
               ))}
@@ -296,8 +297,8 @@ export default function Dashboard() {
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 14, marginTop: 20, borderTop: "1px solid #F1F2F7", paddingTop: 18 }}>
             {[
               { label: "Expected", value: "AED " + sum.toFixed(1) + "M", note: "Scheduled instalments in window", c: "#14161F" },
-              { label: "Confidence-adjusted", value: "AED " + (sum * 0.914).toFixed(1) + "M", note: "At 91.4% historical collection rate", c: "#14161F" },
-              { label: "At risk", value: "AED " + (sum * 0.086).toFixed(1) + "M", note: "Broken promises and dunning ladder", c: "#E5484D" },
+              { label: "Confidence-adjusted", value: "AED " + (sum * data.collectionRate).toFixed(1) + "M", note: data.collectionRate > 0 ? "At " + rnd(data.collectionRate * 100, 1) + "% historical collection rate" : "—", c: "#14161F" },
+              { label: "At risk", value: data.collectionRate > 0 ? "AED " + (sum * (1 - data.collectionRate)).toFixed(1) + "M" : "—", note: "Broken promises and dunning ladder", c: "#E5484D" },
             ].map((x) => (
               <div key={x.label}>
                 <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: ".07em", color: "#9AA0AE", textTransform: "uppercase" }}>{x.label}</div>
@@ -390,3 +391,5 @@ export default function Dashboard() {
     </Shell>
   );
 }
+
+export const getServerSideProps = async () => ({ props: {} });

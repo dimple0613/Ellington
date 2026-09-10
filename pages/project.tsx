@@ -36,3 +36,5 @@ export default function Project() {
     />
   );
 }
+
+export const getServerSideProps = async () => ({ props: {} });

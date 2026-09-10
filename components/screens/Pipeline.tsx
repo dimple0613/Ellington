@@ -31,7 +31,7 @@ const STAGE_SLUGS = ["payment_cleared", "snagging_scheduled", "snagging_done", "
 const FORECAST: number[] = [];
 const maxF = 1;
 
-export default function PipelineScreen() {
+export default function PipelineScreen({ scope }: { scope?: string }) {
   const router = useRouter();
   const [sel, setSel] = useState<number | null>(null);
   const [notice, setNotice] = useState("");
@@ -48,11 +48,17 @@ export default function PipelineScreen() {
 
   useEffect(() => {
     let active = true;
+    setLoaded(false);
+    setCards({});
+    setCounts({});
+    setReadyInfo({});
+    setBlocked([]);
+    const proj = scope && scope !== "ALL" ? "?project=" + encodeURIComponent(scope) : "";
     fetchJSON<{
       pipeline: { unit_no: string; buyer: string; stage: string; meta: string }[];
       readiness: ReadinessRow[];
       overview: { total: number; ready: number; blocked: number };
-    }>("/api/handover")
+    }>("/api/handover" + proj)
       .then((j) => {
         if (!active) return;
         setLoaded(true);
@@ -93,7 +99,7 @@ export default function PipelineScreen() {
         if (active) { setLoaded(true); setApiError(e?.message || "Failed to load pipeline"); }
       });
     return () => { active = false; };
-  }, []);
+  }, [scope]);
 
   const goSnag = () => router.push({ pathname: "/handover", query: { s: "snagging" } }, undefined, { shallow: true });
 

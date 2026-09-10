@@ -47,7 +47,7 @@ export default withPerm("Inventory", "REA", async function (req: NextApiRequest,
   );
 
   const projects = await query<any>(
-    `SELECT code, name FROM projects ORDER BY code`
+    `SELECT code, name FROM projects WHERE lower(name) NOT LIKE '%test%' ORDER BY code`
   );
 
   ok(res, { units: units.rows, summary: summary.rows, projects: projects.rows });

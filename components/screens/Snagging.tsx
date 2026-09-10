@@ -11,7 +11,7 @@ const STATUS_PILL: Record<string, { bg: string; color: string }> = { Open: { bg:
 const sevPill = (v: string) => { const s = SEV_PILL[v] || SEV_PILL.Minor; return { display: "inline-block", fontSize: 10.5, fontWeight: 700, borderRadius: 7, padding: "3px 8px", background: s.bg, color: s.color }; };
 const statusPill = (v: string) => { const s = STATUS_PILL[v] || STATUS_PILL.Open; return { display: "inline-block", fontSize: 10.5, fontWeight: 700, borderRadius: 7, padding: "3px 8px", background: s.bg, color: s.color }; };
 
-export default function SnaggingScreen() {
+export default function SnaggingScreen({ scope }: { scope?: string }) {
   const [closed, setClosed] = useState<Set<number>>(new Set());
   const [notice, setNotice] = useState("");
   const [rows, setRows] = useState<SnagRow[]>([]);
@@ -30,7 +30,10 @@ export default function SnaggingScreen() {
 
   useEffect(() => {
     let active = true;
-    fetchJSON<{ snagging: { unit_no: string; loc: string; trade: string; desc: string; sev: string; contractor: string; status: string; reinspect: string }[] }>("/api/handover")
+    setLoaded(false);
+    setRows([]);
+    const proj = scope && scope !== "ALL" ? "?project=" + encodeURIComponent(scope) : "";
+    fetchJSON<{ snagging: { unit_no: string; loc: string; trade: string; desc: string; sev: string; contractor: string; status: string; reinspect: string }[] }>("/api/handover" + proj)
       .then((j) => {
         if (active) setLoaded(true);
         if (!active || !Array.isArray(j.snagging)) return;
@@ -50,7 +53,7 @@ export default function SnaggingScreen() {
         if (active) { setLoaded(true); setApiError(e?.message || "Failed to load snags"); }
       });
     return () => { active = false; };
-  }, []);
+  }, [scope]);
 
   const closeSnag = (idx: number) => {
     setClosed((prev) => { const next = new Set(prev); next.add(idx); return next; });

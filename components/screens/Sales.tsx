@@ -158,7 +158,7 @@ export default function Sales({ scope }: { scope: string }) {
     return () => { active = false; };
   }, [scope]);
 
-  if (s === "leads") return <Leads onNewBooking={blankBooking} onBookLead={goBooking} goRegister={go("bookings")} />;
+  if (s === "leads") return <Leads onNewBooking={blankBooking} onBookLead={goBooking} goRegister={go("bookings")} scope={scope} />;
   if (s === "booking") return <Booking step={step} setStep={setStep} onBack={go("leads")} lead={lead} blank={!lead} units={units}
     onOpenBuyer={(bid) => {
       if (bid != null) {
@@ -184,14 +184,14 @@ export default function Sales({ scope }: { scope: string }) {
     }} />;
   }
   if (s === "brokers") return <Brokers brtab={brtab} setBrtab={setBrtab} brstep={brstep} setBrstep={setBrstep} />;
-  if (s === "documents") return <Documents dtab={dtab} setDtab={setDtab} doc={doc} setDoc={setDoc} />;
-  return <Leads onNewBooking={blankBooking} onBookLead={goBooking} goRegister={go("bookings")} />;
+  if (s === "documents") return <Documents dtab={dtab} setDtab={setDtab} doc={doc} setDoc={setDoc} scope={scope} />;
+  return <Leads onNewBooking={blankBooking} onBookLead={goBooking} goRegister={go("bookings")} scope={scope} />;
 }
 
 /* ═══════════════════════════════════════════════════════════════════
    LEADS
    ═══════════════════════════════════════════════════════════════════ */
-function Leads({ onNewBooking, onBookLead, goRegister }: { onNewBooking: () => void; onBookLead: (card: Card) => void; goRegister: () => void }) {
+function Leads({ onNewBooking, onBookLead, goRegister, scope }: { onNewBooking: () => void; onBookLead: (card: Card) => void; goRegister: () => void; scope: string }) {
   const [dbCols, setDbCols] = useState<Col[] | null>(null);
   const [liveLeads, setLiveLeads] = useState<ApiLead[] | null>(null);
   const [apiError, setApiError] = useState("");
@@ -199,7 +199,7 @@ function Leads({ onNewBooking, onBookLead, goRegister }: { onNewBooking: () => v
 
   useEffect(() => {
     let active = true;
-    fetchJSON<{ leads: ApiLead[] }>("/api/leads")
+    fetchJSON<{ leads: ApiLead[] }>("/api/leads" + (scope && scope !== "ALL" ? "?project=" + encodeURIComponent(scope) : ""))
       .then((j) => {
         const leads = j.leads;
         if (!active || !Array.isArray(leads)) return;
@@ -244,7 +244,7 @@ function Leads({ onNewBooking, onBookLead, goRegister }: { onNewBooking: () => v
         if (active) { setLoaded(true); setApiError(e?.message || "Failed to load leads"); }
       });
     return () => { active = false; };
-  }, []);
+  }, [scope]);
 
   const cols = dbCols && dbCols.length ? dbCols : LEADS_COLS;
 
@@ -2132,7 +2132,7 @@ function Brokers({ brtab, setBrtab, brstep, setBrstep }: { brtab:string; setBrta
 /* ═══════════════════════════════════════════════════════════════════
    DOCUMENTS
    ═══════════════════════════════════════════════════════════════════ */
-function Documents({ dtab, setDtab, doc, setDoc }: { dtab:string; setDtab:(v:any)=>void; doc:string; setDoc:(s:string)=>void }) {
+function Documents({ dtab, setDtab, doc, setDoc, scope }: { dtab:string; setDtab:(v:any)=>void; doc:string; setDoc:(s:string)=>void; scope:string }) {
   const [units, setUnits] = useState<{ no: string; typ: string; beds: number; area: number; price: number; psf: number }[]>([]);
   const [buyers, setBuyers] = useState<string[]>([]);
   const [unitNo, setUnitNo] = useState("");
@@ -2149,7 +2149,7 @@ function Documents({ dtab, setDtab, doc, setDoc }: { dtab:string; setDtab:(v:any
 
   useEffect(() => {
     let alive = true;
-    fetchJSON<{ docs: { ref: string; type: string; buyer: string; when: string }[]; templates: { doc_type: string; version: string; status: string; changed_at: string; blocks?: string[] }[] }>("/api/documents")
+    fetchJSON<{ docs: { ref: string; type: string; buyer: string; when: string }[]; templates: { doc_type: string; version: string; status: string; changed_at: string; blocks?: string[] }[] }>("/api/documents" + (scope && scope !== "ALL" ? "?project=" + encodeURIComponent(scope) : ""))
       .then((d) => {
         if (!alive) return;
         setGenLog(d.docs.slice(0, 5).map((x) => ({
@@ -2169,7 +2169,7 @@ function Documents({ dtab, setDtab, doc, setDoc }: { dtab:string; setDtab:(v:any
       })
       .catch(() => { /* offline fallback: keep empty local log */ });
     return () => { alive = false; };
-  }, [doc]);
+  }, [doc, scope]);
 
   useEffect(() => {
     let alive = true;

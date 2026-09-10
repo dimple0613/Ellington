@@ -8,7 +8,7 @@ const TABS = [
   { key: "pulse", label: "Pulse", icon: "\u26A1" },
   { key: "money", label: "Money", icon: "\u00A3" },
   { key: "buyers", label: "Buyers", icon: "\u263A" },
-  { key: "appr", label: "Approvals", icon: "\u2713", badge: 2 },
+  { key: "appr", label: "Approvals", icon: "\u2713" },
   { key: "more", label: "More", icon: "\u2261" },
 ];
 
@@ -81,6 +81,9 @@ export default function MobileScreen() {
   const ao = agg?.portfolio;
   const aM = agg?.money;
   const proj0 = agg?.projects?.[0];
+  const apprBadge = agg ? agg.approvals.count || 0 : 0;
+  const todayLabel =
+    new Date().toLocaleDateString("en-US", { weekday: "long" }) + ", " + new Date().getDate() + " " + new Date().toLocaleDateString("en-US", { month: "long" });
 
   const projName = proj0 ? proj0.code + " " + proj0.name : "BLG Belgravia Heights III";
   const ringPct = proj0
@@ -134,13 +137,13 @@ export default function MobileScreen() {
           <span style={{ position: "absolute", right: 20, fontSize: 10, fontWeight: 600, color: "#fff" }}>{"\u25C8"} {"\u25B6"} 100%</span>
         </div>
         <div style={{ flex: 1, overflow: "auto", padding: "12px 14px" }}>{children}</div>
-        <div style={{ borderTop: "1px solid #EDEEF3", display: "flex", overflowX: "auto" }}>{TABS.map((t) => (
+        <div style={{ borderTop: "1px solid #EDEEF3", display: "flex", overflowX: "auto" }}>{TABS.map((t) => { const nb = t.key === "appr" ? apprBadge : 0; return (
             <div key={t.key} onClick={() => setActiveTab(t.key)} style={{ flex: "1 0 auto", minWidth: 46, textAlign: "center", padding: "6px 0", cursor: "pointer", position: "relative" }}>
               <span style={{ fontSize: 15, display: "block", color: activeTab === t.key ? "#4F46E5" : "#9AA0AE" }}>{t.icon}</span>
               <span style={{ fontSize: 8, fontWeight: 700, color: activeTab === t.key ? "#4F46E5" : "#9AA0AE", letterSpacing: ".03em" }}>{t.label}</span>
-              {t.badge && <span style={{ position: "absolute", top: 1, right: "50%", transform: "translateX(14px)", width: 14, height: 14, borderRadius: 7, background: "#E5484D", color: "#fff", fontSize: 8, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center" }}>{t.badge}</span>}
+              {nb > 0 && <span style={{ position: "absolute", top: 1, right: "50%", transform: "translateX(14px)", width: 14, height: 14, borderRadius: 7, background: "#E5484D", color: "#fff", fontSize: 8, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center" }}>{nb}</span>}
             </div>
-          ))}
+          ); })}
         </div>
       </div>
     </div>
@@ -170,29 +173,29 @@ export default function MobileScreen() {
         <PhoneShell>
           {activeTab === "home" && (
             <div>
-              <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 2 }}>Good morning, Khalid</div>
-              <div style={{ fontSize: 10, color: "#9AA0AE", fontWeight: 600, marginBottom: 12 }}>Thursday, 3 September</div>
+              <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 2 }}>Good morning, {agg ? (agg.me.name || "Executive").split(" ")[0] : "Executive"}</div>
+              <div style={{ fontSize: 10, color: "#9AA0AE", fontWeight: 600, marginBottom: 12 }}>{todayLabel}</div>
               <Card>
                 <div style={{ fontSize: 9, fontWeight: 700, color: "#9AA0AE", letterSpacing: ".05em", textTransform: "uppercase" as const }}>Portfolio value</div>
-                <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: "-.03em", marginTop: 4 }}>{aedM(ao ? ao.value : 1320000000)}</div>
+                <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: "-.03em", marginTop: 4 }}>{aedM(ao ? ao.value : 0)}</div>
                 <div style={{ fontSize: 9.5, color: "#1F9D6B", fontWeight: 700, marginTop: 2 }}>{"\u25B2"} 2.4% vs last month</div>
               </Card>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
                 <Card>
                   <div style={{ fontSize: 9, fontWeight: 700, color: "#9AA0AE", letterSpacing: ".05em", textTransform: "uppercase" as const }}>Collected</div>
-                  <div style={{ fontSize: 15, fontWeight: 800, marginTop: 3 }}>{aedM(ao ? ao.collected : 84200000)}</div>
+                  <div style={{ fontSize: 15, fontWeight: 800, marginTop: 3 }}>{aedM(ao ? ao.collected : 0)}</div>
                   <div style={{ fontSize: 9, color: "#1F9D6B", fontWeight: 700 }}>{Math.round(((ao ? ao.collected : 0) / (ao ? ao.target : 1)) * 100)}% of target</div>
                 </Card>
                 <Card>
                   <div style={{ fontSize: 9, fontWeight: 700, color: "#9AA0AE", letterSpacing: ".05em", textTransform: "uppercase" as const }}>Overdue</div>
-                  <div style={{ fontSize: 15, fontWeight: 800, marginTop: 3, color: "#E5484D" }}>{aedM(ao ? ao.overdue : 3100000)}</div>
-                  <div style={{ fontSize: 9, color: "#E5484D", fontWeight: 700 }}>{agg ? agg.portfolio.cheques : 7} cheques</div>
+                  <div style={{ fontSize: 15, fontWeight: 800, marginTop: 3, color: "#E5484D" }}>{aedM(ao ? ao.overdue : 0)}</div>
+                  <div style={{ fontSize: 9, color: "#E5484D", fontWeight: 700 }}>{agg ? agg.portfolio.cheques : "—"} cheques</div>
                 </Card>
               </div>
               <Section title="30-day confidence">
                 <Card>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                    <span style={{ fontSize: 10, fontWeight: 700 }}>Expected {aedM(ao ? ao.confidence.amount : 12400000)}</span>
+                    <span style={{ fontSize: 10, fontWeight: 700 }}>Expected {aedM(ao ? ao.confidence.amount : 0)}</span>
                     <span style={{ fontSize: 9, color: "#1F9D6B", fontWeight: 700 }}>{agg ? agg.portfolio.confidence.pct : 87}% likely</span>
                   </div>
                   <div style={{ height: 6, borderRadius: 3, background: "#F1F2F7", overflow: "hidden" }}>
@@ -435,7 +438,7 @@ export default function MobileScreen() {
                   </div>
                 </div>
               </Card>
-              { [["Notifications", "Center & quiet hours"], ["My approvals", "2 pending"], ["Documents", "Shared with me"], ["Help & support", "FAQ + contact"], ["Settings", "App preferences"]].map(([label, note]) => (
+              { [["Notifications", "Center & quiet hours"], ["My approvals", agg ? agg.approvals.count + " pending" : "Loading\u2026"], ["Documents", "Shared with me"], ["Help & support", "FAQ + contact"], ["Settings", "App preferences"]].map(([label, note]) => (
                 <Card key={label}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <span style={{ fontSize: 11, fontWeight: 700 }}>{label}</span>
@@ -462,7 +465,7 @@ export default function MobileScreen() {
           </div>
           <div style={{ background: "#fff", borderRadius: 20, padding: "22px 24px", boxShadow: "0 1px 3px rgba(20,22,31,.04)", marginTop: 14 }}>
             <div style={{ fontSize: 15, fontWeight: 700, letterSpacing: "-.015em", marginBottom: 12 }}>All screens</div>
-            {TABS.map((t) => (
+            {TABS.map((t) => { const nb = t.key === "appr" ? apprBadge : 0; return (
               <div key={t.key} onClick={() => setActiveTab(t.key)} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", borderRadius: 10, cursor: "pointer", background: activeTab === t.key ? "#F0EFFE" : undefined, marginBottom: 2 }}>
                 <span style={{ fontSize: 16, width: 22, textAlign: "center", color: activeTab === t.key ? "#4F46E5" : "#9AA0AE" }}>{t.icon}</span>
                 <div>
@@ -477,9 +480,9 @@ export default function MobileScreen() {
                     {t.key === "more" && "Profile + settings"}
                   </div>
                 </div>
-                {t.badge && <span style={{ marginLeft: "auto", width: 18, height: 18, borderRadius: 9, background: "#E5484D", color: "#fff", fontSize: 9, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center" }}>{t.badge}</span>}
+                {nb > 0 && <span style={{ marginLeft: "auto", width: 18, height: 18, borderRadius: 9, background: "#E5484D", color: "#fff", fontSize: 9, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center" }}>{nb}</span>}
               </div>
-            ))}
+            ); })}
           </div>
         </div>
       </div>

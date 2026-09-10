@@ -17,7 +17,7 @@ const pill = (v: string, map: Record<string, { bg: string; color: string }>) => 
   return { display: "inline-block", fontSize: 10.5, fontWeight: 700, borderRadius: 7, padding: "3px 8px", background: s.bg, color: s.color };
 };
 
-export default function DeedsScreen() {
+export default function DeedsScreen({ scope }: { scope?: string }) {
   const [notice, setNotice] = useState("");
   const [certOpen, setCertOpen] = useState(false);
   const [certUnit, setCertUnit] = useState("");
@@ -27,7 +27,10 @@ export default function DeedsScreen() {
 
   useEffect(() => {
     let active = true;
-    fetchJSON<{ deeds: { unit_no: string; buyer: string; oqood: string; dld: string; deed: string; issued: string; keys: string; oa: string }[] }>("/api/handover")
+    setLoaded(false);
+    setRows([]);
+    const proj = scope && scope !== "ALL" ? "?project=" + encodeURIComponent(scope) : "";
+    fetchJSON<{ deeds: { unit_no: string; buyer: string; oqood: string; dld: string; deed: string; issued: string; keys: string; oa: string }[] }>("/api/handover" + proj)
       .then((j) => {
         if (active) setLoaded(true);
         if (!active || !Array.isArray(j.deeds)) return;
@@ -47,7 +50,7 @@ export default function DeedsScreen() {
         if (active) { setLoaded(true); setApiError(e?.message || "Failed to load deeds"); }
       });
     return () => { active = false; };
-  }, []);
+  }, [scope]);
 
   const banner = (m: string) => { setNotice(m); setTimeout(() => setNotice(""), 3000); };
 
