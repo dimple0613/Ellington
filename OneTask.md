@@ -10,9 +10,10 @@
 - PUSH THIS (next commit, purge batch 2 — Mobile phone-frame mock-to-live bind):
   - **`components/screens/Mobile.tsx`**: removed hardcoded "▲ 2.4% vs last month" → live "% collected"; snap tab: replaced static `Overdue AED 0` / `Net margin 28.4%` → live portfolio overdue + computed collect-rate%; pulse tab: bound Available/Reserved/Blocked to live project counts, replaced static "newly released"/"selling fastest" with live milestones + honest empty state; buyers tab: replaced static Priya Sharma/Rajesh Menon with live top-overdue buyer + empty state; approval drawdown amount bound to `agg.approvals.valueM`; profile avatar initials now derive from live `me.name`.
   - **`pages/api/mobile.ts`** (already committed in `9034d3e`): test-project filter + live total/sold from units.
+  - **`db/schema.sql`**: removed stale `next` counters from `app_settings.numbering` seed (display-only metadata); corrected receipt prefix from `RCP-{project}-{seq}` to `RCP-{seq}` to match actual row-ID format.
 - Also on branch (already committed, not pushed): wizard rewire commit `11a015c`, remaining-fabricated-data commit `0e53c6e`, notification fix commit, and UI-analysis-round-2 commit `9034d3e` (mobile test-project filter, live badges, SSR tabs, handover scope, WKP→WPK rename).
 - NOT in commit (never): `docs/ARCHITECTURE.md`, `auto-push.ps1`, `test-*.mjs`, `dev.log`.
-- Status: `npx tsc --noEmit` **green** (no errors); `next build` blocked by dev server lock on `.next/trace` — code is type-safe.
+- Status: `npx tsc --noEmit` **green**; `next build` **green** (all pages compiled, dev server stopped for build).
 - Prior task `feat/audit-halfdone-completion` (portals/unit-builder/pricing) is fully shipped on its own branch — historical, NOT in this commit. Demo portal logins: `buyer@example.com` / `broker@example.com`, `Portal123!`.
 
 ## Static data purge (purge-static-data)
