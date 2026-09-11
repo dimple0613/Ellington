@@ -85,9 +85,9 @@ input {
 .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
 
 /* ── Responsive layout helpers ── */
-[style*="min-width: 1180"] { min-width: 0 !important; }
-[style*="overflow-x: auto"] { overflow-x: visible !important; }
-[style*="overflowX: auto"] { overflowX: visible !important; }
+/* NOTE: elements that set overflow-x:auto (kanban strips, table scroll wrappers,
+   tab bars) keep their scroll behavior — never override them to visible here.
+   The app shell already clips at the content level with overflowX:hidden. */
 
 /* Content area responsive padding */
 @media (max-width: 1024px) {
@@ -104,27 +104,53 @@ input {
   .overflow-x-auto { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 }
 
-/* Fluid cards: any button/div with borderRadius:20 should shrink gracefully */
+/* Fluid cards: any button/div with borderRadius 20/22 should shrink gracefully */
 @media (max-width: 640px) {
   [style*="border-radius: 20"] { border-radius: 14px !important; }
   [style*="borderRadius: 20"] { borderRadius: 14px !important; }
+  [style*="border-radius: 22"] { border-radius: 15px !important; }
+  [style*="borderRadius: 22"] { borderRadius: 15px !important; }
 }
 
 /* ── Screen-specific responsive overrides via data attributes ── */
-/* KPI grids: repeat(6,1fr) -> auto-fit */
+/* KPI grids: repeat(6,1fr) -> auto-fit (not repeat(6,38px) toggle matrices) */
 @media (max-width: 1024px) {
-  [style*="repeat(6"] { grid-template-columns: repeat(3, 1fr) !important; }
-  [style*="repeat(6,"] { grid-template-columns: repeat(3, 1fr) !important; }
+  [style*="repeat(6,1fr)"] { grid-template-columns: repeat(3, 1fr) !important; }
+  [style*="repeat(6, 1fr)"] { grid-template-columns: repeat(3, 1fr) !important; }
 }
 @media (max-width: 640px) {
-  [style*="repeat(6"] { grid-template-columns: repeat(2, 1fr) !important; }
-  [style*="repeat(6,"] { grid-template-columns: repeat(2, 1fr) !important; }
+  [style*="repeat(6,1fr)"] { grid-template-columns: repeat(2, 1fr) !important; }
+  [style*="repeat(6, 1fr)"] { grid-template-columns: repeat(2, 1fr) !important; }
 }
 
-/* 2-col feature panels: 1.55fr 1fr, 1.35fr 1fr -> stack */
-@media (max-width: 900px) {
-  [style*="1.55fr 1fr"] { grid-template-columns: 1fr !important; }
-  [style*="1.35fr 1fr"] { grid-template-columns: 1fr !important; }
+/* KPI grids: repeat(4,1fr) / repeat(5,1fr) -> 3-up on tablet, 2-up on mobile */
+@media (max-width: 1024px) {
+  [style*="repeat(4,1fr)"] { grid-template-columns: repeat(3, 1fr) !important; }
+  [style*="repeat(5,1fr)"] { grid-template-columns: repeat(3, 1fr) !important; }
+}
+@media (max-width: 640px) {
+  [style*="repeat(4,1fr)"] { grid-template-columns: repeat(2, 1fr) !important; }
+  [style*="repeat(5,1fr)"] { grid-template-columns: repeat(2, 1fr) !important; }
+  [style*="repeat(4,1fr) 1.4fr"] { grid-template-columns: repeat(2, 1fr) !important; }
+}
+
+/* 2-col feature panels: common fr pairs -> stack.
+   Browsers serialize inline styles as "key: value;" (space after colon,
+   camelCase keys kebab-cased, px suffixes). Data tables are exempt via
+   :not([style*="min-width"]) — every wrapped table grid carries an inline
+   min-width, so only true two-panel layouts (no min-width) collapse. */
+@media (max-width: 1024px) {
+  [style*="1.7fr 1fr"]:not([style*="min-width"]), [style*="1.6fr 1fr"]:not([style*="min-width"]),
+  [style*="1.55fr 1fr"]:not([style*="min-width"]), [style*="1.5fr 1fr"]:not([style*="min-width"]),
+  [style*="1.4fr 1fr"]:not([style*="min-width"]), [style*="1.35fr 1fr"]:not([style*="min-width"]),
+  [style*="1.3fr 1fr"]:not([style*="min-width"]), [style*="1.25fr 1fr"]:not([style*="min-width"]),
+  [style*="1.1fr 1fr"]:not([style*="min-width"]), [style*="1fr 1.2fr"]:not([style*="min-width"]),
+  [style*="1fr 300px"]:not([style*="min-width"]), [style*="1fr 350px"]:not([style*="min-width"]),
+  [style*="300px 1fr"]:not([style*="min-width"]), [style*="340px 1fr"]:not([style*="min-width"]),
+  [style*="210px 1fr 300px"]:not([style*="min-width"]), [style*="230px 1fr 290px"]:not([style*="min-width"]),
+  [style*="250px 1fr 290px"]:not([style*="min-width"]) {
+    grid-template-columns: 1fr !important;
+  }
 }
 
 /* 3-col stats: repeat(3,1fr) -> 2-col on tablet, 1-col on mobile */
@@ -135,6 +161,18 @@ input {
   [style*="repeat(3,1fr)"] { grid-template-columns: 1fr !important; }
 }
 
+/* 2 equal cols (1fr 1fr splits) -> stack on mobile only.
+   Matched against "grid-template-columns: " with and without the space
+   after the colon: React SSR emits "k:value", the hydrated DOM re-serializes
+   to "k: value;". Anchoring prevents wide data tables whose track list merely
+   CONTAINS "1fr 1fr" (e.g. "grid-template-columns: 100px 1fr 1fr 1fr 1fr")
+   from being hit. The :not([style*="min-width"]) guard is a second line of
+   defense for any table grid that starts with the pair but carries min-width. */
+@media (max-width: 640px) {
+  [style*="grid-template-columns: 1fr 1fr"]:not([style*="min-width"]),
+  [style*="grid-template-columns:1fr 1fr"]:not([style*="min-width"]) { grid-template-columns: 1fr !important; }
+}
+
 /* Projects table: fixed px columns -> horizontal scroll wrapper */
 .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; max-width: 100%; }
 
@@ -142,6 +180,8 @@ input {
 @media (max-width: 640px) {
   [style*="fontSize: 26"] { fontSize: 20px !important; }
   [style*="font-size: 26"] { font-size: 20px !important; }
+  [style*="fontSize: 22"] { fontSize: 18px !important; }
+  [style*="font-size: 22"] { font-size: 18px !important; }
 }
 
 /* KPI card text responsive */
@@ -222,4 +262,8 @@ input {
 /* Keep password-input eye button clickable on touch */
 @media (max-width: 640px) {
   button[aria-label$="password"] { min-width: 40px; min-height: 40px; }
+}
+@media (max-width: 640px) {
+  [style*="max-width: 900"], [style*="max-width:900"] { flex-direction: column; }
+  [style*="width: 214"], [style*="width:214"] { width: 100%; }
 }

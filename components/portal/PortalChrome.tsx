@@ -8,7 +8,7 @@ export function PortalChrome({ kind, children }: { kind: "buyer" | "broker"; chi
   return (
     <div dir="ltr" style={{ minHeight: "100vh", background: "#F3F4F8", color: "#14161F", fontFamily: "'Plus Jakarta Sans',system-ui,-apple-system,sans-serif" }}>
       <div style={{ background: "linear-gradient(160deg,#14161F 0%,#252a3d 55%,#2b2570 100%)", padding: "0 26px", position: "sticky", top: 0, zIndex: 20 }}>
-        <div style={{ maxWidth: 1160, margin: "0 auto", display: "flex", alignItems: "center", height: 62 }}>
+        <div style={{ maxWidth: 1160, margin: "0 auto", display: "flex", alignItems: "center", height: 62, flexWrap: "wrap", rowGap: 8 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <div style={{ width: 34, height: 34, borderRadius: 11, background: "#fff", color: PORTAL_ACCENT, fontWeight: 800, fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center" }}>EH</div>
             <div>

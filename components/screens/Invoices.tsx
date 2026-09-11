@@ -140,8 +140,8 @@ export default function InvoicesScreen() {
       )}
       {notice && <div style={{ background: "#E9F8F1", color: "#1F9D6B", borderRadius: 12, padding: "11px 16px", fontSize: 12, fontWeight: 700, marginBottom: 16 }}>{notice}</div>}
 
-      <div style={{ display: "flex", alignItems: "flex-end", gap: 16, marginBottom: 18 }}>
-        <div style={{ flex: 1 }}>
+      <div style={{ display: "flex", flexWrap: "wrap", rowGap: 12, alignItems: "flex-end", gap: 16, marginBottom: 18 }}>
+        <div style={{ flex: 1, minWidth: 220 }}>
           <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: "-.03em", lineHeight: 1.15 }}>Invoices &amp; statements</div>
           <div style={{ fontSize: 13, color: "#6B7180", fontWeight: 500, marginTop: 5 }}>Auto-issued 14 days before due \u00b7 VAT shown as a separate line, never baked into the instalment</div>
         </div>
@@ -161,11 +161,12 @@ export default function InvoicesScreen() {
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 300px", gap: 16, marginTop: 16, alignItems: "start" }}>
         <div style={{ background: "#fff", borderRadius: 20, boxShadow: "0 1px 3px rgba(20,22,31,.04)", overflow: "hidden" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "126px 1fr 96px 1.1fr 86px 86px 96px 96px 88px 76px 76px", gap: 8, padding: "14px 22px", fontSize: 9.5, fontWeight: 700, letterSpacing: ".07em", color: "#9AA0AE", textTransform: "uppercase" as const, background: "#FAFBFD", borderBottom: "1px solid #EDEEF3" }}>
+          <div style={{ overflowX: "auto" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "126px 1fr 96px 1.1fr 86px 86px 96px 96px 88px 76px 76px", minWidth: 1000, gap: 8, padding: "14px 22px", fontSize: 9.5, fontWeight: 700, letterSpacing: ".07em", color: "#9AA0AE", textTransform: "uppercase" as const, background: "#FAFBFD", borderBottom: "1px solid #EDEEF3" }}>
             <span>Invoice</span><span>Buyer</span><span>Unit</span><span>Instalment</span><span>Issued</span><span>Due</span><span style={{ textAlign: "right" }}>Amount</span><span style={{ textAlign: "right" }}>Paid</span><span>Status</span><span>Viewed</span><span style={{ textAlign: "right" }}>Actions</span>
           </div>
           {rows.map((r) => (
-            <div key={r.no} style={{ display: "grid", gridTemplateColumns: "126px 1fr 96px 1.1fr 86px 86px 96px 96px 88px 76px 76px", gap: 8, alignItems: "center", padding: "0 22px", height: 42, borderBottom: "1px solid #F6F7FA" }}>
+            <div key={r.no} style={{ display: "grid", gridTemplateColumns: "126px 1fr 96px 1.1fr 86px 86px 96px 96px 88px 76px 76px", minWidth: 1000, gap: 8, alignItems: "center", padding: "0 22px", height: 42, borderBottom: "1px solid #F6F7FA" }}>
               <span style={{ fontFamily: "monospace", fontSize: 10.5, fontWeight: 600 }}>{r.no}</span>
               <span style={{ fontSize: 11.5, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.buyer}</span>
               <span style={{ fontFamily: "monospace", fontSize: 10, color: "#4A5060" }}>{r.unit}</span>
@@ -186,6 +187,7 @@ export default function InvoicesScreen() {
               </div>
             </div>
           ))}
+          </div>
         </div>
 
         <div style={{ background: "#fff", borderRadius: 20, padding: "22px 24px", boxShadow: "0 1px 3px rgba(20,22,31,.04)" }}>

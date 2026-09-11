@@ -113,8 +113,8 @@ export default function SnaggingScreen({ scope }: { scope?: string }) {
         </div>
       )}
       {notice && <div style={{ background: "#E9F8F1", color: "#1F9D6B", borderRadius: 12, padding: "11px 16px", fontSize: 12, fontWeight: 700, marginBottom: 16 }}>{notice}</div>}
-      <div style={{ display: "flex", alignItems: "flex-end", gap: 16, marginBottom: 18 }}>
-        <div style={{ flex: 1 }}>
+      <div style={{ display: "flex", flexWrap: "wrap", rowGap: 12, alignItems: "flex-end", gap: 16, marginBottom: 18 }}>
+        <div style={{ flex: 1, minWidth: 220 }}>
           <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: "-.03em", lineHeight: 1.15 }}>Snagging</div>
           <div style={{ fontSize: 13, color: "#6B7180", fontWeight: 500, marginTop: 5 }}>Wilton Park Residences \u00b7 reputation is made or lost here</div>
         </div>
@@ -154,14 +154,15 @@ export default function SnaggingScreen({ scope }: { scope?: string }) {
       </div>
 
       <div style={{ background: "#fff", borderRadius: 20, overflow: "hidden", boxShadow: "0 1px 3px rgba(20,22,31,.04)" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "110px 110px 88px 1.4fr 76px 1fr 88px 76px 100px", gap: 8, padding: "13px 20px", fontSize: 9.5, fontWeight: 700, letterSpacing: ".07em", color: "#9AA0AE", textTransform: "uppercase", background: "#FAFBFD", borderBottom: "1px solid #EDEEF3" }}>
+        <div style={{ overflowX: "auto" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "110px 110px 88px 1.4fr 76px 1fr 88px 76px 100px", minWidth: 900, gap: 8, padding: "13px 20px", fontSize: 9.5, fontWeight: 700, letterSpacing: ".07em", color: "#9AA0AE", textTransform: "uppercase", background: "#FAFBFD", borderBottom: "1px solid #EDEEF3" }}>
           <span>Unit</span><span>Location</span><span>Trade</span><span>Description</span><span>Severity</span><span>Contractor</span><span>Status</span><span>Re-inspect</span><span style={{ textAlign: "right" }}></span>
         </div>
         {rows.length ? (
           rows.map((r, i) => {
             const isClosed = closed.has(i) || r.status === "Closed";
             return (
-              <div key={i} style={{ display: "grid", gridTemplateColumns: "110px 110px 88px 1.4fr 76px 1fr 88px 76px 100px", gap: 8, alignItems: "center", padding: "0 20px", height: 50, borderBottom: "1px solid #F6F7FA", opacity: isClosed ? 0.5 : 1 }}>
+              <div key={i} style={{ display: "grid", gridTemplateColumns: "110px 110px 88px 1.4fr 76px 1fr 88px 76px 100px", minWidth: 900, gap: 8, alignItems: "center", padding: "0 20px", height: 50, borderBottom: "1px solid #F6F7FA", opacity: isClosed ? 0.5 : 1 }}>
                 <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10.5, fontWeight: 600 }}>{r.unit}</span>
                 <span style={{ fontSize: 11, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.loc}</span>
                 <span style={{ fontSize: 11, color: "#6B7180", fontWeight: 600 }}>{r.trade}</span>
@@ -180,6 +181,7 @@ export default function SnaggingScreen({ scope }: { scope?: string }) {
         ) : (
           <div style={{ padding: "26px 20px", fontSize: 12, fontWeight: 600, color: "#9AA0AE" }}>No snags yet — raise one to start the re-inspection loop.</div>
         )}
+        </div>
       </div>
 
       {raiseOpen && (

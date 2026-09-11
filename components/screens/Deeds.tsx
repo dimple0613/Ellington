@@ -83,8 +83,8 @@ export default function DeedsScreen({ scope }: { scope?: string }) {
         </div>
       )}
       {notice && <div style={{ background: "#E9F8F1", color: "#1F9D6B", borderRadius: 12, padding: "11px 16px", fontSize: 12, fontWeight: 700, marginBottom: 16 }}>{notice}</div>}
-      <div style={{ display: "flex", alignItems: "flex-end", gap: 16, marginBottom: 18 }}>
-        <div style={{ flex: 1 }}>
+      <div style={{ display: "flex", flexWrap: "wrap", rowGap: 12, alignItems: "flex-end", gap: 16, marginBottom: 18 }}>
+        <div style={{ flex: 1, minWidth: 220 }}>
           <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: "-.03em", lineHeight: 1.15 }}>Title deeds &amp; owners association</div>
           <div style={{ fontSize: 13, color: "#6B7180", fontWeight: 500, marginTop: 5 }}>Deed issuance, key release, warranty pack and the Mollak service charge handoff</div>
         </div>
@@ -94,11 +94,12 @@ export default function DeedsScreen({ scope }: { scope?: string }) {
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 300px", gap: 16, alignItems: "start" }}>
         <div style={{ background: "#fff", borderRadius: 20, overflow: "hidden", boxShadow: "0 1px 3px rgba(20,22,31,.04)" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "110px 1.2fr 96px 104px 88px 92px 88px 96px", gap: 8, padding: "13px 20px", fontSize: 9.5, fontWeight: 700, letterSpacing: ".07em", color: "#9AA0AE", textTransform: "uppercase", background: "#FAFBFD", borderBottom: "1px solid #EDEEF3" }}>
+          <div style={{ overflowX: "auto" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "110px 1.2fr 96px 104px 88px 92px 88px 96px", minWidth: 860, gap: 8, padding: "13px 20px", fontSize: 9.5, fontWeight: 700, letterSpacing: ".07em", color: "#9AA0AE", textTransform: "uppercase", background: "#FAFBFD", borderBottom: "1px solid #EDEEF3" }}>
             <span>Unit</span><span>Owner</span><span>Oqood</span><span style={{ textAlign: "right" }}>DLD 4%</span><span>Deed</span><span>Issued</span><span>Keys</span><span>Mollak</span>
           </div>
           {rows.map((r) => (
-            <div key={r.unit} style={{ display: "grid", gridTemplateColumns: "110px 1.2fr 96px 104px 88px 92px 88px 96px", gap: 8, alignItems: "center", padding: "0 20px", height: 48, borderBottom: "1px solid #F6F7FA" }}>
+            <div key={r.unit} style={{ display: "grid", gridTemplateColumns: "110px 1.2fr 96px 104px 88px 92px 88px 96px", minWidth: 860, gap: 8, alignItems: "center", padding: "0 20px", height: 48, borderBottom: "1px solid #F6F7FA" }}>
               <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, fontWeight: 600 }}>{r.unit}</span>
               <span style={{ fontSize: 11.5, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.buyer}</span>
               <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10.5, color: "#6B7180" }}>{r.oqood}</span>
@@ -109,6 +110,7 @@ export default function DeedsScreen({ scope }: { scope?: string }) {
               <span style={pill(r.oa, OA_PILL)}>{r.oa}</span>
             </div>
           ))}
+          </div>
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>

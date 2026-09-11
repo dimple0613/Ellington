@@ -6,16 +6,19 @@
 ## Push (current branch + what to push)
 > Branch-per-task rule (see AGENTS.md): never push directly to main. Update this section per task.
 
-- Current branch: **`fix/production-audit-wave1`** — Wave-1 production-readiness fixes (issues 1–7). Push target: this branch only (merge to main after operator approval).
-- PUSH THIS (uncommitted, authored this session) — **Production-gate P1 fixes** (all earlier wave-1 items 1–8 are already committed on this branch):
-  - **P1 duplicate-booking guard** (`pages/api/bookings.ts`) — POST createBooking rejects any unit whose `units.status != 'available'` (409); `confirmBooking` runs inside a transaction, rejects when another booking is already confirmed on the unit (409 "already sold"), re-confirm of the same booking stays idempotent; `cancel` of a confirmed booking releases the unit back to `available`. Verified live (double-confirm blocked, unit released on cancel).
-  - **P1/P2 bounced-PDC reversal** (`pages/api/receipts.ts`) — marking a PDC `Bounced` reverses the `projects.collected` bump from receipt POST (and `Cleared`/`Held` after a bounce re-adds it), all inside a transaction; dunning row + audit unchanged.
-  - **Collected now excludes Bounced PDCs** (`pages/api/buyers.ts` + `finance.ts` + `mobile.ts` + `dashboard.ts`) — `SUM(amount)` over receipts filtered `(pdc_status IS NULL OR pdc_status <> 'Bounced')` so buyer/finance/mobile/dashboard "collected/paid" numbers stop overstating bounced cheques.
-  - **`lib/db.ts`** — new `withTransaction()` helper (pg BEGIN/COMMIT for local + Hyperdrive; Neon BEGIN/COMMIT fallback). No schema change, no new deps.
-  - Status: `tsc` **green**; `next build` **green**; scratch HTTP+DB verify (`verify-p1.cjs`, outside repo) **ALL CHECKS PASSED**.
-- NOT in commit (never): `auto-push.ps1`, `test-*.mjs`, `dev.log*`, `*_out.html`, `docs/ARCHITECTURE.md` (tracked, but only committed on request).
-- Status: `npx tsc --noEmit` **green**; `next build` **green**; P1 fixes verified live end-to-end (bookings guard 409 + cancel-reverts-unit + bounced-PDC reversal + re-add on clear + dunning event).
-- Remaining wave-1 on branch (unassigned to this session): item 9 (broker portal read-only allocated-inventory scope + "Convert to booking" path) — confirm with operator.
+- Current branch: **`main`** — `fix/ui-responsive-audit` (PR #93) and `fix/production-audit-wave1` (PR #94) merged (operator-approved 11 Sep 2026). No pending push.
+- **PR #93 (UI responsive/overflow audit)** — `styles/globals.css` serialization-aware CSS selectors (kebab-case + space/no-space dual selectors); table scroll wrappers (`overflowX:"auto"` + `minWidth` on header/row grids) across all 20 screens; header/stats `flexWrap:"wrap"`; modals; misc (password input padding, Mobile phone-grid fix, PortalChrome wrap). Files: `styles/globals.css`, 20 screen tsx, `pages/reset-password.tsx`, `components/portal/PortalChrome.tsx`, `components/screens/Mobile.tsx`. CDP 42/42 pass (no page-level scrollbars; all wrapped tables scrollable).
+- **PR #94 (Production gates — items 1–8 + P1/P2 fixes)** — P1 duplicate-booking guard (`bookings.ts`: confirm runs in transaction, blocks second confirmed booking per unit [409], create rejects non-available units, cancel releases unit to `available`); P1/P2 bounced-PDC reversal (`receipts.ts`: `Bounced` reverses `projects.collected` bump, `Cleared`/`Held` after bounce re-adds, transaction-wrapped, dunning + audit unchanged); collected/paid sums now exclude Bounced (`buyers.ts`, `finance.ts`, `mobile.ts`, `dashboard.ts`); `lib/db.ts` new `withTransaction()` helper. Files: `pages/api/{bookings,receipts,buyers,finance,mobile,dashboard}.ts`, `lib/db.ts`, `OneTask.md`. Live HTTP+DB verify ALL PASS (double-confirm blocked, cancel-reverts-unit, bounce reversal + re-add + dunning event).
+- NOT in commit (never): `auto-push.ps1`, `test-*.mjs`, `dev.log*`, `*_out.html`, `docs/ARCHITECTURE.md` (tracked, only committed on request).
+- Status: `npx tsc --noEmit` **green**; `next build` **green**. Ready for deploy once Neon schema is synced and legacy data reconciled.
+- Remaining wave-1 (unassigned): item 9 (broker portal read-only allocated-inventory scope + "Convert to booking" path from a hold — confirm with operator).
+
+## Production Readiness Audit (11 Sep 2026) — RESOLVED (PRs #93, #94)
+> - **[P1] Duplicate confirmed bookings on one unit** — FIXED (PR #94: confirm guarded + transaction, create rejects non-available, cancel releases unit).
+> - **[P1/P2] Bounced cheque doesn't reverse anything** — FIXED (PR #94: Bounced reverses `projects.collected`, Cleared re-adds, transaction, Bounced excluded from sums).
+> - Cancel now releases unit (fixed in #94). `withTransaction` introduced (confirm + bounce paths; other multi-statement routes wave-2).
+> - Booking-confirm receipt bypass of `projects.collected` bump remains (wave-2); dashboard POST unguarded (wave-2); envelope inconsistency `ok:false` shape (wave-2).
+> - Data-health pass: drift is seed-artifact; legacy bounced cheques (#31/#32 H21) are seed-demo rows (no `collected` bump at INSERT — no reversal needed on dev). Production must reconcile any pre-fix bounced PDC that WAS bumped via POST.
 
 ## Static data purge (purge-static-data)
 > Goal: remove ALL UI mock/fallback rows so the operator can test every screen manually against the live DB.

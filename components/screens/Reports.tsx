@@ -183,8 +183,8 @@ export default function ReportsScreen() {
 
   return (
     <div>
-      <div style={{ display: "flex", alignItems: "flex-end", gap: 16, marginBottom: 20 }}>
-        <div style={{ flex: 1 }}>
+      <div style={{ display: "flex", flexWrap: "wrap", rowGap: 12, alignItems: "flex-end", gap: 16, marginBottom: 20 }}>
+        <div style={{ flex: 1, minWidth: 220 }}>
           <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: "-.03em", lineHeight: 1.15 }}>Reports</div>
           <div style={{ fontSize: 13, color: "#6B7180", fontWeight: 500, marginTop: 5 }}>27 standard reports · XLSX, CSV, branded PDF, board pack</div>
         </div>
@@ -211,16 +211,17 @@ export default function ReportsScreen() {
       ))}
 
       <div style={{ background: "#fff", borderRadius: 20, boxShadow: "0 1px 3px rgba(20,22,31,.04)", overflow: "hidden" }}>
-        <div style={{ padding: "20px 24px 12px", display: "flex", alignItems: "center", gap: 12 }}>
+        <div style={{ padding: "20px 24px 12px", display: "flex", flexWrap: "wrap", rowGap: 10, alignItems: "center", gap: 12 }}>
           <span style={{ flex: 1, fontSize: 15, fontWeight: 700, letterSpacing: "-.015em" }}>Scheduled deliveries</span>
           <button onClick={() => { setSchedOpen(true); setErr(""); }} style={{ height: 32, borderRadius: 10, border: 0, background: AC, color: "#fff", padding: "0 14px", fontFamily: "inherit", fontSize: 11.5, fontWeight: 700, cursor: "pointer" }}>+ Schedule new</button>
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1.2fr 1fr 140px 110px", gap: 12, padding: "14px 24px", fontSize: 9.5, fontWeight: 700, letterSpacing: ".07em", color: "#9AA0AE", textTransform: "uppercase", borderBottom: "1px solid #EDEEF3" }}>
+        <div style={{ overflowX: "auto" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1.2fr 1fr 140px 110px", minWidth: 560, gap: 12, padding: "14px 24px", fontSize: 9.5, fontWeight: 700, letterSpacing: ".07em", color: "#9AA0AE", textTransform: "uppercase", borderBottom: "1px solid #EDEEF3" }}>
           <span>Report</span><span>Recipients</span><span>Frequency</span><span>Format</span><span>Next run</span>
         </div>
         {sched.length ? (
           sched.map((r) => (
-            <div key={r[0] + r[4]} style={{ display: "grid", gridTemplateColumns: "1.2fr 1.2fr 1fr 140px 110px", gap: 12, alignItems: "center", padding: "0 24px", height: 44, borderBottom: "1px solid #F6F7FA" }}>
+            <div key={r[0] + r[4]} style={{ display: "grid", gridTemplateColumns: "1.2fr 1.2fr 1fr 140px 110px", minWidth: 560, gap: 12, alignItems: "center", padding: "0 24px", height: 44, borderBottom: "1px solid #F6F7FA" }}>
               <span style={{ fontSize: 12, fontWeight: 700 }}>{r[0]}</span>
               <span style={{ fontSize: 11.5, color: "#6B7180", fontWeight: 600 }}>{r[1]}</span>
               <span style={{ fontSize: 11.5, color: "#6B7180", fontWeight: 600 }}>{r[2]}</span>
@@ -231,6 +232,7 @@ export default function ReportsScreen() {
         ) : (
           <div style={{ padding: "24px", fontSize: 12, fontWeight: 600, color: "#9AA0AE" }}>No scheduled deliveries yet — create one to auto-deliver reports.</div>
         )}
+        </div>
       </div>
 
       {schedOpen && (

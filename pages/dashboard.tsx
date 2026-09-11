@@ -149,8 +149,8 @@ export default function Dashboard() {
     <Shell group="portfolio" active={screen} crumbs={["Portfolio", SCR_TITLES[screen] || "Dashboard"]} onScope={setScopeAndPush} scopeCode={scope}>
       {screen === "dashboard" ? (
       <div>
-        <div style={{ display: "flex", alignItems: "flex-end", gap: 16, marginBottom: 20 }}>
-          <div style={{ flex: 1 }}>
+        <div style={{ display: "flex", flexWrap: "wrap", rowGap: 12, alignItems: "flex-end", gap: 16, marginBottom: 20 }}>
+          <div style={{ flex: 1, minWidth: 220 }}>
             <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: "-.03em", lineHeight: 1.15 }}>Portfolio position</div>
             <div style={{ fontSize: 13, color: "#6B7180", fontWeight: 500, marginTop: 5 }}>{data.meta.projects} projects · {data.meta.units} units · {data.meta.date}</div>
           </div>
@@ -312,11 +312,12 @@ export default function Dashboard() {
         <div style={{ display: "grid", gridTemplateColumns: "1.35fr 1fr", gap: 16, marginTop: 16 }}>
           <div style={{ background: "#fff", borderRadius: 20, boxShadow: "0 1px 3px rgba(20,22,31,.04)", overflow: "hidden" }}>
             <div style={{ padding: "20px 24px 14px", fontSize: 15, fontWeight: 700, letterSpacing: "-.015em" }}>Projects</div>
-            <div style={{ display: "grid", gridTemplateColumns: "44px 1.5fr 74px 74px 78px 62px 62px 92px", gap: 10, padding: "0 24px 9px", fontSize: 9.5, fontWeight: 700, letterSpacing: ".07em", color: "#9AA0AE", textTransform: "uppercase", borderBottom: "1px solid #F1F2F7" }}>
-              <span /><span>Project</span><span style={{ textAlign: "right" }}>Units</span><span style={{ textAlign: "right" }}>GDV</span><span style={{ textAlign: "right" }}>Sold</span><span style={{ textAlign: "right" }}>Coll</span><span style={{ textAlign: "right" }}>Cons</span><span>Status</span>
-            </div>
-            {activeProjects.map((p) => (
-              <button key={p.code} onClick={() => openProject(p.code)} style={{ width: "100%", display: "grid", gridTemplateColumns: "44px 1.5fr 74px 74px 78px 62px 62px 92px", gap: 10, alignItems: "center", padding: "12px 24px", border: 0, background: "transparent", borderBottom: "1px solid #F6F7FA", cursor: "pointer", fontFamily: "inherit", textAlign: "left" }}>
+            <div style={{ overflowX: "auto" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "44px 1.5fr 74px 74px 78px 62px 62px 92px", minWidth: 660, gap: 10, padding: "0 24px 9px", fontSize: 9.5, fontWeight: 700, letterSpacing: ".07em", color: "#9AA0AE", textTransform: "uppercase", borderBottom: "1px solid #F1F2F7" }}>
+                <span /><span>Project</span><span style={{ textAlign: "right" }}>Units</span><span style={{ textAlign: "right" }}>GDV</span><span style={{ textAlign: "right" }}>Sold</span><span style={{ textAlign: "right" }}>Coll</span><span style={{ textAlign: "right" }}>Cons</span><span>Status</span>
+              </div>
+              {activeProjects.map((p) => (
+                <button key={p.code} onClick={() => openProject(p.code)} style={{ width: "100%", display: "grid", gridTemplateColumns: "44px 1.5fr 74px 74px 78px 62px 62px 92px", minWidth: 660, gap: 10, alignItems: "center", padding: "12px 24px", border: 0, background: "transparent", borderBottom: "1px solid #F6F7FA", cursor: "pointer", fontFamily: "inherit", textAlign: "left" }}>
                 <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10, fontWeight: 700, padding: "4px 5px", borderRadius: 7, background: "#EDECFE", color: AC, textAlign: "center" }}>{p.code}</span>
                 <span style={{ minWidth: 0 }}>
                   <span style={{ display: "block", fontSize: 12.5, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name}</span>
@@ -330,6 +331,7 @@ export default function Dashboard() {
                 <span style={{ fontSize: 10, fontWeight: 700, borderRadius: 8, padding: "4px 8px", textAlign: "center", whiteSpace: "nowrap", background: p.cons === 100 ? "#E4F6F6" : p.cons < 10 ? "#E9F8F1" : "#EDECFE", color: p.cons === 100 ? "#0B8A8A" : p.cons < 10 ? "#1F9D6B" : AC }}>{p.status}</span>
               </button>
             ))}
+            </div>
           </div>
 
           <div style={{ background: "#fff", borderRadius: 20, padding: "20px 22px", boxShadow: "0 1px 3px rgba(20,22,31,.04)" }}>
@@ -358,7 +360,7 @@ export default function Dashboard() {
               <div style={{ fontSize: 15, fontWeight: 700, letterSpacing: "-.015em" }}>Sales velocity</div>
               <div style={{ fontSize: 11.5, color: "#9AA0AE", fontWeight: 500, marginTop: 3 }}>Units booked per week · last 12 weeks</div>
             </div>
-            <div style={{ display: "flex", gap: 32 }}>
+            <div style={{ display: "flex", flexWrap: "wrap", rowGap: 8, gap: 32 }}>
               {data.velocity.stats.map((v) => (
                 <div key={v.label} style={{ textAlign: "right" }}>
                   <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: ".07em", color: "#9AA0AE", textTransform: "uppercase" }}>{v.label}</div>

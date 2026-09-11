@@ -279,8 +279,8 @@ export default function SettingsScreen() {
         </div>
       )}
       {notice && <div style={{ background: "#E9F8F1", color: "#1F9D6B", borderRadius: 12, padding: "11px 16px", fontSize: 12, fontWeight: 700, marginBottom: 16 }}>{notice}</div>}
-      <div style={{ display: "flex", alignItems: "flex-end", gap: 16, marginBottom: 18 }}>
-        <div style={{ flex: 1 }}>
+      <div style={{ display: "flex", flexWrap: "wrap", rowGap: 12, alignItems: "flex-end", gap: 16, marginBottom: 18 }}>
+        <div style={{ flex: 1, minWidth: 220 }}>
           <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: "-.03em", lineHeight: 1.15 }}>Organization settings</div>
           <div style={{ fontSize: 13, color: "#6B7180", fontWeight: 500, marginTop: 5 }}>Ellington Properties Development LLC \u00b7 ORN 21281</div>
         </div>
@@ -436,11 +436,12 @@ export default function SettingsScreen() {
           <div style={{ padding: "18px 22px", borderBottom: "1px solid #EDEEF3" }}>
             <span style={{ fontSize: 15, fontWeight: 700, letterSpacing: "-.015em" }}>Notification matrix</span>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr 80px 80px 80px", gap: 8, padding: "12px 22px", fontSize: 9.5, fontWeight: 700, letterSpacing: ".07em", color: "#9AA0AE", textTransform: "uppercase", borderBottom: "1px solid #F6F7FA" }}>
+          <div style={{ overflowX: "auto" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr 80px 80px 80px", minWidth: 560, gap: 8, padding: "12px 22px", fontSize: 9.5, fontWeight: 700, letterSpacing: ".07em", color: "#9AA0AE", textTransform: "uppercase", borderBottom: "1px solid #F6F7FA" }}>
             <span>Event</span><span>Who is notified</span><span style={{ textAlign: "center" }}>In-app</span><span style={{ textAlign: "center" }}>Email</span><span style={{ textAlign: "center" }}>Slack</span>
           </div>
           {notif.map((row, ri) => (
-            <div key={row[0]} style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr 80px 80px 80px", gap: 8, alignItems: "center", padding: "0 22px", height: 48, borderBottom: "1px solid #F6F7FA" }}>
+            <div key={row[0]} style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr 80px 80px 80px", minWidth: 560, gap: 8, alignItems: "center", padding: "0 22px", height: 48, borderBottom: "1px solid #F6F7FA" }}>
               <span style={{ fontSize: 12, fontWeight: 600 }}>{row[0]}</span>
               <input value={row[4]} onChange={(e) => { const v = e.target.value; setNotif((prev) => prev.map((r, i2) => i2 === ri ? [r[0], r[1], r[2], r[3], v] as NotifRow : r)); }} placeholder="Recipients…" style={{ height: 26, borderRadius: 8, border: "1px solid #EDEEF3", background: "#FAFBFD", padding: "0 8px", fontFamily: "inherit", fontSize: 10.5, fontWeight: 600, color: "#14161F", boxSizing: "border-box", width: "100%" }} />
               {[row[1], row[2], row[3]].map((on, i) => (
@@ -450,6 +451,7 @@ export default function SettingsScreen() {
               ))}
             </div>
           ))}
+          </div>
         </div>
       )}
 

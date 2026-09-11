@@ -97,8 +97,8 @@ export default function AuditLogScreen() {
     setTimeout(() => setNotice(""), 3000);
   };
 
-  const hdrStyle: React.CSSProperties = { display: "grid", gridTemplateColumns: "20px 130px 140px 100px 90px 1.4fr 90px 110px 110px", gap: 6, padding: "13px 22px", fontSize: 9.5, fontWeight: 700, letterSpacing: ".07em", color: "#9AA0AE", textTransform: "uppercase" as const, background: "#FAFBFD", borderBottom: "1px solid #EDEEF3" };
-  const cellGrid: React.CSSProperties = { display: "grid", gridTemplateColumns: "20px 130px 140px 100px 90px 1.4fr 90px 110px 110px", gap: 6, alignItems: "center", padding: "0 22px", height: 44, borderBottom: "1px solid #F6F7FA", cursor: "pointer" };
+  const hdrStyle: React.CSSProperties = { display: "grid", gridTemplateColumns: "20px 130px 140px 100px 90px 1.4fr 90px 110px 110px", minWidth: 920, gap: 6, padding: "13px 22px", fontSize: 9.5, fontWeight: 700, letterSpacing: ".07em", color: "#9AA0AE", textTransform: "uppercase" as const, background: "#FAFBFD", borderBottom: "1px solid #EDEEF3" };
+  const cellGrid: React.CSSProperties = { display: "grid", gridTemplateColumns: "20px 130px 140px 100px 90px 1.4fr 90px 110px 110px", minWidth: 920, gap: 6, alignItems: "center", padding: "0 22px", height: 44, borderBottom: "1px solid #F6F7FA", cursor: "pointer" };
 
   const actionClr = (a: string) => a === "Approved" ? "#1F9D6B" : a === "Created" ? AC : a === "Exported" ? "#F5A623" : "#6B7180";
 
@@ -110,8 +110,8 @@ export default function AuditLogScreen() {
         </div>
       )}
       {notice && <div style={{ background: "#E9F8F1", color: "#1F9D6B", borderRadius: 12, padding: "11px 16px", fontSize: 12, fontWeight: 700, marginBottom: 16 }}>{notice}</div>}
-      <div style={{ display: "flex", alignItems: "flex-end", gap: 16, marginBottom: 18 }}>
-        <div style={{ flex: 1 }}>
+      <div style={{ display: "flex", flexWrap: "wrap", rowGap: 12, alignItems: "flex-end", gap: 16, marginBottom: 18 }}>
+        <div style={{ flex: 1, minWidth: 220 }}>
           <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: "-.03em", lineHeight: 1.15 }}>Audit log</div>
           <div style={{ fontSize: 13, color: "#6B7180", fontWeight: 500, marginTop: 5 }}>{rows.length} entries \u00b7 filter by actor, object, action, project or date</div>
         </div>
@@ -143,6 +143,7 @@ export default function AuditLogScreen() {
       </div>
 
       <div style={{ background: "#fff", borderRadius: 20, overflow: "hidden", boxShadow: "0 1px 3px rgba(20,22,31,.04)" }}>
+        <div style={{ overflowX: "auto" }}>
         <div style={hdrStyle}>
           <span></span><span>Timestamp</span><span>Actor</span><span>Role</span><span>Action</span><span>Object</span><span>Field</span><span>Before</span><span>After</span>
         </div>
@@ -181,6 +182,7 @@ export default function AuditLogScreen() {
           );
         })}
         {filtered.length === 0 && <div style={{ padding: 32, textAlign: "center", fontSize: 13, color: "#9AA0AE", fontWeight: 600 }}>No matching entries</div>}
+        </div>
       </div>
     </div>
   );
