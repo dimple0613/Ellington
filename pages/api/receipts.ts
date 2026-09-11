@@ -1,6 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { withPerm } from "../../lib/permissions";
-import { query } from "../../lib/db";
+import { query, withTransaction } from "../../lib/db";
 import { ok, fail, methodNotAllowed } from "../../lib/api";
 import { fmtShortDate } from "../../lib/format";
 
@@ -113,34 +113,55 @@ export default withPerm("Finance", "REA", async function (req: NextApiRequest, r
       if (!PDC_STATUSES.includes(status)) {
         return fail(res, "pdc-status must be one of " + PDC_STATUSES.join(" / "));
       }
-      const row = await query<any>(
-        `SELECT r.id, r.amount, r.method, r.reference, r.cheque_no, r.pdc_status,
-                b.name AS buyer_name, u.no AS unit_no
-         FROM receipts r
-         LEFT JOIN buyers b ON b.id = r.buyer_id
-         LEFT JOIN units u ON u.id = r.unit_id
-         WHERE r.id = $1`,
-        [id]
-      );
-      if (!row.rows.length) return fail(res, "Receipt not found", 404);
 
-      await query<any>("UPDATE receipts SET pdc_status = $1 WHERE id = $2", [status, id]);
-      const before = row.rows[0].pdc_status || "—";
-
-      if (status === "Bounced") {
-        await query<any>(
-          `INSERT INTO collections (buyer, unit_no, amount, days_due, stage, action)
-           VALUES ($1,$2,$3,0,'Final notice',$4)`,
-          [
-            row.rows[0].buyer_name || "Unknown · " + (row.rows[0].reference || ""),
-            row.rows[0].unit_no || "",
-            Number(row.rows[0].amount) || 0,
-            "PDC bounced · " + (row.rows[0].cheque_no || "") + " · fee raised + dunning event",
-          ]
+      return withTransaction(async (q) => {
+        const row = await q.query<any>(
+          `SELECT r.id, r.amount, r.method, r.reference, r.cheque_no, r.pdc_status, r.project_id,
+                  b.name AS buyer_name, u.no AS unit_no
+           FROM receipts r
+           LEFT JOIN buyers b ON b.id = r.buyer_id
+           LEFT JOIN units u ON u.id = r.unit_id
+           WHERE r.id = $1`,
+          [id]
         );
-      }
-      await audit(session, "Finance", "Updated", "PDC " + (row.rows[0].cheque_no || "RCP-" + id), "Status", before, status);
-      return ok(res, { id, status });
+        if (!row.rows.length) throw new Error("NOT_FOUND");
+
+        const before = row.rows[0].pdc_status || "—";
+        const wasBounced = before === "Bounced";
+        const nowBounced = status === "Bounced";
+        const amount = Number(row.rows[0].amount) || 0;
+        const projectId = row.rows[0].project_id;
+
+        // POST bumps projects.collected for every receipt (cheques included), so a bounce
+        // must reverse that bump — and a later Cleared/Held re-collection bumps it again.
+        if (projectId && nowBounced && !wasBounced) {
+          await q.query("UPDATE projects SET collected = collected - $2 WHERE id = $1", [projectId, amount]);
+        } else if (projectId && !nowBounced && wasBounced) {
+          await q.query("UPDATE projects SET collected = collected + $2 WHERE id = $1", [projectId, amount]);
+        }
+
+        await q.query<any>("UPDATE receipts SET pdc_status = $1 WHERE id = $2", [status, id]);
+
+        if (status === "Bounced") {
+          await q.query<any>(
+            `INSERT INTO collections (buyer, unit_no, amount, days_due, stage, action)
+             VALUES ($1,$2,$3,0,'Final notice',$4)`,
+            [
+              row.rows[0].buyer_name || "Unknown · " + (row.rows[0].reference || ""),
+              row.rows[0].unit_no || "",
+              amount,
+              "PDC bounced · " + (row.rows[0].cheque_no || "") + " · fee raised + dunning event",
+            ]
+          );
+        }
+        await audit(session, "Finance", "Updated", "PDC " + (row.rows[0].cheque_no || "RCP-" + id), "Status", before, status);
+        return { id, status };
+      })
+        .then((r) => ok(res, r))
+        .catch((e: any) => {
+          if (e?.message === "NOT_FOUND") return fail(res, "Receipt not found", 404);
+          return fail(res, "Failed to update PDC: " + (e?.message || e), 500);
+        });
     }
 
     return fail(res, "Unknown action — expected pdc");

@@ -33,7 +33,7 @@ export default withSession(async function (req: NextApiRequest, res: NextApiResp
        WHERE lower(p.name) NOT LIKE '%test%'
        GROUP BY p.id ORDER BY p.code`
     ),
-    query<any>(`SELECT method, COALESCE(SUM(amount),0)::numeric AS total, COUNT(*)::int AS n FROM receipts GROUP BY method`),
+    query<any>(`SELECT method, COALESCE(SUM(amount),0)::numeric AS total, COUNT(*)::int AS n FROM receipts WHERE (pdc_status IS NULL OR pdc_status <> 'Bounced') GROUP BY method`),
     query<any>(`SELECT COALESCE(SUM(amount),0)::numeric AS total, COUNT(*)::int AS n FROM collections`),
     query<any>(
       `SELECT p.code, u.type, COUNT(*)::int AS n,

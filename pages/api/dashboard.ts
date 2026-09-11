@@ -56,7 +56,7 @@ export default withPerm("Dashboard", "REA", async function (_req: NextApiRequest
        GROUP BY p.code`
     ),
     query<any>(
-      `SELECT COUNT(*)::float AS n, COALESCE(SUM(amount),0)::float AS s FROM receipts`
+      `SELECT COUNT(*)::float AS n, COALESCE(SUM(amount),0)::float AS s FROM receipts WHERE (pdc_status IS NULL OR pdc_status <> 'Bounced')`
     ),
     query<any>(
       `SELECT COALESCE(SUM(CASE WHEN direction='in' THEN amount ELSE -amount END),0)::float AS bal,

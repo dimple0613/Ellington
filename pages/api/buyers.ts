@@ -28,7 +28,7 @@ export default withPerm("Sales", "REA", async function (req: NextApiRequest, res
            SELECT buyer_id, COUNT(*)::int AS n, SUM(price) AS c FROM units WHERE buyer_id IS NOT NULL GROUP BY buyer_id
          ) u ON u.buyer_id = b.id
          LEFT JOIN (
-           SELECT buyer_id, SUM(amount) AS c FROM receipts WHERE buyer_id IS NOT NULL GROUP BY buyer_id
+           SELECT buyer_id, SUM(amount) AS c FROM receipts WHERE buyer_id IS NOT NULL AND (pdc_status IS NULL OR pdc_status <> 'Bounced') GROUP BY buyer_id
          ) rc ON rc.buyer_id = b.id
          LEFT JOIN (
            SELECT u.buyer_id, SUM(m.amount) AS c

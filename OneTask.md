@@ -6,37 +6,19 @@
 ## Push (current branch + what to push)
 > Branch-per-task rule (see AGENTS.md): never push directly to main. Update this section per task.
 
-- Current branch: **`fix/ui-responsive-audit`** — Responsive/overflow/UI fixes across the whole console. Push target: this branch only (merge to main after operator approval). The earlier `fix/production-audit-wave1` work stays on its own branch (content preserved below in the wave section).
-- PUSH THIS (current working tree — verified `npx tsc --noEmit` **green** + `next build` **green**):
-  - **`styles/globals.css`** — removed the old `[style*="min-width: 1180"]` + `[style*="overflow-x: auto"]`/`overflowX` overrides that forced every scroll wrapper to `visible` (this restored native scrolling: Sales kanban :488, viewings :433, buyers table :1406, Pipeline kanban, Inventory tabs/stack, Construction photos). New responsive rules: repeat(6/4/5,1fr) and `repeat(4,1fr) 1.4fr` KPI collapse; fr-pair + `1fr 1fr` stacks — ALL guarded with `:not([style*="min-width"])` (serialized DOM form) and the `1fr 1fr` rule anchored to `grid-template-columns: ` so wide data tables (which carry inline min-width) are never collapsed to 1 col on mobile; `repeat(6,…)` matcher narrowed to `repeat(6,1fr)` so the Users permission matrix (`repeat(6,38px)`) is untouched; radius 22→15, fontSize 22→18 / 26→20, `[id=password]/[id=email]` 16px on ≤640; ProjectWizard rail column-stack (`max-width:900` → flex-direction:column, `width:214` → 100% on ≤640).
-  - **Table horizontal-scroll wrappers (`overflowX:"auto"` + `minWidth` on header/row grids)** — dashboard Projects (660), Financials entity (760) + commissions (580), Reports scheduled deliveries (560), Pricing matrix, Sales bookings register (8-col, 1050) + buyers directory (12-col, 1240), Invoices (11-col, 1000), Payments receipts (900) / PDC (820) / statement (620), Escrow drawdowns (640), Collections overdue (780), Unit payment schedule (580), Construction milestones (740), Deeds (8-col, 860), Snagging (9-col, 900), Users (7-col, 680), AuditLog (9-col, 920), Inventory list view (9-col, 760), Settings notification matrix (5-col, 560).
-  - **Header/stats rows `flexWrap:"wrap"` + `rowGap:12` + `minWidth` on titles** — all 20 screens (dashboard, Financials, Cashflow, Reports, Inventory, Pricing, Construction, Users, UnitBuilder, Snagging, Invoices, Settings, Deeds, Pipeline, Sales ×2, Payments, Collections, Projects, AuditLog) + Mobile.tsx preview row + tab bar.
-  - **Modals** — Payments 440/520 → `width: "min(92vw, Npx)"`; Escrow/Invoices/Reports/Settings width caps already fine.
-  - **Misc** — `pages/reset-password.tsx` password input `paddingRight:42` (text no longer runs under the show/hide eye toggle); `Mobile.tsx` phone-inner `1fr 1fr` → `repeat(2,1fr)` so the global mobile-stack rule never touches the iPhone preview grid; `PortalChrome.tsx` header `flexWrap:"wrap"`.
-  - Files: `styles/globals.css`, `pages/dashboard.tsx`, `pages/reset-password.tsx`, `components/portal/PortalChrome.tsx`, `components/screens/{AuditLog,Cashflow,Collections,Construction,Deeds,Escrow,Financials,Inventory,Invoices,Mobile,Payments,Pipeline,Pricing,Projects,Reports,Sales,Settings,Snagging,Unit,UnitBuilder,Users}.tsx`.
-- NOT in commit (never): `auto-push.ps1`, `test-*.mjs`, `dev.log*`, `*_out.html`, `docs/ARCHITECTURE.md` (tracked, but only committed on request).
-- Status: `npx tsc --noEmit` **green**; `next build` **green**. **Live CDP browser verification passed (6 widths × 7 routes = 42 checks):** `documentElement.scrollWidth` == `clientWidth` (no page-level horizontal scrollbar) on every check; all wrapped data tables scroll via their `overflow-x:auto` wrapper (grids correctly skipped as scroll containers); KPI strips collapse (repeat(6)→3/2) and fr-pair panels stack at breakpoints; Users permission matrix (`repeat(6,38px)`) untouched. Residual `clipped` items are intentional/cosmetic only — section titles stretch with their grid min-width and clip at the shell wrapper on ≤430px (by design; title sits above the scrolled grid), search-placeholder ellipsis, table-cell deltas (own-hidden). No regressions detected vs the `verify_functionality`/`verify_responsive` baselines.
+- Current branch: **`main`** — `fix/ui-responsive-audit` (PR #93) and `fix/production-audit-wave1` (PR #94) merged (operator-approved 11 Sep 2026). No pending push.
+- **PR #93 (UI responsive/overflow audit)** — `styles/globals.css` serialization-aware CSS selectors (kebab-case + space/no-space dual selectors); table scroll wrappers (`overflowX:"auto"` + `minWidth` on header/row grids) across all 20 screens; header/stats `flexWrap:"wrap"`; modals; misc (password input padding, Mobile phone-grid fix, PortalChrome wrap). Files: `styles/globals.css`, 20 screen tsx, `pages/reset-password.tsx`, `components/portal/PortalChrome.tsx`, `components/screens/Mobile.tsx`. CDP 42/42 pass (no page-level scrollbars; all wrapped tables scrollable).
+- **PR #94 (Production gates — items 1–8 + P1/P2 fixes)** — P1 duplicate-booking guard (`bookings.ts`: confirm runs in transaction, blocks second confirmed booking per unit [409], create rejects non-available units, cancel releases unit to `available`); P1/P2 bounced-PDC reversal (`receipts.ts`: `Bounced` reverses `projects.collected` bump, `Cleared`/`Held` after bounce re-adds, transaction-wrapped, dunning + audit unchanged); collected/paid sums now exclude Bounced (`buyers.ts`, `finance.ts`, `mobile.ts`, `dashboard.ts`); `lib/db.ts` new `withTransaction()` helper. Files: `pages/api/{bookings,receipts,buyers,finance,mobile,dashboard}.ts`, `lib/db.ts`, `OneTask.md`. Live HTTP+DB verify ALL PASS (double-confirm blocked, cancel-reverts-unit, bounce reversal + re-add + dunning event).
+- NOT in commit (never): `auto-push.ps1`, `test-*.mjs`, `dev.log*`, `*_out.html`, `docs/ARCHITECTURE.md` (tracked, only committed on request).
+- Status: `npx tsc --noEmit` **green**; `next build` **green**. Ready for deploy once Neon schema is synced and legacy data reconciled.
+- Remaining wave-1 (unassigned): item 9 (broker portal read-only allocated-inventory scope + "Convert to booking" path from a hold — confirm with operator).
 
-## Production Readiness Audit (11 Sep 2026) — READY CONDITIONAL, NOT BLOCKING
-> Full release audit run live on the dev stack (branch `fix/production-audit-wave1`). 90/91 API battery,
-> 42 DB-integrity checks, 21/21 workflow-chain + portal, RBAC proof (ops role), tsc + `next build` green,
-> `/sales` serves 200. No code changed (audit-only). Two authoritative go-live gates → OPEN (fix before GO):
->
-> **[P1] Duplicate confirmed bookings on one unit** — `createBooking`/`confirmBooking`
-> (`pages/api/bookings.ts`) never checks `units.status`; proven live: 3 confirmed bookings accepted on one
-> unit (BLG-026). Unit is only set `reserved` at confirm (never before), so a unit can be booked/sold twice.
-> **[P1/P2] Bounced cheque doesn't reverse anything** — `receipts.ts` PUT `action=pdc` → `Bounced` only
-> inserts a dunning `collections` row; the receipt stays in `receipts` sums and `projects.collected` is
-> not decremented (receipts POST bumps it, never undone) → "Collected"/receivables/invoice-paid overstated.
->
-> Additional findings (fix in wave-2, non-blocking for the report): cancel never reverts unit `reserved` to
-> `available` (burned inventory); booking-confirm deposit receipt bypasses the `projects.collected` bump
-> that `receipts.ts` POST does (deposits under-count KPIs); `/api/dashboard` has no method guard (POST → 200);
-> 401/403 guard envelopes are `{error}` without `ok:false` (inconsistent with `fail()`); multi-statement
-> writes (receipts POST, booking confirm) not wrapped in a transaction. Data drift on dev DB (H21/BLG/WPK
-> `projects.collected` vs receipts sum — direct-DB test rows bypass the bump; dup lead phone; 3 seeded paid
-> invoices without a matching receipt; collection actions are free-text). Recommend a data-health pass on
-> the real dataset before GO. Dev DB returned to pre-audit state (QA rows purged, units reverted).
+## Production Readiness Audit (11 Sep 2026) — RESOLVED (PRs #93, #94)
+> - **[P1] Duplicate confirmed bookings on one unit** — FIXED (PR #94: confirm guarded + transaction, create rejects non-available, cancel releases unit).
+> - **[P1/P2] Bounced cheque doesn't reverse anything** — FIXED (PR #94: Bounced reverses `projects.collected`, Cleared re-adds, transaction, Bounced excluded from sums).
+> - Cancel now releases unit (fixed in #94). `withTransaction` introduced (confirm + bounce paths; other multi-statement routes wave-2).
+> - Booking-confirm receipt bypass of `projects.collected` bump remains (wave-2); dashboard POST unguarded (wave-2); envelope inconsistency `ok:false` shape (wave-2).
+> - Data-health pass: drift is seed-artifact; legacy bounced cheques (#31/#32 H21) are seed-demo rows (no `collected` bump at INSERT — no reversal needed on dev). Production must reconcile any pre-fix bounced PDC that WAS bumped via POST.
 
 ## Static data purge (purge-static-data)
 > Goal: remove ALL UI mock/fallback rows so the operator can test every screen manually against the live DB.
