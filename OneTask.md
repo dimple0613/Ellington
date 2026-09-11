@@ -6,136 +6,340 @@
 ## Push (current branch + what to push)
 > Branch-per-task rule (see AGENTS.md): never push directly to main. Update this section per task.
 
-- Current branch: `fix/plinth-parity` (PLINTH Parity Program). Pushed: `81d9b7b` (T1), `8e405db` (T2), `a518b68` (T3), `20d764d` (T4), `91adcb5` (T5), `3fbec64` (T6), `b0ed1df` (T7), `234e74c` (T8), `b2b6180` (T9), `02da04c` (T10), `734c4ed` (T11), `35b4e9b` (T12), `d905002` (T13), `363d1be` (T14), `7cac9bd` (T15), `fb72f6e` (T16), `a6c5872` (T17), `aef6db9` (T18). Final phase: ALL 18 parity tasks committed and pushed. T18 Settings — `app_settings` gained `numbering` + `notif` JSONB columns (schema.sql + dev DB, seeded with per-object prefix/next and the 8-event matrix); `/api/system` GET/PUT carries numbering + notif (whole-row upsert, missing-body 400); `Settings.tsx` numbering tab editable (prefix/pattern/text inputs + numeric next) with live green previews (`H21-T1-0403`, `ESC-2026-9015`), notification matrix loaded from DB + persisted via Save changes. Fresh-setup shakeout performed: `db/reset.ts` rewritten to drop ALL public tables (was a stale 9-table list missing brokers/documents/bookings/settings), then `npx tsx db/reset.ts && npx tsx db/seed.ts` on a clean DB — 26 tables dropped/35 seeded (6 projects incl. H21, 134 units, 8 buyers, 3 bookings, 6 agencies, 5 agents, 3 docs + 7 template versions, 44 receipts incl. 6 PDC + H21 recon rows, 8 collections, 4 drawdowns, 6 invoices, 3 leads, 42 payment milestones, 36 construction milestones, 12 audit rows, 1 admin with settings); test-agent@ellington.com/Test1234 re-created via /api/admins (seed admin defaults from .env: admin@gmail.com + INITIAL_ADMIN_PASSWORD). Full E2E sweep on fresh DB: 23/23 screens PASS (portfolio, project×3, sales×5, finance×4, handover×3, system×3, incl. brokers register, bookings register, documents log, PDC, invoices, settings numbering) + ⌘K opens and typing "record" + Enter navigates to /finance. Cleaned up temp harnesses; remaining temporary files only in `C:\Users\admin\AppData\Local\Temp\opencode\`. Note: git push to origin hangs on GCM credential prompt — workaround `git push "https://oauth2:<gh-token>@github.com/..."`; local Postgres died mid-T6 (0xC0000142) and was restarted by the operator — if it dies again retry start, else commit on lint-only + re-verify pending. Operator out of office — no merges to main. Merge to main only after operator approval.
-- Closed on GitHub (no merge): issue #51 (dead `lib/useApi.ts` removed) on `fix/aud-051-dead-use-api` (`f8cbbd0` + `7a0bd8b`); issue #52 (any-type cleanups) on `fix/aud-052-any-types` (`164047b`).
-- Current branch: `main` (`ad22adf`; `fix/aud-006-system`, `fix/aud-006-finance`, `fix/aud-015-analytics` merged; `fix/aud-015-analytics` branch deleted local+remote).
-- **AUD-015 (#37) CLOSED/MERGED** — `fix/aud-015-analytics` (`ad22adf`): cashflow forecast + report exports live via `/api/finance-analytics` + `/api/report-export`; branch deleted.
-- **DEPLOYED TO CLOUDFLARE** — `npx wrangler deploy` (`wrangler.jsonc`, account `49dcdcff…`): worker `ellington-worker` live at
-  **https://ellington-worker.dimple-49d.workers.dev** (VERSION 989ea1f1). Verified from this machine: login 200 (+session cookie),
-  `/api/auth/me` → `Dipin Ellington` super_admin, `/api/dashboard` ok with `projects`, home page 200. All prod secrets present
-  (ADMIN_EMAIL, ADMIN_PASSWORD, CRON_SECRET, DATABASE_URL, DIGEST_TO, JWT_SECRET, SMTP_*). Build path: `npm run build:cf`
-  (OpenNext → `.open-next/worker.js`) then `wrangler deploy`.
-- Prior merged AUD modules (branches still present locally+remote: `fix/aud-006-system`, `fix/aud-006-finance` — safe to delete on request): all on `main`.
-- **PENDING APPROVAL — `fix/aud-006-system`** → `main` (`7a2b0b4` + docs `2af5c3b..95b807c`: System module wired — `audit_log`/`app_settings` tables, `/api/system` GET+PUT, AuditLog/Settings live via fetchJSON; lint+build green, GET live-verified audit=12/settings keys; #22 comment). **PENDING APPROVAL — `fix/aud-006-finance`** → `main` (`916a1f5` + docs `3e1cf05..ab66bb8`: finance ledgers wired — `collections`/`drawdowns`/`invoices` tables + `escrow_ledger.received_at`, `/api/finance` envelope, Collections/Escrow/Invoices live with error banners; lint+build green, GET live-verified 8/6/4/6 rows; Cashflow/Reports stay static analytics; #22 comment). Both pushed. Awaiting operator Chrome review (localhost:3100) + merge approval.
-- **AUD-006 scope essentially complete** — Handover (merged), System (pending), Finance ledgers (pending). Mobile.tsx is an intentional static iPhone design prototype (no data fetches, no swallowed errors) — excluded. Remaining to wire before closing #22: none blocking.
-- **MERGED** — `fix/aud-006-handover` → `main` (`33e34b0` + `c86b7f8`: Handover module wired — pipeline_items/snag_items/deeds tables, `/api/handover`, three screens live; #22 progress comment). Pushed to `origin/main`.
-- **AUD-006 (Handover module) IN PROGRESS** on branch `fix/aud-006-handover` (`33e34b0` + docs `28827e1`): new `pipeline_items`/`snag_items`/`deeds`
-  tables (idempotent in `db/schema.sql`, seed-guarded, applied to dev DB via lib/db temp script — `db/seed.ts` fails against Neon maintenance DB),
-  `pages/api/handover.ts` (envelope, Handover:REA), Pipeline/Snagging/Deeds fetch live via `fetchJSON` with surfaced errors.
-  lint + build green; verified in operator Chrome at localhost:3100. Push section below; no-hidden-browser policy — verification in operator Chrome only.
-- **MERGED** — `chore/standardize-project` → `main` via **PR #35** (`1ed35b3`, includes `b427dda` ARCHITECTURE + `c2a0ba2` AUD safe fixes) plus doc commits `286c0a3` (AGENTS.md/TASKS.md/`.opencode/`) + `300a3da` (phase-8 status). **MERGED** — `fix/admin-email-consistency` → `main` (`2ea46bf`: default admin email now `admin@ellington.com` in seed fallback + login/forgot-password placeholders). **MERGED** — `fix/aud-009-api-envelope` → `main` (`421594a` + `8058952`: 13 routes on `{ ok, data, error }` envelope; #26 closed). **MERGED** — `fix/aud-007-use-api` → `main` (`2c3fe22` + `0a83826`: fetchJSON + surfaced errors; #24 closed). All pushed to `origin/main`. Nothing pending to push.
-- Full audit tracked on GitHub: issues #20–#34 (AUD-001…AUD-014, severity labels). Board (project) still blocked:
-  local `gh` token lacks `project` scope — operator must run `gh auth refresh -s project`, then board can be created
-  (GraphQL create-project.json already prepared).
-- Deferred (needs visual/contract change, no-visual-change rule): AUD-007 error states (#24), AUD-009 API envelope (#26).
-  AUD-005 (Jest/RTL/Playwright) requires operator approval to add dev deps. AUD-006 (role→permission-map rewiring) not started.
-  **AUD-009 (#26) CLOSED/FIXED** on branch `fix/aud-009-api-envelope` (`421594a`): all 13 routes now return `{ ok, data, error }`
-  via `lib/api.ts` (`ok`/`fail`/`methodNotAllowed`/`notFound` + `validEmail`/`missingFields`); consumers updated
-  (`useApi` unwraps `data`, `useSession` reads `data.user`, login reads `data.next`, Payments/Inventory/Sales/Users read `data.*`).
-  lint + build green; live-verified: dashboard/inventory/receipts/leads/admins/milestones/me all `ok:true` with `data`, bad login 401.
-  Merge pending operator approval.
-- **AUD-007 (#24) CLOSED/FIXED** on branch `fix/aud-007-use-api` (`2c3fe22` + docs): Payments/Inventory/Sales-Leads/Users now
-  GET through shared `fetchJSON` in `lib/api.ts` (unwraps envelope, redirects /login on 401) and render a red
-  "Live data unavailable — showing sample rows" banner on failure instead of silent `.catch(() => {})`.
-  lint + build green; live-verified all four screens show real data (258 units, leads, receipts, admin@ellington.com), no banner.
-  Merge pending operator approval.
-- Last task: merge `feat/cloudflare-hyperdrive` → `main` (Hyperdrive DB connection fix so production reads Neon, delivered 200 on `/api/auth/login` + `/api/auth/me` with admin `Dipin Ellington`/`admin@gmail.com`); pushed.
-- Admin on Neon: id 1 = `Dipin Ellington` / `admin@gmail.com` / `Admin123` (role super_admin) — verified login 200 on live worker.
+- Current branch: **`fix/ui-responsive-audit`** — Responsive/overflow/UI fixes across the whole console. Push target: this branch only (merge to main after operator approval). The earlier `fix/production-audit-wave1` work stays on its own branch (content preserved below in the wave section).
+- PUSH THIS (current working tree — verified `npx tsc --noEmit` **green** + `next build` **green**):
+  - **`styles/globals.css`** — removed the old `[style*="min-width: 1180"]` + `[style*="overflow-x: auto"]`/`overflowX` overrides that forced every scroll wrapper to `visible` (this restored native scrolling: Sales kanban :488, viewings :433, buyers table :1406, Pipeline kanban, Inventory tabs/stack, Construction photos). New responsive rules: repeat(6/4/5,1fr) and `repeat(4,1fr) 1.4fr` KPI collapse; fr-pair + `1fr 1fr` stacks — ALL guarded with `:not([style*="min-width"])` (serialized DOM form) and the `1fr 1fr` rule anchored to `grid-template-columns: ` so wide data tables (which carry inline min-width) are never collapsed to 1 col on mobile; `repeat(6,…)` matcher narrowed to `repeat(6,1fr)` so the Users permission matrix (`repeat(6,38px)`) is untouched; radius 22→15, fontSize 22→18 / 26→20, `[id=password]/[id=email]` 16px on ≤640; ProjectWizard rail column-stack (`max-width:900` → flex-direction:column, `width:214` → 100% on ≤640).
+  - **Table horizontal-scroll wrappers (`overflowX:"auto"` + `minWidth` on header/row grids)** — dashboard Projects (660), Financials entity (760) + commissions (580), Reports scheduled deliveries (560), Pricing matrix, Sales bookings register (8-col, 1050) + buyers directory (12-col, 1240), Invoices (11-col, 1000), Payments receipts (900) / PDC (820) / statement (620), Escrow drawdowns (640), Collections overdue (780), Unit payment schedule (580), Construction milestones (740), Deeds (8-col, 860), Snagging (9-col, 900), Users (7-col, 680), AuditLog (9-col, 920), Inventory list view (9-col, 760), Settings notification matrix (5-col, 560).
+  - **Header/stats rows `flexWrap:"wrap"` + `rowGap:12` + `minWidth` on titles** — all 20 screens (dashboard, Financials, Cashflow, Reports, Inventory, Pricing, Construction, Users, UnitBuilder, Snagging, Invoices, Settings, Deeds, Pipeline, Sales ×2, Payments, Collections, Projects, AuditLog) + Mobile.tsx preview row + tab bar.
+  - **Modals** — Payments 440/520 → `width: "min(92vw, Npx)"`; Escrow/Invoices/Reports/Settings width caps already fine.
+  - **Misc** — `pages/reset-password.tsx` password input `paddingRight:42` (text no longer runs under the show/hide eye toggle); `Mobile.tsx` phone-inner `1fr 1fr` → `repeat(2,1fr)` so the global mobile-stack rule never touches the iPhone preview grid; `PortalChrome.tsx` header `flexWrap:"wrap"`.
+  - Files: `styles/globals.css`, `pages/dashboard.tsx`, `pages/reset-password.tsx`, `components/portal/PortalChrome.tsx`, `components/screens/{AuditLog,Cashflow,Collections,Construction,Deeds,Escrow,Financials,Inventory,Invoices,Mobile,Payments,Pipeline,Pricing,Projects,Reports,Sales,Settings,Snagging,Unit,UnitBuilder,Users}.tsx`.
+- NOT in commit (never): `auto-push.ps1`, `test-*.mjs`, `dev.log*`, `*_out.html`, `docs/ARCHITECTURE.md` (tracked, but only committed on request).
+- Status: `npx tsc --noEmit` **green**; `next build` **green**. **Live CDP browser verification passed (6 widths × 7 routes = 42 checks):** `documentElement.scrollWidth` == `clientWidth` (no page-level horizontal scrollbar) on every check; all wrapped data tables scroll via their `overflow-x:auto` wrapper (grids correctly skipped as scroll containers); KPI strips collapse (repeat(6)→3/2) and fr-pair panels stack at breakpoints; Users permission matrix (`repeat(6,38px)`) untouched. Residual `clipped` items are intentional/cosmetic only — section titles stretch with their grid min-width and clip at the shell wrapper on ≤430px (by design; title sits above the scrolled grid), search-placeholder ellipsis, table-cell deltas (own-hidden). No regressions detected vs the `verify_functionality`/`verify_responsive` baselines.
 
-## PLINTH Parity Program (branch `fix/plinth-parity`)
-> Reference: `C:\Users\admin\Downloads\New folder\plinth-prompt-pack_1.html` (PLINTH prompt pack).
-> Goal: every screen/page functions like the reference. Wiring map verified at start:
-> **16 screens already live** (dashboard, inventory, leads, payments, collections, escrow, invoices,
-> pipeline, snagging, deeds, users, settings, audit, cashflow, reports, projects) via `fetchJSON`;
-> **5 static** (financials, unit, pricing, construction, mobile) + Sales sub-screens
-> (booking/buyer/brokers/documents) + missing write-APIs + loading states (#50). Do one at a time.
-> - [x] **T1** Wire `Financials` (`/dashboard?s=financials`) → live `/api/dashboard` project data
-> - [x] **T2** Wire `Unit Detail` (`/project?s=unit`) → `/api/inventory?unit=` + `/api/milestones?unit=`
-> - [x] **T3** Wire `Pricing & Availability` (`/project?s=pricing`) → live units from `/api/inventory`
-> - [x] **T4** `Construction Progress` → new `construction_milestones` table + `/api/construction` + wire screen
-> - [x] **T5** `Mobile` exec app → new `/api/mobile` aggregate + wire the 5 tabs
-> - [x] **T6** `Buyers` directory + Buyer 360 → new `/api/buyers` (GET) + wire Sales buyer subscreens
-> - [x] **T7** `Leads` → PUT stage to `/api/leads` (drag-persist) + agent leaderboard (live aggregate by agent)
-> - [x] **T8** `Escrow` → add `/api/finance` PUT (reconcile match / drawdown submit) + wire actions
-> - [x] **T9** `Invoices` → add `/api/invoices` POST/PUT (issue / void / bulk-issue) + wire actions
-> - [x] **T10** `Collections` → dunning action PUT (remind/log/promise) + live default calculator (construction %)
-> - [x] **T11** `Payments` → bank-statement import (CSV) + PDC register live from receipts
-> - [x] **T12** `Handover` → payment-clear hard block from collections + readiness dashboard computed
-> - [x] **T13** Loading states (closes issue #50) → spinner/skeleton on all wired screens while fetching
-> - [x] **T14** `Bookings` → `bookings` table + `/api/bookings` + wire booking wizard + bookings register
-> - [x] **T15** `Brokers & agencies` → `brokers` table + `/api/brokers` + wire screen
-> - [x] **T16** `Document generator` → `documents` + `document_templates` tables + `/api/documents` + wire log & template activation
-> - [x] **T16** `Documents vault` audit → covered by Document generator wiring above (generation log persisted, every send logged)
-> - [x] **T17** Shell audit → ⌘K completed (keyboard nav + live indexes), switcher now searchable; notification centre & alerts ticker confirmed working
-> - [x] **T18** `Settings` → persist numbering / notification-matrix tabs via `/api/system` PUT
-> - [x] **Final** Fresh DB reset (all tables) → seed → re-create test agent → full E2E sweep 23/23 PASS → cleanup temp files (all parity work complete, awaiting operator review/merge)
+## Production Readiness Audit (11 Sep 2026) — READY CONDITIONAL, NOT BLOCKING
+> Full release audit run live on the dev stack (branch `fix/production-audit-wave1`). 90/91 API battery,
+> 42 DB-integrity checks, 21/21 workflow-chain + portal, RBAC proof (ops role), tsc + `next build` green,
+> `/sales` serves 200. No code changed (audit-only). Two authoritative go-live gates → OPEN (fix before GO):
+>
+> **[P1] Duplicate confirmed bookings on one unit** — `createBooking`/`confirmBooking`
+> (`pages/api/bookings.ts`) never checks `units.status`; proven live: 3 confirmed bookings accepted on one
+> unit (BLG-026). Unit is only set `reserved` at confirm (never before), so a unit can be booked/sold twice.
+> **[P1/P2] Bounced cheque doesn't reverse anything** — `receipts.ts` PUT `action=pdc` → `Bounced` only
+> inserts a dunning `collections` row; the receipt stays in `receipts` sums and `projects.collected` is
+> not decremented (receipts POST bumps it, never undone) → "Collected"/receivables/invoice-paid overstated.
+>
+> Additional findings (fix in wave-2, non-blocking for the report): cancel never reverts unit `reserved` to
+> `available` (burned inventory); booking-confirm deposit receipt bypasses the `projects.collected` bump
+> that `receipts.ts` POST does (deposits under-count KPIs); `/api/dashboard` has no method guard (POST → 200);
+> 401/403 guard envelopes are `{error}` without `ok:false` (inconsistent with `fail()`); multi-statement
+> writes (receipts POST, booking confirm) not wrapped in a transaction. Data drift on dev DB (H21/BLG/WPK
+> `projects.collected` vs receipts sum — direct-DB test rows bypass the bump; dup lead phone; 3 seeded paid
+> invoices without a matching receipt; collection actions are free-text). Recommend a data-health pass on
+> the real dataset before GO. Dev DB returned to pre-audit state (QA rows purged, units reverted).
 
-> Out of scope (flag as N/A): SSO/2FA, buyer portal, broker portal, Arabic/RTL, e-signature, WhatsApp/SMS channels, Mollak API.
+## Static data purge (purge-static-data)
+> Goal: remove ALL UI mock/fallback rows so the operator can test every screen manually against the live DB.
+> Rule applied: purge mock/fallback ROWS; KEEP option/config lists (status pills, enums, STAGE config,
+> GROUPS report catalog, Settings defaults, Inventory VIEWS/CHIPS, Pricing option lists), empty-array
+> fallbacks, and `pages/api/report-export.ts` FALLBACK (SQL config map). `db/seed.ts` seed data kept.
 
-## Today's Focus
-- [x] Task 1 — Scaffold project (complete md set)
-- [x] Task 2 — Set up GitHub issue/project management (repo + 8 issues created)
-- [x] Reference replication — Dashboard (Portfolio) built in reference order
-- [x] Projects grid screen built (`/dashboard?s=projects`); dashboard value-position units bug fixed
-- [x] Dashboard functionality pass — all buttons/actions wired & verified in browser (KPI → payments/collections/inventory pages, moneyBar + project rows → `/project?s=inventory&scope=<code>`, ageing → Finance·Collections, attention → Finance/Sales pages, Export PDF → `window.print()`, period + fc tabs live); scope now persists via URL `?scope=`
-- [x] Finance·Payments screen built (`/finance?s=payments`) — KPIs, Receipts tab (10 rows, Matched/Unmatched pills, escrow refs), Post-dated cheques tab (6 rows, Held/Presented/Cleared/Bounced pills), tab switching live; verified in browser
-- [x] Projects "+ New project" now functional (modal with name/location/units/GDV, creates card with auto code + red flag, updates header totals); Sort: sell-through / GDV toggle live; modal closes on outside click / Escape; verified on `/dashboard?s=projects&scope=WPK`
-- [x] Financials screen built (`/dashboard?s=financials&scope=WPK`) — 6 KPI tiles, Position by project entity table (computed from PROJECTS), Revenue by quarter bars, Commission payable table; Accounting export (CSV) + Board pack PDF (jsPDF) both work; verified in browser
-- [x] Cashflow screen built (`/dashboard?s=cashflow&scope=WPK`) — Expected collections bars + Confidence-adjusted/At-risk summary, 7d/30d/90d/180 days tabs (live recompute), Balance ladder next 30 days, By trigger type (46/41/13% split), Sep 26–Feb 27 monthly drawdown table; verified full render ×3 (0 console errors) + all 4 tab switches
-- [x] Reports screen built (`/dashboard?s=reports`) — 27 report cards in 4 groups (Sales/Finance/Compliance/Project) each with a working Run (CSV) button, Scheduled deliveries table, Custom report builder modal (report+format selector → CSV/XLSX/PDF download) + Assemble board pack (PDF); all 49 content strings verified, all 3 header actions functional
-- [x] Inventory + Unit screens built (`/project?s=inventory&scope=<code>` and `/project?s=unit&unit=<id>`) — Inventory with all 4 views (Stack plan/Floor plate/List/Cards), status filter bar (live counts+values, dims non-matching), Price/sq.ft heat toggle, Export price list (CSV); Unit screen (header + metrics/bar, Overview/Payments/Documents/Activity tabs, price-derivation ladder, instalment schedule, docs vault, activity timeline, compliance). Clicking any unit routes to the unit screen. Verified in browser: filter dims 120/84 correctly, tabs switch, unit nav works, 0 console errors
-- [x] Sales group built (`/sales?s=leads|booking|buyer|brokers|documents`) — `components/screens/Sales.tsx`: Leads kanban (8 columns, funnel, New booking → booking), Booking wizard (5 steps, deal summary, approval banner, escrow ref), Buyer 360 (header, 4 tiles + Next due, Units/Ledger/Schedule tabs, payment behaviour + relationship sidebar, Open unit record → /project?unit), Brokers (Agencies/Agents/Onboard agency/Activity tabs + 5 KPIs), Documents (13 doc types, Generate preview PDF page + Template studio with merge fields + version control). Build green, 0 console errors, all screens + interactions browser-verified
-- [x] Unit header action buttons made functional: **Generate SOA** → `exportUnitSoa` PDF (`soa-<unit>.pdf`), **Generate EOI** → `exportUnitEoi` PDF (`eoi-<unit>.pdf`), **Record payment** → `/finance?s=payments`. Verified in browser: both downloads fire + nav works, 0 console errors
-- [x] Pricing & availability screen built (`/project?s=pricing`) — `components/screens/Pricing.tsx`: Price ladder (5 typologies × 5 floor-bands heat matrix, 25 cells), Bulx/revision form (interactive Selection + Change dropdowns, preview rows, GDV impact, Submit for approval → pending), Release phases (4 rows + Phase 2 countdown banner), Discount governance (policy + 12-month leakage bars), Export price list CSV, Version history toggle. Build green, 0 console errors, CDP-verified
-- [x] Construction progress screen built (`/project?s=construction`) — `components/screens/Construction.tsx`: dark Overall completion card (46.0%, planned marker, team, handover forecast), Work packages table (8 rows with actual/planned bars + variance), Milestones & money table (6 rows), Site photo feed (5), Risk register (3); **Certify milestone** → Structure 40% → Certified + amount invoiced toast, **Upload photo set** → prepends new photo + toast. Build green, 0 console errors, CDP-verified
-- [x] Leads → New booking made fully dynamic (`components/screens/Sales.tsx`): lead kanban cards now clickable (New booking affordance per card) → opens the 5-step booking wizard **pre-filled with that lead's buyer name + unit suggestion**; top "New booking" button opens a blank booking. Booking form fields are now **editable inputs** (buyer name, mobile, discount %, amount) with live-recalculating net price + booking amount + deal summary; Confirm booking shows a confirmation banner naming the created-from lead. CDP-verified both entry paths, 0 console errors
-- [x] Buyer 360 "Send statement" + "Record payment" made dynamic (`components/screens/Sales.tsx` + `Payments.tsx` + `lib/pdf.ts` + `pages/finance.tsx`): **Send statement** → generates a real buyer Statement PDF (`statement-rajesh-menon.pdf`, via new `exportBuyerStatement` in `lib/pdf.ts`: position summary, units table, transaction ledger from the buyer's live ledger) + "Statement emailed/logged" banner; **Record payment** → navigates to `/finance?s=payments&buyer=Rajesh+Menon`, shows a "Recording payment for <buyer>" context banner, opens the Record payment form (pre-filled buyer), records → prepends new receipt row `RCP-H21-004790` + "Payment recorded" banner. CDP-verified both flows end-to-end, 0 console errors
-- [x] Documents screen made fully dynamic (`components/screens/Sales.tsx` + `lib/pdf.ts`): new `exportDocument` in `lib/pdf.ts` generates a real PDF for any doc type (unit spec table, payment plan, buyer/project metadata). **Generate tab**: Unit + Buyer dropdowns (from `ALL_UNITS`/`BUYERS` data) update the preview live (unit ref, typology, beds, area, price, psf, payment plan amounts all recalculate); media toggles are clickable (state-driven); **Generate and send** → downloads PDF (`i-h21-004412.pdf` for Invoice) + "emailed to <buyer>" banner + "Recently generated" log; **Download PDF** → same export; **Template studio** tab → blocks list, merge fields, version control; **Set as active template** → bumps to v4 Live + notice; **Save as draft** → v4 draft saved + notice. CDP-verified: page loads, doc types selectable, unit/buyer dropdowns change preview, Generate and send downloads real PDF + banner + log, 0 console errors
-- [x] Collections + Escrow screens built (`components/screens/Collections.tsx` + `Escrow.tsx`, wired into `pages/finance.tsx`). **Collections**: 6 aging buckets (Current/1-30/31-60/61-90/90+/Legal) with live selection highlight + red on danger buckets; collection worklist table (8 rows: buyer, unit, AED amount, overdue days, stage pill, action) with **Remind** (queued + banner), **Log call** (logged + banner), **Escalate** (navigates to escrow) per-row buttons; **Default calculator** sidebar (unit info, verified construction %, 3 retention tiers with active highlight, contract/paid/retention/refund summary, Generate 30-day notice button). **Escrow**: header card (project + bank + last import), 4-column identity row (escrow bank, IBAN monospace, RERA acc no.); 4 KPI tiles (collected/deposited/variance alert in red/balance); 3 gauge cards (upfront/retention/drawn-down with bar + mark + flag note); reconciliation queue (6 rows with date/desc/amount/side pill + **Match to** button that removes row + banner + **Flag** button); standing obligations (7 rows with status dots + flagged amber for expiring permits); drawdown requests table (4 rows: DDR ID/milestone/amount/engineer cert/RERA pill/status pill). **New drawdown request** button in header. CDP-verified both screens: 30/31 checks pass, 0 console errors
-- [x] Handover screens built (`components/screens/Pipeline.tsx` + `Snagging.tsx` + `Deeds.tsx`, wired into `pages/handover.tsx`). **Pipeline**: 9-column kanban (Payment cleared \u2192 OA onboarded with unit cards), blocked units list (4 with reason dots), average days in stage bar chart (7 stages, amber for >15d), handovers forecast vertical bars (W1\u2013W8); "Open snag list" navigates to snagging. **Snagging**: 4 KPI tiles (open/critical/re-inspection/closed counts), open by trade horizontal bars (6 trades), snag table (8 rows: unit, location, trade, description, severity pill [Critical/Major/Minor], contractor, status pill [Open/In progress/Closed/Re-inspect], re-inspect date, Photo + Close action buttons); **Close** toggles row to closed + banner, KPIs update live. **Deeds**: title deeds table (6 rows: unit, owner, Oqood ref, DLD 4%, deed status pill [Issued/Applied/Blocked], issued date, keys pill [Released/Held], Mollak pill [Registered/Pending]); sidebar: service charge & warranty card (6 rows), handover completion card (96/140 teal). Build green, 0 console errors, CDP-verified
-- [x] System group built (`components/screens/Users.tsx` + `Settings.tsx` + `AuditLog.tsx`, wired into `pages/system.tsx`). **Users & roles**: 7-user table (name/email/role/projects/last active/2FA/status, row-selectable role editor), permission matrix (6 modules \u00d7 6 CRUD/APR/EXP toggles, working), field-level overrides with Locked pills, approval thresholds with Auto pills, working Invite user. **Settings**: 5 tabs (Company identity/brand locale, Numbering conventions with mono prefixes, Notification matrix with toggles, Integrations grid with Connect/Manage, Other placeholder), working Save changes. **Audit log**: append-only info bar, 12-row 8-column table, live search filter, Export CSV. CDP-verified 24/24 checks, 0 console errors
-- [x] Mobile executive app built (`components/screens/Mobile.tsx`, wired into `pages/mobile.tsx`). Four interactive iPhone 15 Pro mockups via bottom tab bar \u2014 **Home** (portfolio value, collected/overdue, 30-day confidence bar), **Projects** (sold ring 71%, status legend, financial tiles, typology mix bars), **Money** (collections/forecast/ageing tabs, colour-coded ageing buckets, PII-gated buyer row), **Approvals** (2-badge inbox: discount request + drawdown request with working Approve/Reject), **More** (profile + menu). Live tab switching, per-screen description panel, tap-to-preview All screens list. Build green, 0 console errors, CDP-verified
-- [x] **Complete secure authentication flow** (`feat(auth)`, branch `kartik-gohil`, commit `80297f6`, pushed) — server-side route guard in `middleware.ts` (unauthenticated protected pages → `/login?next=...`; authenticated users on `/login`/`/forgot-password`/`/reset-password` → redirect to dashboard), client-side session guard + expiry/logout redirect in `components/Shell.tsx` via new `lib/useSession.ts`; redesigned `pages/login.tsx` (split-screen brand panel, show/hide password, validation, loading state, redirect back to attempted page); new forgot-password + reset-password pages and API routes (`lib/mail.ts`, hashed expiring tokens, password-strength validation, generic success messages); new `/api/auth/me`; `password_resets` table in `db/schema.sql`. `npm run lint` (tsc --noEmit) + `npx next build` green; runtime-verified with `next start`: `/dashboard` & `/sales` no cookie → 307 `/login?next=...`; `/api/auth/me` with cookie → 200 user JSON; `/login` with cookie → 307 `/dashboard`
-- [x] **Database-driven admin credentials + Profile page** (`feat(auth)`, branch `kartik-gohil`, commit `52b480a`, pushed) — fresh-install defaults `admin@gmail.com`/`Admin123` used only at first install/seed (`INITIAL_ADMIN_EMAIL`/`INITIAL_ADMIN_PASSWORD`); runtime auth reads the `admins` table only (env-based `ensureEnvAdmin` removed). New `/profile` page + `PUT /api/auth/profile` (name/email/password with current-password verification, email uniqueness, password strength); credential changes sign the user out so old defaults are never accepted again; session carries `full_name` (Shell avatar + identity now live). Reset-password rejects tokens whose admin email no longer exists. Seed hash bug fixed. Local DB reset to defaults (dev); production Neon admin row needs operator update. lint + build green, runtime-verified
-- [x] **Full-system verification completed (CDP, headless Chrome)** \u2014 `verify_functionality.js` **89/89** and `verify_responsive.js` **70/70** all pass (commit `524ace6`, pushed). Every screen (25) renders with zero console errors; all buttons/menus/modals/interactions exercise live state (notifications panel + dismiss/mark-all-read, profile/help menus, CmdK search, login form submit + redirect, Escrow New drawdown, Users Invite, Snagging Raise snag + Assign contractor, Reports Custom report builder + Run + Assemble board pack). Responsive across mobile/tablet/laptop/desktop with no horizontal overflow on mobile/tablet. `npm run build` green. Any previously flagged test "failures" were test-harness text-marker mismatches, not app bugs \u2014 resolved and re-verified.
-- [x] **Production audit + OpenNext build fix** (`b7d773a`, pushed) — production (`ellington.pages.dev`) had ALL `/api/*` → 500 (even logout, proving a broken Worker, not DB). Root cause: `package.json` `build` = `opennextjs-cloudflare build` recursed into itself via OpenNext's internal `npm run build`. Split to `build` = `next build` + `build:cf` = `opennextjs-cloudflare build`. Rebuilt with Node 22, ran the fixed Worker in workerd via `wrangler dev` → **20/20** (APIs + pages + middleware). Local baseline also **20/20**. Deployment to production still requires operator decision (merge `kartik-gohil` → `main` + correct deploy output dir / env on Cloudflare Pages).
-- [x] **Full audit complete** (`docs/AUDIT_COVERAGE.md`, `docs/ROUTE_INVENTORY.md`, pushed) — every route/screen/API discovered from source; no-auth (47/47 → 307), auth (31/31 → 200) matrices; browser functional audit **44/44** (25 screens render clean, 0 console errors, 0 API failures; interactions pass). Led to issues **#18** (favicon) + **#19** (no server-side RBAC).
-- [x] **Issue #18 (favicon) fixed + closed** (`4c35ac0`, pushed) — added `public/favicon.svg` + head link in `_app.tsx`; verified clean + regression. NOTE: local DB admin email had drifted again to `kartik1111gohil@gmail.com` (were `admin@gmail.com`); re-seeded to `admin@gmail.com`/`Admin123`. Root cause of drift not yet pinned — monitor.
-- [x] **Issue #19 (server-side RBAC) fixed + verified** — `role_permissions` table + seeds; `lib/permission-map.ts` (edge-safe) + `lib/permissions.ts`/`withPerm` (DB source-of-truth API 403s); `middleware.ts` route→module gate → `/403`; Shell nav filtered client-side. **18/18** RBAC + **20/20** API + **8/8** browser regression.
-- [x] **Deploy prep started for production** — removed erroneous `wrangler.toml` (its `pages_build_output_dir = ".vercel/output/static"` points to a non-existent dir and caused the broken-worker misdiagnosis); confirmed correct config is `wrangler.jsonc` (Worker `ellington-worker`, `main: .open-next/worker.js`, assets `binding: ASSETS`); `npm run build:cf` with Node 22 emits valid `.open-next/worker.js` + `.open-next/assets` (incl. favicon). **Merged `kartik-gohil` → `main`** (18 commits: RBAC, favicon, build fix, config cleanup) and pushed to `origin/main` (`d1e3999..322bcd0`). Production APIs still **all 500/404** and do NOT show new code (no favicon after 5 min) — the `main` push did **NOT** trigger a Cloudflare auto-deploy. **HARD BLOCKER: production deploy cannot be run from this machine** — no Cloudflare auth anywhere (`CLOUDFLARE_API_TOKEN`/`ACCOUNT_ID` absent, no `wrangler` config, no git hooks, no GH Actions, no Pages auto-build). Only the Cloudflare account owner (`dimple0613`) can deploy via `wrangler login`/API token + `wrangler deploy` (Worker `ellington-worker`), then re-seed Neon admin/roles.
+- [x] **Cashflow / Escrow / Collections / Invoices** — API-first; static rows emptied; empty states; Invoices duplicate `SOA_FIELDS` (fake values) removed.
+- [x] **Payments** — `KPI_FALLBACK`/`payRows`/`fallbackPdc` removed; `record()` async (posts `project_code`, calls `loadReceipts()` after POST; local row uses honest placeholders); table = live rows + local POST echo only.
+- [x] **Financials** — `REV_BARS`/`COMM_ROWS` emptied; header "position live"; empty states for chart + commissions table.
+- [x] **Construction** — `PKG`/`MILES`/static `PHOTOS`/static `RISKS` removed; live-only pct/certs; empty states; `TEAM` kept as vendor config; toasts genericized.
+- [x] **Pipeline** — `PIPE` cards/counts emptied (labels/colors kept), `BLOCKED`/`STAGE_DAYS`/`FORECAST` emptied; defaults blank; modal chips → text inputs; empty states.
+- [x] **Reports** — `SCHEDULED` emptied; report cards "Live export ready"; board-pack date dynamic; `GROUPS` catalog kept.
+- [x] **Deeds** — `ROWS` removed, `MOLLAK` emptied, `certUnit` blank; `doIssue` guarded; handover tile computed from rows.
+- [x] **Snagging** — static `TRADES`/`ROWS` removed; `TRADES`/`maxTrade` computed live; KPIs live; `raiseSnag` guarded; unit chips → input.
+- [x] **AuditLog** — static `ROWS` removed; count/filters live; error text fixed.
+- [x] **Users** — static `USERS` fallback emptied; header count computed; empty-state; `ROLE_PERMS`/`THRESHOLDS_BASE`/`PLAIN` kept as role config.
+- [x] **Sales** — dead `DEAL`/`refOf` removed; `BROK_FALLBACK` left (already all-empty, harmless).
+- [x] **Sales booking wizard rewired to live data** (operator-approved) — deleted `SFIELDS` static step data; wizard now loads available units from `/api/inventory?status=available` (scoped to `?scope=`), unit picked in a live `<select>`, and `listPrice`/`psf`/`booking token`/`DLD` derived from the selected unit's `price`/`area`. `saveDraft`/`doConfirm` POST `unit_no` + `list_price` from the live unit; escrow/bank/ref defaults emptied (escrow is mandatory input before confirm); discount default 0 with live approval copy; step 2 identity fields honest ("Captured at KYC"/"—"/"Pending screening"); step 4 docs "Queued after confirmation"; deal rail + step-5 review + confirmed screen all live. Save-draft/continue disabled until a unit is selected.
+- [x] **Notifications now fully dynamic** — Shell tray no longer seeded with 6 fabricated notifications (`NOTIFS` removed); tray/ticker built only from `/api/finance` (overdue >90d, unmatched escrow, drawdowns awaiting trustee, worklist), re-fetched on window focus; "Due today" fallback now `AED 0` instead of fake `AED 4.2M`; profile "Preferences · Notifications & quiet hours" opens Settings on the real Notifications tab (`?s=settings&tab=notif`); "Offline cache · Last synced 09:39" fake timestamp neutralized; Mobile "Notifications · 12 unread" fake count neutralized. Settings notification matrix already live (loads/merges/saves `app_settings.notif` via `/api/system`).
+- [x] **Notification read/dismiss persists** — stable content-derived IDs (`collections-overdue`, `escrow-unmatched`, `drawdowns-awaiting`, `collections-worklist`) instead of ephemeral `n1/n2…`; mark-all-read + per-item dismiss now saved to `localStorage["ellington_notif_<userId>"]` (per admin) and applied on every rebuild, so unread state survives refresh. Client-side only — no schema/API change; per-user and per-device.
 
-- [x] **Project standardization pass** (`chore/standardize-project`, merged via **PR #35** (`1ed35b3`) + docs commits) — Phase 1+2 audit → `docs/ARCHITECTURE.md`; 15 AUD issues filed (#20–#34) + severity labels; Phase 6+7 safe fixes applied (login error leak, JWT secret fail-closed, mail link leak, admins validation, permissions dedupe, dead deps, Stub dedupe, `any` mappers, cookie Secure/`__Host-`, `.env.example` generic, `.gitignore` backups). Phases 3/4/5/9 done (AGENTS.md, TASKS.md, `.opencode/` auditor, folder-structure doc). Phase 10 summary posted as issue **#36**. lint + prod build green. **Phase 8 round-trip browser retest PASSED** — login with `admin@ellington.com`/`Admin123` → `/dashboard` renders real data, `/api/auth/me` → 200 (super_admin). Local DB admin drifted (was `kartik1111gohil@gmail.com`) → **fixed to `admin@ellington.com`**; `db/seed.ts` fallback + login/forgot-password placeholders updated to match (`2ea46bf`). Board creation still blocked (needs `gh auth refresh -s project`).
+## Wave-1 production-readiness (fix/production-audit-wave1)
+> Live checklist from the PLINTH reference audit. Issue-by-issue, one task at a time.
 
-## Backlog (pending)
-- [ ] Issue #1 — Task 3: CEO-Review baseline (feature spec from Ellington reference)
-- [ ] Issue #2 — Task 4: Data model: projects, units, buyers, receipts, milestones, escrow ledger
-- [ ] Issue #3 — Task 5: Inventory screen (unit board + status)
-- [ ] Issue #4 — Task 6: Sales: leads kanban + booking wizard
-- [ ] Issue #5 — Task 7: Finance: payments, collections ageing, escrow recon, cashflow
-- [ ] Issue #6 — Task 8: Executive mobile app (read-only)
-- [ ] Issue #7 — Task 9: Handover — pipeline, snagging, title deeds
-- [ ] Issue #8 — Task 10: Daily status digest (IST 10:00 / 22:00)
+- [x] **1 · B-04** Mobile approvals persistence — `pages/api/mobile.ts` (withSession; GET Dashboard/REA live drawdowns + masked money; POST Finance/APR approve/reject + audit) + `Mobile.tsx` live approve/reject UI with non-empty reject reason.
+- [x] **2 · RC-01** Oqood blocks Sold — `units.oqood_no`/`updated_at` ALTER + deeds backfill (dev applied, 84 sold units); `inventory.ts` PUT `{unit_id,status,oqood_no?}` gated `Inventory/UPD`; `sold` without Oqood → 400. Live-verified block + ok + revert.
+- [x] **3 · DI-01/02** Fake audit actors removed from seed + append-only trigger `trg_audit_log_append_only` (BEFORE UPDATE/DELETE → RAISE). `db/cleanup-audit-actors.ts` (operator-run, refuses if trigger present) applied to dev.
+- [x] **4 · B-01..03 + PI-01..03** PDF parameterization — no hardcoded figures/dates/fees in SOA, 4-page EOI (NON-BINDING watermark, build-driven schedule), USO with real issue date, handover cert today, dynamic report subtitles.
+- [x] **5 · DI-04** PII gating — buyer name masked by default (`M*****e`); `?reveal=1` logs every reveal to audit_log (sensitive=true).
+- [x] **6 · MF-06/RC-04** Law-19 default calculator — retention = % of **sums paid** (25/40/100 by construction tier), refund = paid − retention, `legalReviewRequired`; notice PDF renders real tier and never fabricates refund; collections notice blocks generation without a calc result.
+- [x] **7 · RC-02/03** ProjectWizard validators — no construction-linked instalment > 20% (booking/deposit/SPA/handover/completion exempt), broker commission ≤ 5% (hard block + gauges both steps).
+- [x] **8 · Broker 24h hold** — `units.held_until` + `broker_reservations.expires_at` added (schema + dev DB); portal Reserve now sets unit `held` + 24h `held_until` and reservation `expires_at`; expired holds swept on every portal read (unit → `available`, reservation → `expired`); portal inventory shows live hold countdown chip (`hold_until`), MY RESERVATIONS show "hold ends HH:MM:SS", HOME shows release countdown banner (`release_countdown_s`); `inventory.ts` PUT clears `held_until` on `available`. Live-verified: reserve → held 24h (86 399s) → re-reserve blocked → admin sees `held` → forced expiry swept to available/expired.
+- [ ] **9/remaining · (optional follow-ups)** — broker portal READ-ONLY allocated inventory scope (reference: brokers see only `alloc_units`) and "Convert to booking" path from a hold — confirm with operator on branch.
 
-## GitHub Issues
-- #1 Task 3 / #2 Task 4 / #3 Task 5 / #4 Task 6 / #5 Task 7 / #6 Task 8 / #7 Task 9 / #8 Task 10
+## PLINTH Parity Program — verified remaining tasks
+> Re-audited from scratch against `C:\Users\admin\Downloads\New folder\plinth-prompt-pack_1.html`
+> (audit runs Apr 2026 by 4 explore agents + direct file reads). The "all 18 done, 23/23 PASS"
+> narrative in git history is NOT trusted; every item below is a CONFIRMED gap with `file:line` evidence.
 
-## In Progress
-- [~] Issue #4 - Sales: leads kanban + booking wizard
+### P1 — Dashboard / Leads (highest user-visible value)
+- [x] **D1 Dashboard live KPIs** — `pages/api/dashboard.ts` now computes kpis/ageing/forecast/attention/
+      velocity from tables (receipts, collections, invoices, payment_milestones, bookings, escrow_ledger,
+      deeds, units, projects, leads); `pages/dashboard.tsx` consumes new payload with computed
+      `fallbackDash()` on API failure. Committed `728b479`.
+- [x] **D2 Leads detail drawer** — clicking a lead card opens a `LeadDrawer` (contact/deal/activity,
+      stage pill, "Convert to booking" CTA that prefills the wizard); drag-move gates on missing
+      name/budget for qualifying stages with amber notice. Committed `bf3f350`.
 
-## Done
-- [x] Task 1 — scaffold (TEAM, OneTask, CEO-Review, README, MILESTONES, ROADMAP, WORKFLOW, AGENTS + docs/)
-- [x] Task 2 — Git repo + remote origin + gh installed/auth + project labels + 8 issues on github.com/dimple0613/Ellington
-- [x] Task 3 — Issue #1/CEO-Review migrated; issue #2 data model + Next.js/TS scaffold done (commit 4542e8e; build + tsc pass; DB seeded with 5 Ellington projects)
-- [x] Task 4 — Issue #3 inventory screen (unit board + status tiles + filters + API) done (build + tsc pass)
+### P2 — Inventory / Shell
+- [x] **D3 Inventory context** — scopeName derived from `/api/inventory` projects list; building tab pills
+      switch `?scope=`; summary strip (units/available/total value/avg psf) and filter chips computed from
+      loaded units instead of static CHIPS. Committed `0c94935`.
+- [x] **D4 Shell live** — "Due today" ticker + notification tray rebuilt from `/api/finance`
+      (overdue >90d collections, unmatched escrow, drawdowns awaiting trustee, worklist count); ORN
+      subtitle reflects current scope. Committed `57adfdd`.
 
-## Blocked
-- (none)
+### P3 — Finance / Sales stats
+- [x] **D5 Finance KPIs** — Payments KPIs (today/MTD/cheques pending/unreconciled/bounced) computed from
+      receipts already loaded; Collections age buckets + subtitle derived from live rows. Committed `bc4f84f`.
+- [x] **D6 Sales stats** — funnel counts + avg days-to-close + per-stage conversion + header
+      (open/potential/agents) computed from live leads; leaderboard was already live. Committed `31ff7aa`.
 
-## CEO Notes
-- Reference: Archive/UI systems design review/Ellington ERP.dc.html
-- Stack: PostgreSQL + SQL, Next.js, shadcn/ui + Tailwind, Formik + Yup, toast.
-## Active Assignment (CEO)
-- **Issue #4 — Sales: leads kanban + booking wizard**
-- Assignee: Engineering Lead + Frontend Engineer
-- Reviewer: CEO (approval before close)
-- Reporting: CEO gets status at each milestone
+### Deferred / N/A (needs operator approval — NOT started)
+- [ ] **`lib/data.ts` mock purge** (`POS :22-29`, `BUYERS :31-44`, `PROJECTS :60-66`, `UNITS :84-122`)
+      — retained as offline fallback; every screen above is API-first.
+
+## Dynamic audit vs reference — confirmed findings (09 Sep 2026)
+> Full evidence: `docs/AUDIT-VS-REFERENCE.md` (committed with this entry).
+> 62 pass / 12 fail then code+DB verification of every fail. Baseline harnesses still green.
+
+- [x] **BUG: Payments Collected today / MTD always AED 0** even with receipts today (ids 43/44, `09 Sept 26`).
+      Root cause `pages/api/receipts.ts:37,42` `en-GB` month `"Sept"` (4 letters) vs
+      `Payments.tsx:126` regex expecting 3-letter → `parseD` null → 0. Fixed `6179180` via `fmtShortDate`
+      (`lib/format.ts`) used in receipts + statements APIs. Verified: today AED 38.02M/13 receipts,
+      MTD AED 208.40M/39 receipts. Also matches reference `24 Aug 26` date style.
+- [x] **Gap: Settings** — now 7 tabs incl. Financial (FX rates + refresh, VAT/fiscal, banks w/ escrow),
+      Templates (EN/AR library, merge fields, preview, test-send, activate/draft) and Data (retention, PII,
+      backup, JSON export); Numbering + Booking/Invoice/Quote rows w/ live preview; stored vars merged over
+      defaults on load. Approved + verified live, committed `02fbe52`.
+- [x] **Gap: Audit Log** — added expandable rows (before→after field-diff panel, red→green), date-range +
+      actor + action + project filters, high-sensitivity toggle, Clear filters, append-only banner, live
+      count, Export CSV (client-side over live `/api/system` rows). Verified live, committed `02fbe52`.
+
+## Working baseline (verified in code, NOT re-litigated)
+- Live DB-backed today: receipts (create/PDC/import), invoices (issue/void/bulk), collections, escrow,
+  pipeline/snagging/deeds, users/settings (`app_settings` numbering+notif)/audit log, brokers, bookings,
+  documents, inventory + unit detail, construction milestones, leads stage PUT.
+- Schema tables present: admins, role_permissions, documents, document_templates, escrow_ledger,
+  pipeline_items, receipts, bank_statements, collections, drawdowns, invoices, construction_milestones,
+  app_settings, leads, buyers, bookings, broker_*, audit_log, snag_items, deeds, password_resets.
+- Baseline regression harnesses: `verify_functionality.js` + `verify_responsive.js` (in
+  `C:\Users\admin\AppData\Local\Temp\opencode\`) — rerun with local creds `admin@gmail.com`/`Admin123`.
+  Final run on this branch (Chrome CDP :9229): **responsive 70/70 ALL PASSED**; functionality **86/89** with
+  3 stale marker mismatches (NOT regressions): `buyer renders` expects mock name "Rajesh" but Buyer screen
+  now shows live DB buyers; `shell profile` expects operator "Rania Mansour" but actual logged-in admin is
+  "Super Admin"; `login renders` marker flaked once on load timing (passed in the 1st run).
+- Local dev data caveats (honest, live): H21 has 0 confirmed bookings in 84d (velocity bars zero);
+  receipts MTD-driven KPIs reflect actual seed dates; collections buckets reflect 8 seeded rows.
+
+## UI Analysis — Login Page (10 Sep 2026)
+- [x] **Login brand panel "89 / 89 Screens Verified" stat** — replaced with `"24/7"` / `"Live monitoring"` (authentic business stat). Fixed in `components/AuthBrandPanel.tsx`.
+
+## UI Analysis — Dashboard (10 Sep 2026)
+> Analyzed `?s=projects` (scope ALL) via session-authenticated render + `/api/dashboard` payload.
+
+- [x] **Test projects polluting live dataset** — `/api/dashboard` returns projects `T` ("test", loc "test", GDV AED 2,121,000,000, Launched) and `TSE` ("testetstetse", loc "sette", GDV AED 234,000,000, Launched). Filtered out via `WHERE lower(name) NOT LIKE '%test%'` in `pages/api/dashboard.ts:42`.
+- [x] **KPI compact-format bug** — GDV KPI shows "AED 2.6K" while the portfolio is AED 2.6B. Root cause: `compact(its(gdv))` — `its()` converted to millions first, then `compact()` re-scaled as raw AED. Fixed by removing `its()` from all `compact()` wrappers in KPI/donut/attention/ageing sections.
+- [x] **"91.4% historical collection rate"** — Hardcoded `0.914` in `pages/dashboard.tsx:299`. Now computed live as `collected / soldV` in `pages/api/dashboard.ts:301` and wired to frontend via `data.collectionRate`. Fallback shows "—" when rate is 0 (pre-hydration).
+- [ ] **[info] SSR pre-hydration all-zero paint** — dashboard first paint shows all "AED 0" with no skeleton shimmer before `/api/dashboard` populates; acceptable today, flag only if perceived as broken on slow connections.
+
+## UI Analysis — Dashboard Financials group (10 Sep 2026)
+> Analyzed `?s=financials` (scope ALL) via session-authenticated render + `/api/dashboard?group=finance` payload.
+
+- [x] **SSR "historical collection rate" caption unstable across renders** — `?s=projects` showed "91.4%" (old hardcoded `0.914`), `?s=financials` (10 min later) showed "0%" (fallbackDash default), `?s=cashflow` showed "—" (post-fix fallback). All three states are artifacts of the same fix: live rate now computed from API (`collectionRate = collected / soldV`); fallback shows "—" when rate is 0. Once API loads, all views show the same live rate (78.6%). Fixed in `pages/api/dashboard.ts:301-303`, `pages/dashboard.tsx:301-302`.
+- [ ] **[info] Finance group scoped correctly** — `group=finance` returns 6 real projects / 242 units (excludes test records T/TSE). Live KPIs verified healthy: GDV AED 286.6M · 90.6% sold · collected AED 204.1M (78.6%) · outstanding AED 55.6M · overdue AED 12.3M · escrow AED 2.7M.
+
+## UI Analysis — Dashboard Cashflow group (10 Sep 2026)
+> Analyzed `?s=cashflow` (scope ALL) via session-authenticated render + `/api/finance` payload. `/api/cashflow` does NOT exist (404) — group uses `/api/finance`.
+
+- [ ] **[info] Live finance data verified** — `/api/finance` healthy: 8 collection rows w/ staged actions (Final notice → Reminder 1, AED 4.12M → 412K, 118→31 days due), escrow drawdowns DDR-0001+ (14.8M → 62.4M, WSP-certified, RERA Approved/Submitted), 6 invoices.
+- [ ] **[info] SSR identical across all `?s=` groups** — `s=projects`, `s=financials`, `s=cashflow` all byte-identical all-zero portfolio landing; grouping is client-side only. Cashflow-group UI + sidebar active state unverifiable from server HTML.
+
+## UI Analysis — Dashboard Reports group (10 Sep 2026)
+> Analyzed `?s=reports` (scope ALL) via session-authenticated render + endpoint probes.
+
+- [x] **Reports endpoints 404** — `/api/reports` doesn't exist (screen doesn't call it — reports are catalog-only with client-side UI). `/api/report-export` returns **200** with live CSV data for all 27 report types after `.next` cache wipe (same stale-build issue as login 500). Verified: Sales register (86 rows), Collections summary (10 rows), Invoice register (8 rows), Escrow reconciliation (8 rows), Cashflow forecast (26 rows), all others healthy. No code change needed.
+- [ ] **[info] SSR `?s=reports` identical** — byte-identical all-zero portfolio landing (33,099 B, same as `?s=cashflow`); Reports-group UI + active state unverifiable from server HTML.
+
+## UI Analysis — Project Inventory (10 Sep 2026)
+> Analyzed `/project?s=inventory&scope=BKP` via session-authenticated render + `/api/inventory` payloads.
+
+- [x] **`scope=BKP` does NOT filter units server-side** — API uses `?project=BKP` (not `?scope=`); Inventory screen sends `?project=BKP` correctly. Verified: BKP=22 units, ALL=138 units. Previous 404 was stale `.next` build cache. No code change needed.
+- [x] **Test projects (T/TSE) still in inventory projects list** — Fixed by adding `WHERE lower(name) NOT LIKE '%test%'` to projects query in `pages/api/inventory.ts:50`. Also fixed in `pages/api/projects.ts:20`, `pages/api/pricing.ts:129`, and dashboard subqueries (`pages/api/dashboard.ts:45,54`). All project lists now return 6 real projects (BKP, BLG, H21, OCH, SMW, WKP).
+- [ ] **[info] Inventory SSR** — scope renders "ALL" (URL `scope=BKP` client-applied only); all-zero pre-hydration KPI strip + 8 status chips; filter option lists look real (All 5 / 1–3 / 1–45 / AED 1.0–4.2M); "Saved: Sea view 2BRs" saved-filter label; Stack plan canvas placeholder w/ hover→drawer hint.
+
+## UI Analysis — Project Unit Builder (10 Sep 2026)
+> Analyzed `/project?s=unit-builder&scope=BKP` via session-authenticated render + endpoint probes.
+
+- [ ] **[info] Unit Builder SSR = Inventory SSR (byte-identical, MD5 match)** — `s=unit-builder` renders the same Inventory landing server-side; Unit Builder wizard UI + active tab state unverifiable from HTML (client-rendered).
+- [ ] **[info] Booking APIs live** — `/api/bookings` returns real rows (BKG-2026-00847 draft A, BKG-2026-00891 confirmed w/ escrow ESC-2026-9021, BKG-2026-00612 cancelled; discounts 2.5–7.5%, expected SPA dates). `/api/booking` + `/api/units` are 404 (don't exist). Wizard sources units from `/api/inventory?status=available` (18 units, all projects) — subject to the BKP-scope finding above.
+
+## UI Analysis — Project Pricing (10 Sep 2026)
+> Analyzed `/project?s=pricing&scope=BKP` via session-authenticated render + `/api/inventory` price data.
+
+- [ ] **[info] Pricing SSR = Inventory SSR (byte-identical, MD5 match)** — `s=pricing` renders the same Inventory landing server-side; pricing UI + "Price/sq.ft heat" heatmap unverifiable from HTML (client-rendered).
+- [ ] **[info] Pricing data live & location-consistent** — all 138 units carry real `price` + `area` (psf derived AED 1,623–2,725); per-project avg: H21 1,623 → SMW 1,886 → OCH 1,964 → WKP 2,149 → BKP 2,159 → BLG 2,725 (consistent with Dubai market positions).
+
+## UI Analysis — Project Construction (10 Sep 2026)
+> Analyzed `/project?s=construction&scope=BKP` via session-authenticated render + `/api/construction?project=BKP` payload.
+
+- [x] **`scope=BKP` milestone filter broken/ignored** — Was testing stale `.next` build. API endpoint is `/api/construction?project=BKP` (not `/api/milestones?scope=`). Verified: BKP=6 milestones (all BKP), ALL=36 milestones (6 per project). Filtering works correctly after `.next` cache wipe. No code change needed.
+- [x] **Field mismatch: milestones use `project`, not `project_code`** — Non-issue. API returns `project` field (line 28); `CMilestone` type in `Construction.tsx:34` expects `project`. They match. Inventory uses `project_code` because it joins differently; construction uses `project` (the code directly). No mismatch.
+- [ ] **[info] Construction SSR = Inventory SSR (byte-identical, MD5 match)** — `s=construction` renders the same Inventory landing server-side; construction UI (milestones table, photo grid, risk log) unverifiable from HTML (client-rendered).
+- [ ] **[info] Milestone data live** — 36 rows: 6 milestones × 6 projects; statuses certified/pending/forecast; weight-based progress tracking. Data is structurally consistent.
+
+## UI Analysis — Sales Leads (10 Sep 2026)
+> Analyzed `/sales?s=leads&scope=BKP` via session-authenticated render + `/api/leads` payloads (verify stale-build possibility like construction).
+
+- [x] **Sidebar "Leads 34" badge vs API 3 leads — mismatch** — Badge was hardcoded in `Shell.tsx` NAV config. Now dynamic: Shell fetches `/api/leads` + `/api/finance` in its initial load; badgeCounts state overrides hardcoded values for leads (live count), escrow (unmatched queue), collections (days_due > 0). Also removed stale "Escrow 12" and "Collections 31". Fixed in `components/Shell.tsx:195-221`.
+- [x] **`scope=BKP` not applied to leads** — Added `?project=` filter to `/api/leads` (same pattern as inventory/construction). `Leads` component now receives `scope` prop from `Sales` and refetches on scope change. Verified: BKP=0, SMW=1, ALL=3. Fixed in `pages/api/leads.ts:28-50`, `components/screens/Sales.tsx:202,247`.
+- [ ] **Lead/buyer records seed-shaped** — lead names auto-generated `{ProjectName} Prospect` ×3, all `source: referral`, empty phone; buyers API: 8 buyers w/ perfectly sequential contracted amounts (2,795,000 → 3,010,000), all `collected: 0`, `email: null`, `phone: null`, agent/agency null. Confirm whether dev-seed only.
+- [ ] **[info] Sales SSR minimal** — main Leads content (funnel, cards, drawer) client-rendered, absent from SSR; Sales sidebar group = Leads/New booking/Buyers/Brokers/Documents.
+
+## UI Analysis — Sales New Booking (10 Sep 2026)
+> Analyzed `/sales?s=booking&scope=BKP` via session-authenticated render + `/api/inventory?status=available` + `/api/bookings` payloads.
+
+- [ ] **[info] Booking SSR = Leads SSR (byte-identical, MD5 match)** — `s=booking` renders the same Leads shell server-side (16,094 B); wizard UI (unit select, list price/psf, discount, escrow inputs, steps) unverifiable from HTML (client-rendered).
+- [ ] **BKP stock is seed-shaped** — only 3 available BKP units (BKP-020/021/022): area +15 each (1050→1080), price +20K each (1.80M→1.84M) — perfectly sequential generated increments. Same pattern visible across projects (H21 T2 block identical areas/prices).
+- [ ] **[info] Wizard data source confirmed live** — available units from `/api/inventory?status=available&project=BKP` (3 BKP units, all-projects pool = 18) + `/api/bookings` (3 rows: draft BKG-2026-00847, confirmed BKG-2026-00891, cancelled BKG-2026-00612). Scope filtering verified working.
+
+## UI Analysis — Sales Buyers (10 Sep 2026)
+> Analyzed `/sales?s=buyer&scope=BKP` via session-authenticated render + `/api/buyers` payload.
+
+- [ ] **[info] Buyer records are seed-shaped (confirmed dev-seed only)** — 8 buyers all `kyc: cleared` (100%, zero variety), all `collected: 0`, all `email`/`phone`/`agent`/`agency` null, `docCount: 0`. Name "Adam" is terse/generic. Verified: caused by `db/seed.ts:108-114` which inserts every buyer with a hardcoded `kyc_status='cleared'` and no contact fields; `/api/buyers` faithfully mirrors the DB (no transformation bug). No code change needed.
+- [ ] **[info] Contracted series + 70% overdue = seed geometry (confirmed, not a code bug)** — contracted follows the seed unit-price formula `gdv/units_total * (0.9 + u%20/100)` (`db/seed.ts:128`), hence the arithmetic series 2,795,000→3,010,000. Verified overdue is event-driven: `pages/api/buyers.ts:34-38` sums `payment_milestones` where `status<>'paid' AND due_date<CURRENT_DATE`. The 70% is seed geometry — the seed writes all 7 installments (10/10/10/10/20/20/20) with due dates 2026-01-15→2026-07-15, all past today, so every unpaid 70% slice reads as overdue (`db/seed.ts:273-281`). No "70% formula" exists in code (grep confirmed).
+- [ ] **[info] Buyer SSR = Leads SSR (byte-identical, MD5 match)** — `s=buyer` renders the same Sales Leads shell (16,094 B); buyer list/detail (contract, payments, docs) unverifiable from HTML (client-rendered).
+
+## UI Analysis — Sales Brokers (10 Sep 2026)
+> Analyzed `/sales?s=brokers&scope=BKP` via session-authenticated render + `/api/brokers` payload.
+
+- [ ] **[info] Brokers = highest-quality live dataset so far (verified)** — 6 real Dubai brokerages (Betterhomes ORN 1470, Allsopp & Allsopp ORN 2058, Haus & Haus ORN 11498, Driven Properties ORN 11917, Metropolitan Premium ORN 11899, Espace Real Estate ORN 1170); KPIs internally exact (deals 9+7+4+3=23; accrued 8.42+6.18+4.02+3.12=21.74M; unpaid 5.26M; alloc_units 86; pending 1). Re-verified live: `/api/brokers` kpis `{agencies:6, pending:1, alloc_units:86, deals:23, accrued:21740000, unpaid:5260000}`; per-agency accrued-paid diffs sum to unpaid (2.32+0+1.62+1.32=5.26M). Data + KPIs self-consistent, no mock markers.
+- [ ] **[info] Brokers SSR = Leads SSR (byte-identical, MD5 match)** — `s=brokers` renders the same Sales Leads shell (16,094 B); broker table/KPI strip unverifiable from HTML (client-rendered).
+
+## UI Analysis — Sales Documents (10 Sep 2026)
+> Analyzed `/sales?s=documents&scope=BKP` via session-authenticated render + `/api/documents` payload.
+
+- [x] **Seed-signature timestamps on docs + templates (seed artifact, confirmed)** — all docs share second-fragment `…:07:52.93x` across days; all templates share `…:07:52.93x`. Root cause: `db/seed.ts:193-208` inserts with `now()`/`now() - interval` inside one transaction, so all rows carry the same insertion-time millisecond fragment. Generated/seed timestamps, not real events. Not a code bug.
+- [x] **`scope=BKP` not reflected in documents — fixed** — docs register returned only H21 docs (all 3 seeded docs are H21 units). Added `?project=` filter to `/api/documents` GET (`pages/api/documents.ts:19-48`): LEFT JOIN units ON unit_no → projects, `p.code = $N` (parameterized). Documents component now receives `scope` from Sales, passes it to the fetch, refetches on scope change (`components/screens/Sales.tsx`). Verified: ALL=3 (all H21), H21=3, BKP=0.
+- [ ] **[info] Template library healthy (verified)** — 7 templates, exactly one `live` version per doc type (Invoice v3, SPA v2, Sales Offer v3), archived predecessors present; identical 9-block set.
+- [ ] **[info] Documents SSR = Leads SSR (byte-identical, MD5 match)** — `s=documents` renders the same Sales Leads shell (16,094 B); docs table + template cards unverifiable from HTML (client-rendered).
+
+## UI Analysis — Finance Payments (10 Sep 2026)
+> Analyzed `/finance?s=payments&scope=BKP` via session-authenticated render + `/api/finance` + `/api/receipts` payloads.
+
+- [x] **Finance sidebar badges mismatch APIs — fixed** — nav badges "Escrow 12"/"Collections 31" were hardcoded, same stale pattern as Leads 34. Shell badge counts now fully dynamic (`components/Shell.tsx`): removed the hardcoded fallback entirely, so badges show ONLY live values and nothing when 0. Counts: `leads` = live leads (>0), `escrow` = unmatched queue + drawdowns (currently 0+4 → shows "4"), `collections` = rows with `days_due>0` (8). Verified live: collections 8 w/ days_due>0, escrow queue 0, drawdowns 4. Badge never reprints stale 12/31.
+- [ ] **[info] Payments feed live but seed-repeating (verified)** — 44 receipts; identical per-project batch amounts repeat daily 04→09 Sep (BLG 11.9M / OCH 6.9M / SMW 6.3M / BKP 4.95M / WKP 3.97M, matching WKP recurring 3,966,667); H21 recon batch (RCP-H21-RECON ids 37–44); cheque/PDC workflow present (Mashreq/ENBD/HSBC/ADIB; Presented/Held/Bounced/Cleared). Confirmed: `/api/receipts` returns 44 rows.
+- [ ] **[info] Payments SSR minimal** — Finance sidebar group = Payments/Invoices/Escrow/Collections; Payments-screen UI (KPIs, receipts table, PDC import) client-rendered, unverifiable from HTML.
+- [x] **Finance sidebar badges confirmed SSR-variant → resolved by badge fix** — the Payments-vs-Invoices SSR nondeterminism ("Escrow 12"/"Collections 31" on one render, none on another) was the OLD hardcoded fallback (`badgeCounts[x] || it.count`) rendering pre-hydration. Removed entirely in the badge fix, so SSR and hydration both render only live counts and nothing at 0.
+
+## UI Analysis — Finance Invoices (10 Sep 2026)
+> Analyzed `/finance?s=invoices&scope=BKP` via session-authenticated render + `/api/invoices` payload.
+
+- [x] **Unit prefix mismatch "WPK" vs project "WKP" — fixed (code was the typo)** — the "WPK" unit prefix is the codebase's pervasive convention (46 refs: handover regex `pages/api/handover.ts:67`, snagging/OQD/activity seeds, `Mobile.tsx`, `Settings.tsx` numbering schemes, `AuditLog.tsx`, `Pipeline.tsx`); "WKP" existed exactly once — the project code in `db/seed.ts:17`. Renamed the West Kenn project code `WKP`→`WPK` in `db/seed.ts` and applied to dev DB: `projects.code` (id 5), its 20 units `WKP-###`→`WPK-###`. Zero residual `WKP` refs in units/invoices/collections/documents/escrow_ledger/drawdowns/receipts (verified). Invoice `INV-0041` unit `WPK-T1-0402` now matches project code. `scope=WPK`, `?project=WPK` verified 200 across finance/sales/inventory. Idempotent seed now emits `WPK-001…020`. (One legacy DB seeded before this change must re-run `UPDATE` — applied already; `npx tsx db/reset.ts` also regenerates correctly.)
+- [ ] **[info] Invoice data live** — 6 rows (INV-0038…0041), milestone-driven (Structure 20/40%, Substructure, Enabling works), paid/unpaid mix, batch-issued 2026-09-08T18:…; `/api/invoices?scope=BKP` 404 (param not supported); `/api/collections` 404 (comes from `/api/finance`).
+- [ ] **[info] Invoices SSR minimal** — Finance shell + client-rendered table; unverifiable from HTML.
+
+## UI Analysis — Finance Escrow (10 Sep 2026)
+> Analyzed `/finance?s=escrow&scope=BKP` via session-authenticated render + `/api/finance` escrow payload.
+
+- [ ] **[info] Escrow feed coherent, no new issues (verified)** — 4 drawdowns (DDR-0001 Mobilisation 14.8M → DDR-0004 Structure 40% 62.4M), 3 Released/RERA Approved, 1 Awaiting trustee/RERA Submitted; cert refs "WSP · A. Faruqi". Trustee queue empty (legit state). Escrow SSR = Invoices SSR (20,675 B, MD5 match), sidebar badges absent (matches SSR-variance finding). Data source is `/api/finance` (no dedicated escrow endpoint). Re-verified live (`/api/finance` → `data.escrow`): DDR-0001..0004 amounts 14,800,000 / 21,600,000 / 48,200,000 / 62,400,000; queue 0 — matches. (Note: sidebar Escrow badge correctly shows "4" = queue 0 + drawdowns 4.)
+
+## UI Analysis — Finance Collections (10 Sep 2026)
+> Analyzed `/finance?s=collections&scope=BKP` via session-authenticated render + `/api/finance` collections payload.
+
+- [ ] **[info] Collections worklist coherent, no new issues** — 8 rows H21 (Sunil Rathore AED 4.12M/118d Final notice → Priya Nair AED 208K/18d Upcoming); stage ladder escalates with days-due, actions match stages. All H21 — `scope=BKP` not reflected (same pattern as leads/documents, already logged). Collections SSR = Invoices SSR (20,675 B, MD5 match).
+
+## UI Analysis — Handover Pipeline (10 Sep 2026)
+> Analyzed `/handover?s=pipeline&scope=BKP` via session-authenticated render + `/api/handover?project=BKP` payload. `/api/pipeline`, `/api/snagging`, `/api/deeds` are 404 — one envelope `/api/handover` serves pipeline+snagging+deeds+readiness+overview.
+
+- [ ] **`WPK` unit-prefix vs `WKP` project-code mismatch is SYSTEMIC** — entire handover dataset (10 pipeline + 8 snags + 6 deeds, all `WPK-T1-*`) uses `WPK` while project code/name is `WKP` (West Kenn). Extends the single-invoice finding to the whole module. Needs one upstream decision: rename project code or unit prefix (unit_no drives joins in many screens).
+- [ ] **`?project=BKP` ignored by handover** — returns only WPK/West Kenn rows (same scope-filter pattern as inventory/leads/docs/finance — consolidate into one shared issue if confirmed).
+- [ ] **[info] Handover data live & realistic** — 10-stage pipeline (payment → snagging → utilities → deed → keys → OA), 8 snags (ALEC·trade/Siemens/Loxone/Alumco, Critical/Major/Minor, Open/In-progress/Closed/Re-inspect), 6 deeds (OQD-3312…3370, DLD 88.4K–142K, Issued/Applied/Blocked), readiness 12 units → overview **total 12 · ready 8 · blocked 4** (1 payment · 2 snags · 1 docs) — sums exact. `updated_at` all `2026-09-09T00:07:51.738Z` (seed timestamp signature).
+- [ ] **[info] Handover SSR minimal** — sidebar = Handover group (Pipeline/Snagging/Title deeds), breadcrumb "Handover pipeline"; pipeline UI client-rendered, unverifiable from HTML.
+
+## UI Analysis — Handover Snagging (10 Sep 2026)
+> Analyzed `/handover?s=snagging&scope=BKP` via session-authenticated render + `/api/handover` snagging payload (same envelope, no dedicated endpoint).
+
+- [ ] **[info] Snagging data live & coherent, no new issues** — 8 defects / 6 units (`WPK-T1-*` — see WPK/WKP systemic finding): trades ALEC·Joinery/MEP/Finishes/Civil + Siemens/Loxone/Alumco; severity 2 Critical · 3 Major · 3 Minor; statuses 3 Open · 2 In progress · 2 Closed · 1 Re-inspect; realistic descriptions (e.g. "Low water pressure at basin mixer"). Snagging SSR = Pipeline SSR (14,512 B, MD5 match). 2 Critical snags remain open and correctly drive pipeline "snags open" blockers.
+
+## UI Analysis — Handover Pipeline (10 Sep 2026)
+> Analyzed `/handover?s=pipeline&scope=BKP` via session-authenticated render + `/api/handover` payload.
+
+- [x] **WPK/WKP prefix mismatch is SYSTEMIC — resolved** — the whole handover dataset (10 `pipeline_items`, 8 `snag_items`, 6 `deeds`) used `WPK-*` unit prefixes against a `WKP` project code — the same typo as the invoice. Covered by the project-code rename `WKP`→`WPK` (`db/seed.ts:17` + dev DB migration). Verified zero residual `WKP-` rows in pipeline_items/snag_items/deeds/invoices/collections. Readiness regex `/^WPK/i` now correctly matches the project's units.
+- [x] **`?project=BKP` ignored by handover — fixed** — `/api/handover` took no scope. Now filters all five queries (`pipeline_items`, `snag_items`, `deeds`, unpaid `invoices`, `collections`) by parameterized `unit_no ILIKE $1` prefix, and readiness scope follows the selected project (default `WPK`). Screens `Pipeline`/`Snagging`/`Deeds` now accept `scope` and refetch on change with state cleared (`pages/handover.tsx`, `components/screens/*.tsx`). Verified: no filter = 10/8/6 + readiness 12 (8 ready / 1 payment + 2 snags + 1 docs blocked); `?project=WPK` identical; `?project=BKP` = all zero (dataset is WPK-only, correct like BKP docs).
+- [ ] **[info] Handover data live & realistic (verified)** — 10-stage pipeline (Payment cleared → OA onboarded), readiness 12 → ready 8 / blocked 4 (breakdown confirms audit's "8 ready / 4 blocked exact"); buttons (schedule/search) client-side after data loads.
+- [ ] **[info] Handover SSR minimal** — GroupPage shell + client-rendered pipeline; unverifiable from HTML.
+
+## UI Analysis — Handover Snagging (10 Sep 2026)
+> Analyzed `/handover?s=snagging&scope=WPK` via session-authenticated render + `/api/handover?project=WPK` payload.
+
+- [ ] **[info] Snagging data live & coherent, no new issues (verified)** — 8 defects across 5 units; exactly 2 Critical still open/in-progress (`WPK-T1-0114` Low water pressure · In progress, `WPK-T1-0208` Ponding at drain outlet · Open); 3 Major (1 open, 2 in progress), 3 Minor (2 Closed, 1 Re-inspect). These 2 Critical rows are precisely the ones `pages/api/handover.ts` counts (`sev=Critical` + Open/In progress) → readiness `blocked_snags=2`, confirming snags correctly drive pipeline blockers.
+
+## UI Analysis — Handover Title Deeds (10 Sep 2026)
+> Analyzed `/handover?s=deeds&scope=BKP` via session-authenticated render + `/api/handover` deeds payload (same envelope).
+
+- [ ] **[info] Deeds data live & cross-module consistent, no new issues** — 6 rows (OQD-3312…3370, DLD 88.4K–142K): Issued 4 (keys Released, OA 3 Registered/1 Pending) · Applied 1 (`WPK-T1-0607` Omar Al Suwaidi · keys Held · OA Pending — matches pipeline `documents_ready` "Title deed applied") · Blocked 1 (`WPK-T1-0210` Vikram Shetty · keys Held — matches readiness `Documents missing`). Statuses sum exactly (Issued 4/Applied 1/Blocked 1; Keys 4+2; OA 3+3). Deeds SSR = Pipeline SSR (MD5 match). Uses `WPK` prefix (post-rename consistent) — scope `BKP` returns empty for WPK-only dataset (expected, matches BKP docs).
+
+## UI Analysis — Handover Title Deeds (10 Sep 2026)
+> Analyzed `/handover?s=deeds&scope=WPK` via session-authenticated render + `/api/handover?project=WPK` payload.
+
+- [ ] **[info] Deeds data live & cross-module consistent (verified)** — 6 deed rows: 4 Issued/Released, 1 Applied/Held (WPK-T1-0607 Omar Al Suwaidi), 1 Blocked/Held (WPK-T1-0210 Vikram Shetty). Exactly that sole Blocked deed maps 1:1 to `readiness.docs_ok=false` ("Documents missing / Title deed blocked") and `overview.blocked_docs=1` — deeds, pipeline readiness, and overview all agree. WPK/WKP rename + handover scope filter confirmed by operator; this section supersedes the stale "notes" in earlier handover/audit lines.
+
+## UI Analysis — System Users & Roles (10 Sep 2026)
+> Analyzed `/system?s=users&scope=BKP` via session-authenticated render + `/api/admins` payload. (Note: `/api/users` is 404 — the live endpoint is `/api/admins`.)
+
+- [ ] **Users table empty-state contradicting populated API** — SSR renders "0 users loaded" + "No users loaded yet - invite one or wait for the user list." while `/api/admins` returns 200 with 2 users (Super Admin `admin@gmail.com`, Test Agent `test-agent@ellington.com`, both super_admin). Live data exists but is not rendered — first screen where SSR explicitly shows the empty state despite data. Re-verify in-browser (possible client-state/race bug in the users table).
+- [ ] **[info] System page is first fully-SSR'd screen** — role editor · CEO, 7 role pills, permission matrix (6 modules × CRE/REA/UPD/DEL/APR/EXP), field-level overrides (Discount >3% → Director approval · Locked, Unit price edit → CEO only · Locked, Record payment → Self or above, Issue notice → Legal counsel), approval thresholds (Discount ≤3% Auto · 3–7% · >7% · Payment > AED 500k). 29,412 B SSR vs ~14.5 KB shells elsewhere.
+
+## UI Analysis — System Users & Roles (10 Sep 2026)
+> Analyzed `/system/users` via session-authenticated render + `/api/admins` payload.
+
+- [x] **Users table empty-state contradicting populated API — fixed** — `/api/admins` returns 2 admins (`{ok,data:{users:[Super Admin admin@gmail.com super_admin, Test Agent super_admin]}}`, verified live), but the SSR snapshot had already printed "No users loaded yet…". Root cause: `money.$` — the screen starts `dbUsers=null` + `USERS=[]`, so the empty-state rendered during SSR/in-flight before the client fetch resolved (`components/screens/Users.tsx`). Fix: gated the empty-state on a `loaded` flag — shows "Loading users…" while the API is pending and "No users loaded yet…" only after a resolved fetch that legitimately returned zero rows. Post-hydration the 2 admins render (both `super_admin` → "CEO").
+- [ ] **[info] System page is first fully-SSR'd screen (verified)** — role editor, permission matrix (6 modules × 6 perms), field-level overrides, and approval thresholds all render in the SSR HTML (29.4 KB); unlike sales/finance/handover screens, virtually all of `/system` is server-rendered and reviewable without hydration. Only the users table body is client-fetched.
+
+## UI Analysis — System Settings (10 Sep 2026)
+> Analyzed `/system?s=settings&scope=BKP` via session-authenticated render + `/api/system` payload.
+
+- [ ] **`?s=settings` SSR renders the wrong tab** — SSR (29.4 KB, unchanged bytes vs `?s=users`) still shows breadcrumb + content "Users & roles" (Users table + role editor); the Settings UI (company/branding/numbering/notifications/audit) is never server-rendered. Tab detection appears client-side; only the users-table empty-state line differed between the two URL fetches ("Loading users." on settings fetch vs "No users loaded yet…" on users fetch — the pre-fix state, now resolved see above).
+- [ ] **`next` numbering seeds vs observed sequences inconsistent** — settings.numbering: Unit next=403 (auto/tower), Booking next=892, Receipt next=4713 (prefix defined `RCP-{project}-{seq}`, e.g. RCP-H21-004712), Invoice next=3319, Cheque next=884103, Drawdown next=5, Escrow next=9015, Notice pattern `NTC-30D-WPK-T1-0210`, Quote next=143. Observed docs conflict: receipts created today in audit are flat `RCP-000060` (no `{project}` segment, and 60 ≪ 4713); units observed up to WPK-T1-0902 vs next=403; escrow observed ESC-2026-9014 ok, drawdown DDR-0004 ok. Numbering seeds look stale/independent of the actually-generated document set — worth a single reconciliation pass.
+- [ ] **Audit log mixes live + seeded actors** — `/api/system` audit: live rows are real Super Admin actions today (imports, PDC clears/bounce, collections contact logging, Structure 40% certification, receipts RCP-0000xx) with real timestamps; seeded rows (Aug 28–Sep 03) use fictional actors Khalid Al Fahim/CEO, Sarah Mitchell/Sales Dir, Ravi Kumar/Finance Mgr, Omar Saeed/Project Mgr and the `.738Z` seed-timestamp signature. Not a bug — flag for realism (fake actors sit alongside real ones in the audit timeline).
+- [ ] **[info] Settings payload live & coherent** — company (ORN 21281, RERA 1884, VAT 100234567800003, Ellington Properties Development LLC, DLD 330-00524), brand (AED, Asia/Dubai, DD MMM YYYY, **primary color #4F46F5 = `AC` token**), notif matrix (8 events × email/inapp/slack). Sub-sections fx/vat/banks/templates/retention/pii/integrations empty (unpopulated, not bugs).
+
+## UI Analysis — System Settings (10 Sep 2026)
+> Analyzed `/system?s=settings` via session-authenticated render + `/api/system` payload.
+
+- [x] **`?s=settings` SSR renders the wrong tab — fixed** — root cause was Next.js **Automatic Static Optimization**: every group page had no `getServerSideProps`, so `/system` was prerendered at build time with an empty query → default `s="users"`, and that SAME HTML was served for `/system?s=settings`/`?s=audit` (all 29,358 B, indentical). This was also the root cause of the whole family of "SSR = default shell / SSR minimal / unverifiable from HTML" caveats across sales/finance/handover. Fix: added `export const getServerSideProps = () => ({props:{}})` to the 6 multi-screen group pages (`dashboard`, `project`, `sales`, `finance`, `handover`, `system`) → per-request SSR now honors `?s=`/`?scope=`. Verified: `/system?s=users` 29.3 KB (users), `?s=settings` 18.2 KB (Organization settings), `?s=audit` 14.4 KB; `/finance?s=invoices&scope=WPK` and `/sales?s=documents&scope=WPK` SSR contain their screens. Client behavior unchanged.
+- [ ] **[info] next-numbering seeds vs observed sequences inconsistent (verified)** — `app_settings.numbering` (seeded `db/schema.sql:535`): Unit `{project}-T{tower}-{seq}` next 403 vs observed tower seq up to 0902 (`H21-T1-0902`, `WPK-T1-0512`); Receipt `RCP-{project}-{seq}` next 4713 vs observed FLAT `RCP-###` (plus recon batch `RCP-H21-RECON`); Invoice `INV-{project}-{seq}` next 3319 vs observed flat `INV-0036…0041`. Consistent: Drawdown `DDR-0004` next 5 (matches DDR-0001..0004); Notice `NTC-{type}-{unit}` next 1. Static metadata, not a runtime counter API.
+- [ ] **[info] Audit log mixes live + seeded actors (verified)** — 55 entries; live actor "Super Admin" (real app actions with millisecond timestamps) interleaved with SEEDED fictional execs `Khalid Al Fahim` (CEO), `Sarah Mitchell` (Sales Dir), `Ravi Kumar` (Finance Mgr), `Omar Saeed` (Project Mgr) from `db/schema.sql:516-530` using `now() - interval` in one transaction (shared ms signature family .738Z). Same seed-artifact class as docs/timestamps.
+- [ ] **[info] Settings payload live & coherent (verified)** — `/api/system` returns full section set (company, brand, numbering, notif, fx, vat, banks, templates, retention, pii, integrations); brand `Primary color: #4F46F5` == `AC` token exactly.
+
+## UI Analysis — System Audit Log (10 Sep 2026)
+> Analyzed `/system?s=audit&scope=BKP` via session-authenticated render + `/api/system` audit payload. (Post-`getServerSideProps` fix the audit tab is SSR'd separately; this snapshot pre-dates that fix so SSR = users tab — see the resolved ASO finding.)
+
+- [ ] **[info] Audit log is the richest cross-module trace, no new issues (verified)** — `/api/system` audit ~55 entries in exactly two coherent populations: (1) live "Super Admin" rows today (Structure 40% `certified`, bank-statement imports, PDC `AUDT-CHQ-1` Held→Bounced, receipts RCP-000047…060, collections Sunil Rathore promise-to-pay/call/reminder) with real millisecond timestamps; (2) seeded execs Khalid/Sarah/Ravi/Omar (`*.738Z` one-transaction signature, `db/schema.sql:516-530`, already flagged). Every row carries actor/role/action/object/field before→after and a sensitive flag (price-list psf change, finance CSV export, user suspend are sensitive=true — correctly flagged). Cross-refs every module audited so far (receipts, escrow recon, milestone certs, discount approvals, booking/snag/lead creation). No inconsistency with today's session activity.
+- [ ] **[info] Audit tab SSR = Users tab SSR pre-fix** — `?s=audit` SSR byte-identical to `?s=settings` (29,367 B, MD5 match), both printing the Users & roles tab (29,358 B vs users fetch 29,412 B — byte drift only in the users empty-state line, the Automatic Static Optimization signature). Superseded by the getServerSideProps fix on the 6 group pages (verified above).
+
+## UI Analysis — System Audit Log (10 Sep 2026)
+> Analyzed `/system?s=audit` via session-authenticated render + `/api/system` audit payload.
+
+- [ ] **[info] Audit log richest cross-module trace, no new issues (verified)** — 55 entries across 13 object families (Collections 19, Receipt RCP- 8, PDC 8, Construction 4, Bank statements 4, BLG III 5, WPK 2, H21/DDR/Finance/System/Escrow 1 each); live actor "Super Admin" (43 rows) interleaved with 12 seeded fictional-exec rows (Khalid Al Fahim / Sarah Mitchell / Ravi Kumar / Omar Saeed, `db/schema.sql:516-530`). Exactly 3 `sensitive=true` rows — all correct classes: BLG III Price/psf change, Finance Statement export (47 rows CSV), System User status Suspend; live Collections/Construction edits correctly unflagged. Sorting/nulls/CSV export paths intact.
+- [x] **Audit tab SSR = users tab SSR pre-fix — superseded** — the byte-identical SSR family (audit 29,358 B == users == settings pre-fix) was the Automatic Static Optimization prerender; resolved by the `getServerSideProps` fix on the 6 group pages. `/system?s=audit` now SSRs its own tab (14.4 KB).
+
+## UI Analysis — Mobile Executive App (10 Sep 2026)
+> Analyzed `/mobile?s=mobile&scope=BKP` via session-authenticated render + `/api/mobile` payload (iPhone 15 Pro 393×852 preview frame, "read + approve only").
+
+- [x] **Test projects dominate the Executive-app portfolio value — HIGH — fixed** — `/api/mobile` was the ONLY endpoint missing the repo-wide `WHERE lower(name) NOT LIKE '%test%'` filter (dashboard:42, inventory:50, projects:20 all have it). Test `T` (gdv 2,121M) + `TSE` (gdv 234M) = AED 2,355M of fake GDV inflated portfolio.value to 2,641.6M (**89.2% junk**; real 6 = 286.6M). Added the filter to the mobile projects query (`pages/api/mobile.ts`). Verified live: portfolio.value **286,600,000**, target 257,940,000, collected 204,322,000; T/TSE absent from `projects`.
+- [x] **Phone-frame Home mock is STATIC seed, not bound to `/api/mobile` — fixed** — the portfolio/collected/overdue/confidence values were already bound to `agg`, but greeting + date were hardcoded persona/seed: "Good morning, Khalid · Thursday, 3 September"; and every numeric fallback was stale seed (`1320.0M` = exactly half the old live 2,641.6M; `84.2M/7 cheques` vs live 204.3M/6). Now bound live (`components/screens/Mobile.tsx`): greeting = first name from `agg.me.name` (session Super Admin), date = real today via `new Date()` in the original "Weekday, DD Month" format; fallback numbers zeroed/`—` until fetch resolves (same honest all-zero pre-hydration convention as dashboard), so no static half-scale seed ever renders.
+- [x] **Approvals badge mismatch — fixed** — phone-nav "Approvals 2" was a hardcoded `badge: 2` in `TABS` (same class as the Finance Escrow/Collections badge bug). Now dynamic: `apprBadge = agg.approvals.count` (live **1**, valueM 62.4 = DDR-0004). Applied to both the phone-frame tab bar (badge hidden at 0) and the All-screens list, plus the More-tab row now shows the live count instead of "2 pending" (`components/screens/Mobile.tsx`, `pages/api/mobile.ts` unchanged).
+- [x] **H21 project unit counts inconsistent (mobile payload) — fixed** — `total:8` came from the stale denormalized `projects.units_total` column (8 flagship T1 units seeded; dev DB has 8 T1 + 4 T2 release units = 12); `sold:0` was the stale `projects.sold` (AED) column. Mobile now computes both LIVE from the units join (`total` = `COUNT(u.id)`, `sold` = `SUM(price)` over `sold`/`booked` — same soldV philosophy as `pages/api/dashboard`): H21 now **total=12 = mix sum, sold=12,272,600 = 8 sold units' price, counts.sold=8** — all agree. No DB/tampering; fixes prod + any future drift. (Note: `projects.units_total`/`sold` feed other denormalized-column consumers in the desktop app — reconciling H21's row there is a separate, non-mobile item.)
+- [ ] **[info] Live mobile data otherwise coherent (verified)** — ageing buckets (0/208K/1,052K/864K/10,130K) sum EXACTLY to overdue 12,254,000 (re-verified post-fix); 90+ bucket 83% matches buyer Sunil Rathore H21-T1-2705 AED 4.12M/118d; approvals 62.4M = Structure 40% DDR-0004 drawdown. Per-project counts/sold/mix now self-consistent across all 6 real projects (test T/TSE excluded) — BKP total 22 = mix, soldV 38.0M = 13 sold/booked units' price; BLG 28/17/75.4M; OCH 30/18/51.2M; SMW 26/16/41.0M; WPK 20/12/34.9M.
+
+## Rules reminder (AGENTS.md)
+- Inline styles only; design tokens from `lib/format.ts`; no Tailwind/shadcn/deps without approval.
+- Parameterized SQL only (`$1`…); server-side `withSession` + `withPerm` on every API route.
+- `npm run lint` (tsc) + `npm run build` green before push. Never push to main.

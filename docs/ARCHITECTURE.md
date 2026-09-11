@@ -5,7 +5,7 @@
 > GitHub issues `AUD-xxx`). No visual/UI changes are permitted during standardization
 > ("fully finalize without any look update").
 
-Last updated: 2026-09-08 · Branch in progress: `chore/standardize-project`
+Last updated: 2026-09-09 · Branch in progress: `chore/standardize-project`
 
 ---
 
@@ -205,6 +205,59 @@ Only parameterized SQL is used. Seeds/scripts under `db/` (`schema.sql`, `seed.t
 - **AUD-016 (#51) — Dead `lib/useApi.ts`.** Only `pages/dashboard.tsx` imported it; all
   wired screens use `fetchJSON<T>` from `lib/api.ts`. **FIXED** (`fix/aud-051-dead-use-api`) —
   dashboard.tsx switched to `fetchJSON`, `lib/useApi.ts` deleted, references tidied.
+
+### Sales / PLINTH feature audit (2026-09-09)
+
+SALES screens compared against the PLINTH prompt pack (PROMPT 1.7 booking workflow,
+1.8 buyer directory + buyer 360, 1.11 leads/CRM, 2.9 documents). Files: `pages/sales.tsx`,
+`components/screens/Sales.tsx`, `pages/api/{leads,buyers,bookings,brokers,documents}.ts`.
+
+- **AUD-017 (#60, Medium) — Booking wizard incomplete vs PROMPT 1.7.** Soft-lock countdown
+  is static text (`Sales.tsx:564`), "Save as draft" is a dead button (`Sales.tsx:645`),
+  Step 3 payment schedule not editable / no 100% validator / no construction timeline,
+  Step 4 documents static labels only, success screen is a banner not a screen, no
+  emails/notifications on confirm (`api/bookings.ts:confirmBooking`).
+- **AUD-018 (#65, Medium) — Buyer directory incomplete vs PROMPT 1.8.** Missing columns
+  (Buyer ID, Nationality, Type, Outstanding, Documents bar, Agent, Broker), no filters,
+  no bulk actions, no "Documents expiring" filter. `api/buyers.ts` drops agent/broker/
+  nationality/type data.
+- **AUD-019 (#66, Medium) — Buyer 360 incomplete vs PROMPT 1.8.** Only 3 of 7 tabs
+  (UNITS/LEDGER/SCHEDULE; missing PROFILE/DOCUMENTS/COMMUNICATIONS/ACTIVITY); header
+  missing name AR, nationality, risk badge, portal access.
+- **AUD-020 (#69, Medium) — Leads/CRM incomplete vs PROMPT 1.11.** Kanban primary + drag
+  persist + leaderboard PASS; missing table secondary view, right drawer (contact/
+  timeline/documents/notes), source attribution strip, viewings calendar.
+- **AUD-021 (#72, Low) — Document Template Studio not functional vs PROMPT 2.9.** Block
+  editor is a static list (no drag reorder), "Save as v4 draft" is client-only; versions
+  + activate live via `api/documents.ts` PASS.
+
+### Project workspace / PLINTH audit (2026-09-09)
+
+PROJECT workspace screens compared against the PLINTH prompt pack (1.3 Create-Project wizard,
+1.4 Unit builder, 1.5 Inventory grid, 1.6 Unit detail, 1.12 Pricing & availability,
+1.13 Construction). Files: `pages/project.tsx`, `components/screens/{Projects,Inventory,Unit,
+Pricing,Construction}.tsx`, `pages/api/{projects,inventory,milestones,construction}.ts`.
+
+The six core prompts are tracked across **#71 / #74 / #75 / #80 / #81 / #83** (all OPEN, created
+this session — CREATE-PROJECT wizard and UNIT BUILDER are MISSING/high; Inventory grid, Unit
+detail, Pricing, Construction are PARTIAL/medium). This addendum records the additional
+screen-level findings found while re-reading those files:
+
+- **AUD-024 (#91, Low) — CSV export bugs in Inventory/Pricing.** `Inventory.tsx` `exportedRows()`
+  escapes with `.replace(/"/g, '"')` — a no-op — so fields with `"`/`,` produce malformed CSV and
+  there is no formula-injection guard; both `Inventory.tsx` and `Pricing.tsx` `exportCsv` hardcode
+  the same download filename `ellington-price-list.csv`.
+- **AUD-025 (#90, Low) — Inventory header count frozen.** `Inventory.tsx:209` prints static
+  `UNITS.length` (258 mock) even when live `dbUnits` load; `scopeName = 'Tower 1'` (line 150) is
+  hardcoded, not derived from the selected project/building.
+- **AUD-026 (#92, Low) — `/project` blank for unknown screens.** `pages/project.tsx` returns
+  `null` for any `s=` outside inventory/unit/pricing/construction, whereas the other group pages
+  fall back to a `<Stub>`; also no Overview/Typologies nav (cf. #70) and no wizard entry point.
+
+Standards check (AGENTS.md) on the PROJECT workspace API routes PASSED: `projects`, `inventory`,
+`construction` all use parameterized SQL and are wrapped with `withPerm`/`hasPerm` (fail-closed,
+no debug bypass). Exceptions already tracked: `/api/milestones.ts` guarded `Finance:REA` but
+consumed by the Project·Unit screen (Inventory module) → **AUD-023 (#87)**.
 
 ## 5. Standardized folder structure (target)
 

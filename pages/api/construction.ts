@@ -19,7 +19,8 @@ export default withPerm("Construction", "REA", async function (req: NextApiReque
        FROM construction_milestones cm
        JOIN projects p ON p.id = cm.project_id
        ${where}
-       ORDER BY cm.planned, cm.id`
+       ORDER BY cm.planned, cm.id`,
+      params
     );
     return ok(res, {
       milestones: rows.rows.map((r) => ({

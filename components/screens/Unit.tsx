@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/router";
-import { AC, money } from "../../lib/format";
-import { ST, Unit, UnitStatus, selectedUnit } from "../../lib/data";
+import { AC, money, fmtShortDate } from "../../lib/format";
+import { ST, stKey, Unit } from "../../lib/unit";
 import { fetchJSON } from "../../lib/api";
 import { exportUnitSoa, exportUnitEoi } from "../../lib/pdf";
 
@@ -29,15 +29,6 @@ type MileRow = {
   status: string;
 };
 
-const LIVE_UNIT_STATUS: Record<string, UnitStatus> = {
-  available: "Available",
-  booked: "Booked",
-  reserved: "Reserved",
-  held: "Held",
-  blocked: "Blocked",
-  sold: "Sold",
-};
-
 function floorFromNo(no: string): number {
   const m = no.match(/(\d+)\s*$/);
   const n = m ? parseInt(m[1], 10) : 0;
@@ -51,7 +42,23 @@ function mileStatus(s: string): "Paid" | "Due" | "Scheduled" {
 }
 
 function mapLiveUnit(row: LiveRow | null, unitId: string | undefined): Unit {
-  if (!row) return selectedUnit(unitId || null);
+  if (!row) {
+    return {
+      f: floorFromNo(unitId || ""),
+      pos: 1,
+      no: unitId || "",
+      id: unitId || "",
+      typ: "2BR",
+      beds: 2,
+      area: 0,
+      view: "\u2014",
+      psf: 0,
+      price: 0,
+      status: "Available",
+      base: 1450,
+      buyer: "\u2014",
+    };
+  }
   const price = Number(row.price) || 0;
   const area = Number(row.area) || 0;
   const no = row.no != null ? String(row.no) : row.id != null ? String(row.id) : "";
@@ -67,7 +74,7 @@ function mapLiveUnit(row: LiveRow | null, unitId: string | undefined): Unit {
     view: row.view || "Park",
     psf: area > 0 ? Math.round(price / area) : 0,
     price,
-    status: LIVE_UNIT_STATUS[st] || "Available",
+    status: stKey(st),
     base: area > 0 ? Math.round(price / area) : 1450,
     buyer: row.buyer ? String(row.buyer) : "—",
   };
@@ -85,6 +92,7 @@ export default function UnitScreen({
   const router = useRouter();
   const [liveRow, setLiveRow] = useState<LiveRow | null>(null);
   const [liveMiles, setLiveMiles] = useState<MileRow[]>([]);
+  const [liveDocs, setLiveDocs] = useState<any[]>([]);
 
   useEffect(() => {
     let active = true;
@@ -114,29 +122,54 @@ export default function UnitScreen({
     };
   }, [liveRow]);
 
+  useEffect(() => {
+    let active = true;
+    fetchJSON<{ docs: any[] }>("/api/documents")
+      .then((j) => {
+        if (active && Array.isArray(j.docs)) setLiveDocs(j.docs);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const su: Unit = useMemo(() => mapLiveUnit(liveRow, unitId), [liveRow, unitId]);
   const [tab, setTab] = useState<"overview" | "pay" | "docs" | "act">("overview");
 
   const data = useMemo(() => {
+    if (liveMiles.length) {
+      const liveNet = liveMiles.reduce((a, m) => a + (Number(m.amount) || 0), 0);
+      const liveCollected = liveMiles.reduce((a, m) => a + (mileStatus(m.status || "scheduled") === "Paid" ? (Number(m.amount) || 0) : 0), 0);
+      const net = liveNet || Math.round(su.price * (1 - NET_DISCOUNT));
+      const collected = liveCollected;
+      const outstanding = Math.max(0, net - collected);
+      return { net, collected, outstanding, live: true };
+    }
     const net = Math.round(su.price * (1 - NET_DISCOUNT));
-    const collected = Math.round(net * 0.62);
-    const outstanding = net - collected;
-    return { net, collected, outstanding };
-  }, [su]);
+    const collected = 0;
+    const outstanding = net;
+    return { net, collected, outstanding, live: false };
+  }, [su, liveMiles]);
 
-  const { net, collected, outstanding } = data;
+  const { net, collected, outstanding, live: liveMetrics } = data;
+  const discountPct = su.price > 0 ? Math.round((1 - net / su.price) * 1000) / 10 : 0;
   const where = "Tower 1 \u00b7 L" + su.f + " \u00b7 " + su.view;
+
+  const unitDocs = liveDocs.filter(
+    (d) => String(d.unit_no || "") === su.no || String(d.unit_no || "") === su.id
+  );
 
   const metrics = [
     { label: "List price", value: money(su.price), note: "AED " + su.psf.toLocaleString("en-US") + " /sq.ft", color: "#14161F" },
-    { label: "Net price", value: money(net), note: "5.0% discount approved 14 Mar 2026", color: "#14161F" },
-    { label: "Collected", value: money(collected), note: "62% of net price", color: AC },
-    { label: "Outstanding", value: money(outstanding), note: "next due 14 Sep 2026", color: "#14161F" },
+    { label: "Net price", value: money(net), note: liveMetrics ? "from live payment schedule" : "discount applied to list price", color: "#14161F" },
+    { label: "Collected", value: money(collected), note: liveMetrics ? "paid instalments to date" : "no payments recorded", color: AC },
+    { label: "Outstanding", value: money(outstanding), note: liveMetrics ? "remaining instalments" : "balance per schedule", color: "#14161F" },
   ];
 
   const uBar = [
-    { title: "Collected " + money(collected), w: (collected / net) * 100, c: AC },
-    { title: "Outstanding " + money(outstanding), w: (outstanding / net) * 100, c: "#B9B4FA" },
+    { title: "Collected " + money(collected), w: net > 0 ? (collected / net) * 100 : 0, c: AC },
+    { title: "Outstanding " + money(outstanding), w: net > 0 ? (outstanding / net) * 100 : 0, c: "#B9B4FA" },
   ];
 
   const uSpec = [
@@ -152,7 +185,7 @@ export default function UnitScreen({
     ["View premium", su.view, "+ 0.0%", false],
     ["List price/sq.ft", "", "AED " + su.psf.toLocaleString("en-US"), true],
     ["List price", su.area.toLocaleString("en-US") + " sq.ft", money(su.price), false],
-    ["Approved discount", "A. Haddad \u00b7 14 Mar", "\u2212 " + money(su.price - net), false],
+    ["Approved discount", "applied to unit", "\u2212 " + money(su.price - net), false],
     ["Net price", "", money(net), true],
     ["DLD registration 4%", "payable by buyer", money(net * 0.04), false],
     ["Developer admin fee", "payable by buyer", "AED 4,200", false],
@@ -163,55 +196,33 @@ export default function UnitScreen({
     ["Sanitaryware", "Duravit / Grohe"], ["Joinery", "Oak veneer"], ["Smart home", "Loxone \u00b7 Tier 2"],
   ];
 
-  const uMiles: [string, string, boolean][] = [
-    ["Booking", "14 Mar 26", true], ["SPA", "02 Apr 26", true], ["20%", "14 Jun 26", true],
-    ["30%", "14 Sep 26", false], ["50%", "14 Mar 27", false], ["Handover", "Q4 2027", false],
-  ];
+  const uMiles: [string, string, boolean][] = liveMiles
+    .slice(0, 6)
+    .map((m) => [m.milestone, m.due || "\u2014", mileStatus(m.status || "scheduled") === "Paid"]);
 
-  const uInstMock = [
-    ["01", "Booking deposit", "On booking", "14 Mar 2026", "10%", "Paid"],
-    ["02", "SPA execution", "30 days from booking", "13 Apr 2026", "10%", "Paid"],
-    ["03", "Excavation complete", "Construction 20%", "14 Jun 2026", "15%", "Paid"],
-    ["04", "Structure 40%", "Construction 40%", "14 Sep 2026", "20%", "Due"],
-    ["05", "Facade complete", "Construction 70%", "14 Mar 2027", "15%", "Scheduled"],
-    ["06", "Fit-out complete", "Construction 90%", "12 Sep 2027", "10%", "Scheduled"],
-    ["07", "On handover", "Handover", "Q4 2027", "20%", "Scheduled"],
-  ].map((i) => ({
-    seq: i[0], label: i[1], trigger: i[2], due: i[3], pct: i[4], status: i[5] as "Paid" | "Due" | "Scheduled",
-    amount: money((net * parseInt(i[4])) / 100),
+  const uInst = liveMiles.map((m, i) => ({
+    seq: String(i + 1).padStart(2, "0"),
+    label: m.milestone,
+    trigger: "Milestone payment",
+    due: m.due || "\u2014",
+    pct: m.percent + "%",
+    status: mileStatus(m.status || "scheduled"),
+    amount: money(m.amount),
   }));
 
-  const uInst = liveMiles.length
-    ? liveMiles.map((m, i) => ({
-        seq: String(i + 1).padStart(2, "0"),
-        label: m.milestone,
-        trigger: "Milestone payment",
-        due: m.due || "—",
-        pct: m.percent + "%",
-        status: mileStatus(m.status || "scheduled"),
-        amount: money(m.amount),
-      }))
-    : uInstMock;
-
-  const uDocs = [
-    ["PDF", "Reservation form", "v1 \u00b7 214 KB \u00b7 A. Haddad \u00b7 14 Mar 2026", "Signed"],
-    ["PDF", "Sale & purchase agreement", "v3 \u00b7 1.8 MB \u00b7 Legal \u00b7 02 Apr 2026", "Signed"],
-    ["PDF", "Oqood certificate", "DLD \u00b7 11 Apr 2026", "Registered"],
-    ["PDF", "Receipt RCP-H21-004521", "AED 465,500 \u00b7 14 Jun 2026", "Issued"],
-    ["JPG", "Passport copy", "Expires 11 Oct 2026", "Expiring"],
-    ["JPG", "Emirates ID", "Expires 04 Feb 2028", "Valid"],
-    ["PDF", "Source of funds declaration", "AML \u00b7 reviewed by Compliance", "Cleared"],
-  ] as [string, string, string, string][];
+  const uDocs: [string, string, string, string][] = unitDocs.slice(0, 10).map((d) => [
+    String(d.type || "PDF").toUpperCase().includes("PDF") ? "PDF" : String(d.type || "DOC"),
+    d.ref || "Document",
+    (d.buyer || "\u2014") + " \u00b7 " + fmtShortDate(d.generated_at || d.created_at),
+    String(d.status || "Issued"),
+  ]);
 
   const uActs = [
-    ["Payment recorded \u00b7 AED 465,500", "F. Nasser \u00b7 Finance \u00b7 14 Jun 2026 11:04 \u00b7 escrow ref ESC-2026-8841"],
-    ["Oqood registration completed", "L. Ferreira \u00b7 Legal \u00b7 11 Apr 2026 09:22 \u00b7 ref OQD-4417-2026"],
-    ["SPA countersigned by developer", "System \u00b7 02 Apr 2026 16:40"],
-    ["Status changed Reserved \u2192 Booked", "System \u00b7 02 Apr 2026 16:40"],
-    ["Discount 5.0% approved", "A. Haddad \u00b7 Sales Director \u00b7 14 Mar 2026 12:18"],
-    ["Booking created", "R. Kapoor \u00b7 Sales Agent \u00b7 14 Mar 2026 10:55"],
-    ["48-hour hold placed", "R. Kapoor \u00b7 Sales Agent \u00b7 12 Mar 2026 15:31"],
-  ] as [string, string][];
+    ...liveMiles
+      .filter((m) => mileStatus(m.status || "scheduled") === "Paid")
+      .map((m) => ["Payment recorded \u00b7 " + money(Number(m.amount) || 0), "Milestone \u00b7 " + m.milestone + " \u00b7 " + (m.due || "\u2014")] as [string, string]),
+    ...unitDocs.map((d) => ["Document generated \u00b7 " + (d.ref || ""), String(d.type || "Document") + " \u00b7 " + (d.buyer || "\u2014") + " \u00b7 " + fmtShortDate(d.generated_at || d.created_at)] as [string, string]),
+  ];
 
   const pill = (s: string) =>
     s === "Paid"
@@ -260,8 +271,8 @@ export default function UnitScreen({
             </div>
           </div>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <button onClick={() => exportUnitSoa({ id: su.id, typ: su.typ, beds: su.beds, area: su.area, view: su.view, f: su.f, psf: su.psf, price: su.price, status: su.status, buyer: su.buyer }, uInst.map((i) => ({ seq: i.seq, label: i.label, due: i.due, pct: i.pct, amount: i.amount, status: i.status })))} style={{ height: 38, borderRadius: 12, border: "1px solid #EDEEF3", background: "#fff", padding: "0 14px", fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, color: "#4A5060", cursor: "pointer" }}>Generate SOA</button>
-            <button onClick={() => exportUnitEoi({ id: su.id, typ: su.typ, beds: su.beds, area: su.area, view: su.view, f: su.f, psf: su.psf, price: su.price, status: su.status, buyer: su.buyer })} style={{ height: 38, borderRadius: 12, border: "1px solid #EDEEF3", background: "#fff", padding: "0 14px", fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, color: "#4A5060", cursor: "pointer" }}>Generate EOI</button>
+            <button onClick={() => exportUnitSoa({ id: su.id, typ: su.typ, beds: su.beds, area: su.area, view: su.view, f: su.f, psf: su.psf, price: su.price, status: su.status, buyer: su.buyer }, uInst.map((i) => ({ seq: i.seq, label: i.label, due: i.due, pct: i.pct, amount: i.amount, status: i.status })), { discountPct, collected: liveMetrics ? collected : undefined })} style={{ height: 38, borderRadius: 12, border: "1px solid #EDEEF3", background: "#fff", padding: "0 14px", fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, color: "#4A5060", cursor: "pointer" }}>Generate SOA</button>
+            <button onClick={() => exportUnitEoi({ id: su.id, typ: su.typ, beds: su.beds, area: su.area, view: su.view, f: su.f, psf: su.psf, price: su.price, status: su.status, buyer: su.buyer }, { discountPct })} style={{ height: 38, borderRadius: 12, border: "1px solid #EDEEF3", background: "#fff", padding: "0 14px", fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, color: "#4A5060", cursor: "pointer" }}>Generate EOI</button>
             <button onClick={() => router.push("/finance?s=payments")} style={{ height: 38, borderRadius: 12, background: AC, color: "#fff", border: 0, padding: "0 16px", fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}>Record payment</button>
           </div>
         </div>
@@ -283,7 +294,7 @@ export default function UnitScreen({
 
       <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr", gap: 16, marginTop: 16, alignItems: "start" }}>
         <div>
-          <div style={{ display: "flex", gap: 4, background: "#fff", border: "1px solid #EDEEF3", borderRadius: 13, padding: 4, marginBottom: 14, width: "fit-content" }}>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 4, background: "#fff", border: "1px solid #EDEEF3", borderRadius: 13, padding: 4, marginBottom: 14, width: "fit-content" }}>
             {tabBtn("overview", "Overview")}
             {tabBtn("pay", "Payments")}
             {tabBtn("docs", "Documents")}
@@ -341,13 +352,17 @@ export default function UnitScreen({
                   </div>
                 ))}
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "28px 1.4fr 96px 82px 92px 84px", gap: 8, padding: "10px 0", fontSize: 9.5, fontWeight: 700, letterSpacing: ".07em", color: "#9AA0AE", textTransform: "uppercase", borderBottom: "1px solid #EDEEF3" }}>
+              <div style={{ overflowX: "auto" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "28px 1.4fr 96px 82px 92px 84px", minWidth: 580, gap: 8, padding: "10px 0", fontSize: 9.5, fontWeight: 700, letterSpacing: ".07em", color: "#9AA0AE", textTransform: "uppercase", borderBottom: "1px solid #EDEEF3" }}>
                 <span>#</span><span>Milestone</span><span>Due</span><span style={{ textAlign: "right" }}>%</span><span style={{ textAlign: "right" }}>Amount</span><span>Status</span>
               </div>
+              {uInst.length === 0 && (
+                <div style={{ fontSize: 12, color: "#9AA0AE", fontWeight: 500, padding: "14px 0" }}>No payment schedule on file yet.</div>
+              )}
               {uInst.map((i) => {
                 const p = pill(i.status);
                 return (
-                  <div key={i.seq} style={{ display: "grid", gridTemplateColumns: "28px 1.4fr 96px 82px 92px 84px", gap: 8, alignItems: "center", padding: "11px 0", borderBottom: "1px solid #F6F7FA" }}>
+                  <div key={i.seq} style={{ display: "grid", gridTemplateColumns: "28px 1.4fr 96px 82px 92px 84px", minWidth: 580, gap: 8, alignItems: "center", padding: "11px 0", borderBottom: "1px solid #F6F7FA" }}>
                     <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, color: "#9AA0AE" }}>{i.seq}</span>
                     <span style={{ minWidth: 0 }}>
                       <span style={{ display: "block", fontSize: 12, fontWeight: 600 }}>{i.label}</span>
@@ -360,6 +375,7 @@ export default function UnitScreen({
                   </div>
                 );
               })}
+              </div>
               <div style={{ display: "grid", gridTemplateColumns: "28px 1.4fr 96px 82px 92px 84px", gap: 8, alignItems: "center", padding: "14px 0 2px" }}>
                 <span></span><span style={{ fontSize: 12, fontWeight: 800 }}>Total</span><span></span>
                 <span style={{ textAlign: "right", fontSize: 11.5, fontWeight: 700 }}>100%</span>
@@ -371,6 +387,9 @@ export default function UnitScreen({
           {tab === "docs" && (
             <div style={{ background: "#fff", borderRadius: 20, padding: "20px 24px", boxShadow: "0 1px 3px rgba(20,22,31,.04)" }}>
               <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: "-.015em", marginBottom: 14 }}>Document vault</div>
+              {uDocs.length === 0 && (
+                <div style={{ fontSize: 12, color: "#9AA0AE", fontWeight: 500, padding: "10px 0" }}>No documents generated for this unit yet.</div>
+              )}
               {uDocs.map((d) => {
                 const p = pill(d[3]);
                 return (
@@ -390,6 +409,9 @@ export default function UnitScreen({
           {tab === "act" && (
             <div style={{ background: "#fff", borderRadius: 20, padding: "20px 24px", boxShadow: "0 1px 3px rgba(20,22,31,.04)" }}>
               <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: "-.015em", marginBottom: 14 }}>Activity</div>
+              {uActs.length === 0 && (
+                <div style={{ fontSize: 12, color: "#9AA0AE", fontWeight: 500, padding: "10px 0" }}>No activity recorded for this unit yet.</div>
+              )}
               {uActs.map((a, i) => (
                 <div key={a[0]} style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: "12px 0", borderBottom: i === uActs.length - 1 ? "0" : "1px solid #F6F7FA" }}>
                   <span style={{ width: 9, height: 9, borderRadius: 5, flex: "none", marginTop: 4, background: i < 3 ? AC : "#DDE0E8" }}></span>

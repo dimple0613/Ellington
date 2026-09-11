@@ -1,4 +1,53 @@
-export function buildResetUrl(token: string): string {
+export async function sendPortalInvite(kind: "buyer" | "broker", email: string, name: string, tempPassword: string, portalUrl: string): Promise<void> {
+  const smtpHost = process.env.SMTP_HOST;
+  const label = kind === "buyer" ? "buyer portal" : "agent portal";
+  if (smtpHost) {
+    try {
+      // nodemailer is optional at runtime; falls back to console delivery when unavailable.
+      // @ts-ignore - intentionally resolved at runtime so the Cloudflare build stays lean
+      const nodemailer = await import("nodemailer");
+      const transporter = nodemailer.createTransport({
+        host: smtpHost,
+        port: Number(process.env.SMTP_PORT || 587),
+        secure: process.env.SMTP_SECURE === "true",
+        ...(process.env.SMTP_USER
+          ? { auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS || "" } }
+          : {}),
+      });
+      await transporter.sendMail({
+        from: { name: "Ellington", address: process.env.SMTP_USER || "no-reply@ellington.ae" },
+        to: email,
+        subject: `Your Ellington ${label} access`,
+        html: [
+          `<div style="font-family:'Plus Jakarta Sans',-apple-system,Arial,Helvetica,sans-serif;background:#F3F4F8;padding:36px 16px;">`,
+          `<div style="max-width:500px;margin:0 auto;background:#fff;border:1px solid #EDEEF3;border-radius:22px;overflow:hidden;">`,
+          `<div style="background:linear-gradient(160deg,#14161F,#2b2570);padding:28px 32px;color:#fff;">`,
+          `<span style="font-size:19px;font-weight:800;">Ellington</span> <span style="opacity:.65;font-size:12px;font-weight:700;">&nbsp;${label}</span></div>`,
+          `<div style="padding:30px 32px;color:#14161F;">`,
+          `<p style="margin:0 0 6px;font-size:20px;font-weight:800;letter-spacing:-.02em;">Welcome, ${name}</p>`,
+          `<p style="margin:0 0 20px;font-size:13.5px;line-height:1.6;color:#6B7180;">Your ${label} access is ready. Sign in with the credentials below — you can change the password after your first sign-in.</p>`,
+          `<div style="background:#F6F7FB;border:1px solid #EDEEF3;border-radius:12px;padding:14px 16px;font-size:13px;font-weight:600;line-height:1.8;">`,
+          `Sign in: <a href="${portalUrl}" style="color:#4F46F5;">${portalUrl}</a><br/>`,
+          `Email: <b style="font-family:'JetBrains Mono',monospace;">${email}</b><br/>`,
+          `Temporary password: <b style="font-family:'JetBrains Mono',monospace;">${tempPassword}</b>`,
+          `</div></div>`,
+          `<div style="background:#F3F4F8;border-top:1px solid #EDEEF3;padding:18px 32px;font-size:11.5px;color:#9AA0AE;font-weight:600;">Ellington Holdings · ORN 21281</div>`,
+          `</div></div>`,
+        ].join(""),
+      });
+      return;
+    } catch (e) {
+      console.error("MAIL_ERROR", e);
+    }
+  }
+  const prod = typeof process.env.NODE_ENV === "undefined" || process.env.NODE_ENV === "production";
+  if (!prod) {
+    console.log(`PORTAL_INVITE kind=${kind} email=${email} url=${portalUrl} temp_password=${tempPassword}`);
+  } else {
+    console.log(`PORTAL_INVITE_NO_SMTP kind=${kind} email=${email}`);
+  }
+}
+  export function buildResetUrl(token: string): string {
   const base = process.env.APP_URL || "http://localhost:3000";
   return `${base.replace(/\/+$/, "")}/reset-password?token=${encodeURIComponent(token)}`;
 }

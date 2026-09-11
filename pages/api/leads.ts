@@ -26,6 +26,14 @@ function stageIndex(stage: string): number {
 
 export default withPerm("Sales", "REA", async function (req: NextApiRequest, res: NextApiResponse, session: any) {
   if (req.method === "GET") {
+    const project = (req.query.project as string) || "all";
+    const conds: string[] = [];
+    const params: any[] = [];
+    if (project && project !== "all") {
+      params.push(project);
+      conds.push(`p.code = $${params.length}`);
+    }
+    const where = conds.length ? "WHERE " + conds.join(" AND ") : "";
     const leads = await query<any>(
       `SELECT l.id, l.name, COALESCE(l.source,'referral') AS source, COALESCE(l.stage,'new') AS stage,
               l.budget_min, l.budget_max, COALESCE(l.agent,'') AS agent, l.phone,
@@ -33,7 +41,9 @@ export default withPerm("Sales", "REA", async function (req: NextApiRequest, res
               p.code AS project_code
        FROM leads l
        LEFT JOIN projects p ON p.id = l.project_id
-       ORDER BY l.stage_changed_at DESC NULLS LAST, l.id DESC`
+       ${where}
+       ORDER BY l.stage_changed_at DESC NULLS LAST, l.id DESC`,
+      params
     );
     const data = leads.rows.map((l) => ({
       id: l.id,

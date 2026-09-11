@@ -11,15 +11,7 @@ type AdminRow = {
 };
 
 const PERMS = ["CRE", "REA", "UPD", "DEL", "APR", "EXP"];
-const USERS: UserRow[] = [
-  { name: "Khalid Al Fahim", email: "k.fahim@ellington.ae", role: "CEO", projects: "All", lastActive: "Just now", tfa: "Enabled", status: "Active" },
-  { name: "Sarah Mitchell", email: "s.mitchell@ellington.ae", role: "Sales Director", projects: "BLG III, WPK", lastActive: "2 h ago", tfa: "Enabled", status: "Active" },
-  { name: "Ravi Kumar", email: "r.kumar@ellington.ae", role: "Finance Manager", projects: "All", lastActive: "4 h ago", tfa: "Enabled", status: "Active" },
-  { name: "Aisha Nasser", email: "a.nasser@ellington.ae", role: "Sales Agent", projects: "BLG III", lastActive: "1 d ago", tfa: "Disabled", status: "Active" },
-  { name: "Omar Saeed", email: "o.saeed@ellington.ae", role: "Project Manager", projects: "WPK", lastActive: "3 d ago", tfa: "Enabled", status: "Active" },
-  { name: "Layla Habib", email: "l.habib@ellington.ae", role: "Legal Counsel", projects: "All", lastActive: "5 d ago", tfa: "Enabled", status: "Suspended" },
-  { name: "James Park", email: "j.park@ellington.ae", role: "Sales Agent", projects: "BLG III, WPK", lastActive: "1 w ago", tfa: "Disabled", status: "Active" },
-];
+const USERS: UserRow[] = [];
 
 type PermRow = { module: string; perm: Record<string, boolean> };
 const ROLE_PERMS: PermRow[] = [
@@ -38,7 +30,8 @@ const FIELDS = [
   { field: "Issue notice", override: "Legal counsel", locked: false },
 ];
 
-const THRESHOLDS = [
+type Threshold = { label: string; approver: string; auto: boolean };
+const THRESHOLDS_BASE: Threshold[] = [
   { label: "Discount up to 3%", approver: "Sales Agent", auto: true },
   { label: "Discount 3\u20137%", approver: "Sales Director", auto: false },
   { label: "Discount > 7%", approver: "CEO", auto: false },
@@ -58,8 +51,8 @@ const PLAIN: Record<string, string> = {
 };
 
 export default function UsersScreen() {
-  const [sel, setSel] = useState(1);
-  const [role, setRole] = useState(USERS[1].role);
+  const [sel, setSel] = useState(0);
+  const [role, setRole] = useState("CEO");
   const [notice, setNotice] = useState("");
   const [users, setUsers] = useState<UserRow[]>(USERS);
   const [inviteOpen, setInviteOpen] = useState(false);
@@ -73,15 +66,23 @@ export default function UsersScreen() {
     for (const r of ROLES) init[r] = ROLE_PERMS.map((row) => ({ ...row, perm: { ...row.perm } }));
     return init;
   });
+  const [thresholdsByRole, setThresholdsByRole] = useState<Record<string, Threshold[]>>(() => {
+    const init: Record<string, Threshold[]> = {};
+    for (const r of ROLES) init[r] = THRESHOLDS_BASE.map((t) => ({ ...t }));
+    return init;
+  });
   const [dbUsers, setDbUsers] = useState<UserRow[] | null>(null);
+  const [loaded, setLoaded] = useState(false);
   const [apiError, setApiError] = useState("");
 
   useEffect(() => {
     let active = true;
     fetchJSON<{ users: AdminRow[] }>("/api/admins")
       .then((j) => {
+        if (!active) return;
+        setLoaded(true);
         const users = j.users;
-        if (!active || !Array.isArray(users)) return;
+        if (!Array.isArray(users)) return;
         const rows: UserRow[] = users.map((u: AdminRow) => ({
           name: u.name || u.email,
           email: u.email,
@@ -94,7 +95,7 @@ export default function UsersScreen() {
         if (rows.length) setDbUsers(rows);
       })
       .catch((e) => {
-        if (active) setApiError(e?.message || "Failed to load users");
+        if (active) { setLoaded(true); setApiError(e?.message || "Failed to load users"); }
       });
     return () => { active = false; };
   }, []);
@@ -111,6 +112,17 @@ export default function UsersScreen() {
     setNotice(perm + " toggled " + (matrix.find((m) => m.module === module)?.perm[perm] ? "off" : "on") + " for " + module + " \u00b7 role: " + role);
     setTimeout(() => setNotice(""), 3000);
   };
+
+  const setThreshold = (label: string, approver: string) => {
+    setThresholdsByRole((prev) => ({
+      ...prev,
+      [role]: prev[role].map((t) => (t.label === label ? { ...t, approver } : t)),
+    }));
+    setNotice("Approval threshold \u00b7 " + label + " \u2192 " + approver);
+    setTimeout(() => setNotice(""), 3000);
+  };
+
+  const effectiveThresholds = thresholdsByRole[role] || THRESHOLDS_BASE;
 
   const invite = () => {
     if (!iName.trim() || !iEmail.trim()) { setErr("Enter both name and work email"); return; }
@@ -132,21 +144,23 @@ export default function UsersScreen() {
     <div>
       {apiError && <div style={{ background: "#FDECEC", color: "#E5484D", borderRadius: 12, padding: "11px 16px", fontSize: 12, fontWeight: 700, marginBottom: 16 }}>Live data unavailable ({apiError}) — showing sample rows</div>}
       {notice && <div style={{ background: "#E9F8F1", color: "#1F9D6B", borderRadius: 12, padding: "11px 16px", fontSize: 12, fontWeight: 700, marginBottom: 16 }}>{notice}</div>}
-      <div style={{ display: "flex", alignItems: "flex-end", gap: 16, marginBottom: 18 }}>
-        <div style={{ flex: 1 }}>
+      <div style={{ display: "flex", flexWrap: "wrap", rowGap: 12, alignItems: "flex-end", gap: 16, marginBottom: 18 }}>
+        <div style={{ flex: 1, minWidth: 220 }}>
           <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: "-.03em", lineHeight: 1.15 }}>Users &amp; roles</div>
-          <div style={{ fontSize: 13, color: "#6B7180", fontWeight: 500, marginTop: 5 }}>Role-based with per-project scoping \u00b7 7 active users \u00b7 2FA enforced on production</div>
+          <div style={{ fontSize: 13, color: "#6B7180", fontWeight: 500, marginTop: 5 }}>Role-based with per-project scoping \u00b7 {effectiveUsers.length} users loaded</div>
         </div>
         <button onClick={() => setInviteOpen(true)} style={{ height: 38, borderRadius: 12, background: AC, color: "#fff", border: 0, padding: "0 16px", fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}>Invite user</button>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 350px", gap: 16, alignItems: "start" }}>
         <div style={{ background: "#fff", borderRadius: 20, overflow: "hidden", boxShadow: "0 1px 3px rgba(20,22,31,.04)" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1.4fr 96px 1.1fr 82px 72px 72px", gap: 8, padding: "13px 20px", fontSize: 9.5, fontWeight: 700, letterSpacing: ".07em", color: "#9AA0AE", textTransform: "uppercase", background: "#FAFBFD", borderBottom: "1px solid #EDEEF3" }}>
+          <div style={{ overflowX: "auto" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1.4fr 96px 1.1fr 82px 72px 72px", minWidth: 680, gap: 8, padding: "13px 20px", fontSize: 9.5, fontWeight: 700, letterSpacing: ".07em", color: "#9AA0AE", textTransform: "uppercase", background: "#FAFBFD", borderBottom: "1px solid #EDEEF3" }}>
             <span>Name</span><span>Email</span><span>Role</span><span>Projects</span><span>Last active</span><span>2FA</span><span>Status</span>
           </div>
+          {effectiveUsers.length === 0 && <div style={{ padding: 32, textAlign: "center", fontSize: 13, color: "#9AA0AE", fontWeight: 600 }}>{loaded ? "No users loaded yet — invite one or wait for the user list." : "Loading users…"}</div>}
           {effectiveUsers.map((u, i) => (
-            <div key={i} onClick={() => { setSel(i); setRole(u.role); }} style={{ display: "grid", gridTemplateColumns: "1.2fr 1.4fr 96px 1.1fr 82px 72px 72px", gap: 8, alignItems: "center", padding: "0 20px", height: 46, borderBottom: "1px solid #F6F7FA", cursor: "pointer", background: i === sel ? "#F0EFFE" : undefined }}>
+            <div key={i} onClick={() => { setSel(i); setRole(u.role); }} style={{ display: "grid", gridTemplateColumns: "1.2fr 1.4fr 96px 1.1fr 82px 72px 72px", minWidth: 680, gap: 8, alignItems: "center", padding: "0 20px", height: 46, borderBottom: "1px solid #F6F7FA", cursor: "pointer", background: i === sel ? "#F0EFFE" : undefined }}>
               <span style={{ fontSize: 12, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{u.name}</span>
               <span style={{ fontSize: 11, color: "#6B7180", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{u.email}</span>
               <span style={{ fontSize: 11, fontWeight: 700, color: AC }}>{u.role}</span>
@@ -156,6 +170,7 @@ export default function UsersScreen() {
               <span style={{ fontSize: 10.5, fontWeight: 700, color: u.status === "Active" ? "#1F9D6B" : "#E5484D" }}>{u.status}</span>
             </div>
           ))}
+          </div>
         </div>
 
         <div style={{ background: "#fff", borderRadius: 20, padding: "22px 24px", boxShadow: "0 1px 3px rgba(20,22,31,.04)" }}>
@@ -200,13 +215,15 @@ export default function UsersScreen() {
           </div>
 
           <div style={{ marginTop: 18, paddingTop: 14, borderTop: "1px solid #F1F2F7" }}>
-            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".05em", color: "#9AA0AE", textTransform: "uppercase", marginBottom: 8 }}>Approval thresholds</div>
-            {THRESHOLDS.map((t) => (
-              <div key={t.label} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: "1px solid #F6F7FA" }}>
+            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".05em", color: "#9AA0AE", textTransform: "uppercase", marginBottom: 8 }}>Approval thresholds · {role}</div>
+            {effectiveThresholds.map((t) => (
+              <div key={t.label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, padding: "6px 0", borderBottom: "1px solid #F6F7FA" }}>
                 <span style={{ fontSize: 11.5, fontWeight: 600 }}>{t.label}</span>
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <span style={{ fontSize: 10.5, fontWeight: 700 }}>{t.approver}</span>
                   {t.auto && <span style={{ fontSize: 9, fontWeight: 800, background: "#E9F8F1", color: "#1F9D6B", borderRadius: 6, padding: "2px 6px" }}>Auto</span>}
+                  <select value={t.approver} onChange={(e) => setThreshold(t.label, e.target.value)} disabled={t.auto} style={{ height: 28, borderRadius: 8, border: "1px solid " + (t.auto ? "#EDEEF3" : "#E4E6EE"), background: t.auto ? "#F7F8FB" : "#fff", padding: "0 8px", fontFamily: "inherit", fontSize: 10.5, fontWeight: 600, color: t.auto ? "#9AA0AE" : "#14161F" }}>
+                    {ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
+                  </select>
                 </div>
               </div>
             ))}

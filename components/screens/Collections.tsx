@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/router";
 import { AC } from "../../lib/format";
 import { exportCollectionNotice } from "../../lib/pdf";
@@ -26,32 +26,12 @@ export default function CollectionsScreen() {
   const [promiseAmount, setPromiseAmount] = useState("");
   const [promiseErr, setPromiseErr] = useState("");
 
-  const buckets = [
-    { label: "Current", value: "AED 439.6M", note: "428 buyers", idx: 0 },
-    { label: "1\u201330", value: "AED 18.4M", note: "21 buyers", idx: 1 },
-    { label: "31\u201360", value: "AED 7.1M", note: "12 buyers", idx: 2 },
-    { label: "61\u201390", value: "AED 3.7M", note: "8 buyers", idx: 3 },
-    { label: "90+", value: "AED 33.6M", note: "31 buyers", idx: 4 },
-    { label: "Legal", value: "AED 4.1M", note: "3 buyers", idx: 5 },
-  ];
-
-  const MOCK_ROWS: CollRow[] = [
-    { id: 1, buyer: "Sunil Rathore", unit: "H21-T1-2705", amount: "4,120,000", days: 118, stage: "Final notice", action: "Legal review \u00b7 28 Aug" },
-    { id: 2, buyer: "Elena Petrova", unit: "H21-T1-4102", amount: "2,860,000", days: 104, stage: "30-day notice", action: "Notice issued 12 Aug" },
-    { id: 3, buyer: "Marcus Lindqvist", unit: "H21-T1-2404", amount: "1,940,000", days: 96, stage: "Reminder 2", action: "Promise to pay 02 Sep" },
-    { id: 4, buyer: "Wei Chen", unit: "H21-T1-1602", amount: "1,210,000", days: 92, stage: "Reminder 2", action: "Cheque bounced \u00b7 re-present" },
-    { id: 5, buyer: "Nadia Khoury", unit: "H21-T1-2202", amount: "864,000", days: 61, stage: "Reminder 1", action: "Call scheduled 26 Aug" },
-    { id: 6, buyer: "Omar Al Suwaidi", unit: "H21-T1-3601", amount: "640,000", days: 44, stage: "Reminder 1", action: "Awaiting bank confirmation" },
-    { id: 7, buyer: "Grace Okonkwo", unit: "H21-T1-1103", amount: "412,000", days: 31, stage: "Reminder 1", action: "Email sent 22 Aug" },
-    { id: 8, buyer: "Priya Nair", unit: "H21-T1-0904", amount: "208,000", days: 18, stage: "Upcoming", action: "Auto-reminder 27 Aug" },
-  ];
-
   const [liveRows, setLiveRows] = useState<CollRow[]>([]);
   const [apiError, setApiError] = useState("");
   const [loaded, setLoaded] = useState(false);
   const [calc, setCalc] = useState<any>(null);
   const [calcErr, setCalcErr] = useState("");
-  const [calcUnit, setCalcUnit] = useState("H21-T1-2705");
+  const [calcUnit, setCalcUnit] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -84,7 +64,29 @@ export default function CollectionsScreen() {
       .catch((e) => setCalcErr(e?.message || "Failed to load calculator"));
   };
 
-  const rows = liveRows.length ? liveRows : MOCK_ROWS;
+  const rows = liveRows;
+
+  const buckets = useMemo(() => {
+    if (!liveRows.length) return [];
+    const fmt = (v: number) => (v >= 1e6 ? "AED " + (v / 1e6).toFixed(1).replace(/\.0$/, "") + "M" : v >= 1e3 ? "AED " + Math.round(v / 1e3) + "k" : "AED " + v);
+    const build = (label: string, idx: number, pred: (r: CollRow) => boolean) => {
+      const sel = rows.filter(pred);
+      const v = sel.reduce((a, r) => a + (Number(String(r.amount).replace(/,/g, "")) || 0), 0);
+      return { label, value: fmt(v), note: sel.length + (sel.length === 1 ? " buyer" : " buyers"), idx };
+    };
+    return [
+      build("Current", 0, (r) => r.days <= 0),
+      build("1\u201330", 1, (r) => r.days >= 1 && r.days <= 30),
+      build("31\u201360", 2, (r) => r.days >= 31 && r.days <= 60),
+      build("61\u201390", 3, (r) => r.days >= 61 && r.days <= 90),
+      build("90+", 4, (r) => r.days > 90),
+      build("Legal", 5, (r) => /notice/i.test(r.stage || "")),
+    ];
+  }, [rows, liveRows.length]);
+
+  const overdueRows = rows.filter((r) => r.days > 0);
+  const overdueSum = overdueRows.reduce((a, r) => a + (Number(String(r.amount).replace(/,/g, "")) || 0), 0);
+  const overdueFmt = (v: number) => (v >= 1e6 ? "AED " + (v / 1e6).toFixed(1).replace(/\.0$/, "") + "M" : "AED " + Math.round(v / 1e3) + "k");
 
   const tiers: [string, string, boolean][] = [
     ["Construction < 60%", "up to 25%", true],
@@ -93,11 +95,11 @@ export default function CollectionsScreen() {
   ];
 
   const ladder: { stage: string; trigger: string; action: string; count: number; color: string }[] = [
-    { stage: "Upcoming", trigger: "14\u201330 days before due", action: "Auto-reminder \u00b7 email + SMS", count: 1, color: "#6B7180" },
-    { stage: "Reminder 1", trigger: "0\u201330 days overdue", action: "Email + SMS \u00b7 soft reminder", count: 3, color: "#B07B14" },
-    { stage: "Reminder 2", trigger: "31\u201360 days overdue", action: "Promise-to-pay + cheque follow-up", count: 2, color: "#B07B14" },
-    { stage: "30-day notice", trigger: "61\u201390 days overdue", action: "Formal notice \u00b7 legal review", count: 1, color: "#E5484D" },
-    { stage: "Final notice", trigger: "90+ days overdue", action: "Cancellation + retention per Law 19", count: 1, color: "#E5484D" },
+    { stage: "Upcoming", trigger: "14\u201330 days before due", action: "Auto-reminder \u00b7 email + SMS", count: rows.filter((r) => r.days <= 0).length, color: "#6B7180" },
+    { stage: "Reminder 1", trigger: "0\u201330 days overdue", action: "Email + SMS \u00b7 soft reminder", count: rows.filter((r) => r.days > 0 && r.days <= 30).length, color: "#B07B14" },
+    { stage: "Reminder 2", trigger: "31\u201360 days overdue", action: "Promise-to-pay + cheque follow-up", count: rows.filter((r) => r.days > 30 && r.days <= 60).length, color: "#B07B14" },
+    { stage: "30-day notice", trigger: "61\u201390 days overdue", action: "Formal notice \u00b7 legal review", count: rows.filter((r) => r.days > 60 && r.days <= 90).length, color: "#E5484D" },
+    { stage: "Final notice", trigger: "90+ days overdue", action: "Cancellation + retention per Law 19", count: rows.filter((r) => r.days > 90).length, color: "#E5484D" },
   ];
 
   const remind = async (row: CollRow) => {
@@ -133,14 +135,23 @@ export default function CollectionsScreen() {
   const escalate = (row: CollRow) => { router.push({ pathname: "/finance", query: { s: "escrow" } }, undefined, { shallow: true }); };
   const genNotice = () => {
     const c = calc;
+    if (!c) {
+      setNotice("Run the calculator for a unit first \u00b7 notice figures are never estimated");
+      setTimeout(() => setNotice(""), 3500);
+      return;
+    }
+    const first = rows.find((r) => r.days > 0) || rows[0];
+    const amt = first ? Number(String(first.amount).replace(/,/g, "")) : 0;
     exportCollectionNotice(
-      "Sunil Rathore", "H21-T1-2705",
-      c ? Number(c.contract).toLocaleString("en-US") : "4,120,000",
-      118,
-      c ? Number(c.retentionAmount).toLocaleString("en-US") : "1,030,000",
-      c ? Number(c.refund).toLocaleString("en-US") : "206,000"
+      first?.buyer || "Buyer",
+      first?.unit || "",
+      first ? amt.toLocaleString("en-US") : "0",
+      first?.days || 0,
+      Number(c.retentionAmount).toLocaleString("en-US"),
+      Number(c.refund).toLocaleString("en-US"),
+      String(c.tier || "")
     );
-    setNotice("30-day notice generated for Sunil Rathore \u00b7 sent to legal review");
+    setNotice("30-day notice generated for " + (first?.buyer || "buyer") + " \u00b7 sent to legal review");
     setTimeout(() => setNotice(""), 3000);
   };
 
@@ -171,15 +182,15 @@ export default function CollectionsScreen() {
     <div>
       {apiError && (
         <div style={{ background: "#FDECEC", color: "#E5484D", borderRadius: 12, padding: "11px 16px", fontSize: 12, fontWeight: 700, marginBottom: 16 }}>
-          Live data unavailable ({apiError}) — showing sample rows
+          Live data unavailable ({apiError}) — collections are empty until data loads
         </div>
       )}
       {notice && <div style={{ background: "#E9F8F1", color: "#1F9D6B", borderRadius: 12, padding: "11px 16px", fontSize: 12, fontWeight: 700, marginBottom: 16 }}>{notice}</div>}
       {logEntry && <div style={{ background: "#F0EFFE", color: AC, borderRadius: 12, padding: "11px 16px", fontSize: 12, fontWeight: 700, marginBottom: 16 }}>Call logged for {logEntry} \u00b7 15-min follow-up scheduled</div>}
-      <div style={{ display: "flex", alignItems: "flex-end", gap: 16, marginBottom: 18 }}>
-        <div style={{ flex: 1 }}>
+      <div style={{ display: "flex", flexWrap: "wrap", rowGap: 12, alignItems: "flex-end", gap: 16, marginBottom: 18 }}>
+        <div style={{ flex: 1, minWidth: 220 }}>
           <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: "-.03em", lineHeight: 1.15 }}>Collections</div>
-          <div style={{ fontSize: 13, color: "#6B7180", fontWeight: 500, marginTop: 5 }}>31 overdue instalments \u00b7 AED 31.4M \u00b7 sorted by priority score</div>
+          <div style={{ fontSize: 13, color: "#6B7180", fontWeight: 500, marginTop: 5 }}>{overdueRows.length} overdue instalments \u00b7 {overdueFmt(overdueSum)} \u00b7 sorted by priority score</div>
         </div>
         <button onClick={() => setLadderOpen(true)} style={{ height: 38, borderRadius: 12, border: "1px solid #EDEEF3", background: "#fff", padding: "0 14px", fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, color: "#4A5060", cursor: "pointer" }}>Dunning ladder</button>
       </div>
@@ -201,11 +212,12 @@ export default function CollectionsScreen() {
       <div style={{ display: "grid", gridTemplateColumns: "1.7fr 1fr", gap: 16, alignItems: "start" }}>
         <div>
           <div style={{ background: "#fff", borderRadius: 20, overflow: "hidden", boxShadow: "0 1px 3px rgba(20,22,31,.04)" }}>
-            <div style={{ display: "grid", gridTemplateColumns: "1.1fr 92px 96px 72px 116px 1fr", gap: 8, padding: "13px 20px", fontSize: 9.5, fontWeight: 700, letterSpacing: ".07em", color: "#9AA0AE", textTransform: "uppercase", background: "#FAFBFD", borderBottom: "1px solid #EDEEF3" }}>
+            <div style={{ overflowX: "auto" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1.1fr 92px 96px 72px 116px 1fr", minWidth: 780, gap: 8, padding: "13px 20px", fontSize: 9.5, fontWeight: 700, letterSpacing: ".07em", color: "#9AA0AE", textTransform: "uppercase", background: "#FAFBFD", borderBottom: "1px solid #EDEEF3" }}>
               <span>Buyer</span><span>Unit</span><span style={{ textAlign: "right" }}>Amount</span><span style={{ textAlign: "right" }}>Days</span><span>Stage</span><span>Next action</span>
             </div>
             {rows.map((r, i) => (
-              <div key={i} style={{ display: "grid", gridTemplateColumns: "1.1fr 92px 96px 72px 116px 1fr", gap: 8, alignItems: "center", padding: "0 20px", height: 46, borderBottom: "1px solid #F6F7FA" }}>
+              <div key={i} style={{ display: "grid", gridTemplateColumns: "1.1fr 92px 96px 72px 116px 1fr", minWidth: 780, gap: 8, alignItems: "center", padding: "0 20px", height: 46, borderBottom: "1px solid #F6F7FA" }}>
                 <span style={{ fontSize: 12, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.buyer}</span>
                 <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10.5, color: "#4A5060" }}>{r.unit}</span>
                 <span style={{ textAlign: "right", fontSize: 12, fontWeight: 700, color: "#E5484D" }}>AED {r.amount}</span>
@@ -220,6 +232,7 @@ export default function CollectionsScreen() {
                 </div>
               </div>
             ))}
+            </div>
           </div>
         </div>
 

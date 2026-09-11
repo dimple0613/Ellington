@@ -5,6 +5,7 @@ export const SCR_TITLES: Record<string, string> = {
   cashflow: "Cashflow",
   reports: "Reports",
   inventory: "Inventory",
+  "unit-builder": "Unit Builder",
   pricing: "Pricing & availability",
   construction: "Construction",
   unit: "Unit",

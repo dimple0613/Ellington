@@ -33,7 +33,7 @@ export default function AuthBrandPanel() {
           {[
             { v: "AED 1.94B", l: "Portfolio GDV" },
             { v: "850", l: "Units tracked" },
-            { v: "89 / 89", l: "Screens verified" },
+            { v: "24/7", l: "Live monitoring" },
           ].map((s) => (
             <div key={s.l}>
               <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: "-.03em", color: "#4F46F5" }}>

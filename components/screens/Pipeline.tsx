@@ -8,72 +8,57 @@ type PipeCard = { no: string; buyer: string; meta: string };
 type PipeCol = { label: string; count: number; color: string; cards: PipeCard[] };
 
 const PIPE: PipeCol[] = [
-  { label: "Payment cleared", count: 18, color: "#34C08A", cards: [{ no: "WPK-T1-0402", buyer: "N. Khoury", meta: "Cleared 04 Aug" }, { no: "WPK-T1-0405", buyer: "M. Haddad", meta: "Cleared 06 Aug" }] },
-  { label: "Snagging scheduled", count: 14, color: AC, cards: [{ no: "WPK-T1-0311", buyer: "S. Rathore", meta: "Inspection 28 Aug" }] },
-  { label: "Snagging done", count: 22, color: AC, cards: [{ no: "WPK-T1-0208", buyer: "G. Okonkwo", meta: "11 snags raised" }] },
-  { label: "De-snagging", count: 16, color: "#8B7CF6", cards: [{ no: "WPK-T1-0104", buyer: "W. Chen", meta: "4 snags open \u00b7 ALEC" }] },
-  { label: "Utilities", count: 12, color: "#8B7CF6", cards: [{ no: "WPK-T1-0512", buyer: "P. Nair", meta: "DEWA pending" }] },
-  { label: "Documents ready", count: 19, color: "#E2A33C", cards: [{ no: "WPK-T1-0607", buyer: "O. Al Suwaidi", meta: "Title deed applied" }] },
-  { label: "Title deed issued", count: 15, color: "#E2A33C", cards: [{ no: "WPK-T1-0703", buyer: "E. Petrova", meta: "Deed 4417-2026" }] },
-  { label: "Keys handed", count: 20, color: "#0EA5A5", cards: [{ no: "WPK-T1-0801", buyer: "F. Al Hashimi", meta: "Keys 22 Aug" }] },
-  { label: "OA onboarded", count: 4, color: "#8A94A6", cards: [{ no: "WPK-T1-0902", buyer: "M. Lindqvist", meta: "Mollak registered" }] },
+  { label: "Payment cleared", count: 0, color: "#34C08A", cards: [] },
+  { label: "Snagging scheduled", count: 0, color: AC, cards: [] },
+  { label: "Snagging done", count: 0, color: AC, cards: [] },
+  { label: "De-snagging", count: 0, color: "#8B7CF6", cards: [] },
+  { label: "Utilities", count: 0, color: "#8B7CF6", cards: [] },
+  { label: "Documents ready", count: 0, color: "#E2A33C", cards: [] },
+  { label: "Title deed issued", count: 0, color: "#E2A33C", cards: [] },
+  { label: "Keys handed", count: 0, color: "#0EA5A5", cards: [] },
+  { label: "OA onboarded", count: 0, color: "#8A94A6", cards: [] },
 ];
 
-const BLOCKED = [
-  { unit: "WPK-T1-0210", buyer: "V. Shetty", reason: "Outstanding payment", detail: "AED 412,000", color: "#E5484D" },
-  { unit: "WPK-T1-0114", buyer: "T. Alderton", reason: "Snags open", detail: "6 items \u00b7 ALEC", color: "#E2A33C" },
-  { unit: "WPK-T1-0308", buyer: "A. Farouk", reason: "Documents missing", detail: "Passport renewal", color: "#E2A33C" },
-  { unit: "WPK-T1-0421", buyer: "C. Liu", reason: "Utilities pending", detail: "Empower activation", color: "#8B7CF6" },
-];
+const BLOCKED: BlockedRow[] = [];
 
 type BlockedRow = { unit: string; buyer: string; reason: string; detail: string; color: string };
 type ReadinessRow = { unit_no: string; buyer: string; stage: string; payment_ok: boolean; snags_ok: boolean; docs_ok: boolean; blocked: boolean; reason: string; detail: string };
 
-const STAGE_DAYS = [
-  { label: "Payment cleared", days: 6 },
-  { label: "Snagging", days: 11 },
-  { label: "De-snagging", days: 18 },
-  { label: "Utilities", days: 9 },
-  { label: "Documents", days: 14 },
-  { label: "Deed", days: 21 },
-  { label: "Keys", days: 4 },
-];
+const STAGE_DAYS: { label: string; days: number }[] = [];
 
 const STAGE_SLUGS = ["payment_cleared", "snagging_scheduled", "snagging_done", "de_snagging", "utilities", "documents_ready", "title_deed_issued", "keys_handed", "oa_onboarded"];
 
-const FORECAST = [8, 12, 15, 11, 18, 14, 9, 6];
-const maxF = Math.max(...FORECAST);
+const FORECAST: number[] = [];
+const maxF = 1;
 
-export default function PipelineScreen() {
+export default function PipelineScreen({ scope }: { scope?: string }) {
   const router = useRouter();
   const [sel, setSel] = useState<number | null>(null);
   const [notice, setNotice] = useState("");
   const [open, setOpen] = useState(false);
-  const [unit, setUnit] = useState("WPK-T1-0211");
-  const [date, setDate] = useState("06 Sep 26");
-  const [cards, setCards] = useState<Record<number, PipeCard[]>>(() => {
-    const m: Record<number, PipeCard[]> = {};
-    PIPE.forEach((c, i) => { m[i] = c.cards; });
-    return m;
-  });
-  const [counts, setCounts] = useState<Record<number, number>>(() => {
-    const m: Record<number, number> = {};
-    PIPE.forEach((c, i) => { m[i] = c.count; });
-    return m;
-  });
+  const [unit, setUnit] = useState("");
+  const [date, setDate] = useState("");
+  const [cards, setCards] = useState<Record<number, PipeCard[]>>({});
+  const [counts, setCounts] = useState<Record<number, number>>({});
   const [blocked, setBlocked] = useState<BlockedRow[]>(BLOCKED);
-  const [overview, setOverview] = useState<{ total: number; ready: number; blocked: number }>({ total: 140, ready: 0, blocked: 4 });
+  const [overview, setOverview] = useState<{ total: number; ready: number; blocked: number }>({ total: 0, ready: 0, blocked: 0 });
   const [readyInfo, setReadyInfo] = useState<Record<string, ReadinessRow>>({});
   const [apiError, setApiError] = useState("");
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     let active = true;
+    setLoaded(false);
+    setCards({});
+    setCounts({});
+    setReadyInfo({});
+    setBlocked([]);
+    const proj = scope && scope !== "ALL" ? "?project=" + encodeURIComponent(scope) : "";
     fetchJSON<{
       pipeline: { unit_no: string; buyer: string; stage: string; meta: string }[];
       readiness: ReadinessRow[];
       overview: { total: number; ready: number; blocked: number };
-    }>("/api/handover")
+    }>("/api/handover" + proj)
       .then((j) => {
         if (!active) return;
         setLoaded(true);
@@ -114,12 +99,13 @@ export default function PipelineScreen() {
         if (active) { setLoaded(true); setApiError(e?.message || "Failed to load pipeline"); }
       });
     return () => { active = false; };
-  }, []);
+  }, [scope]);
 
   const goSnag = () => router.push({ pathname: "/handover", query: { s: "snagging" } }, undefined, { shallow: true });
 
   const schedule = () => {
-    const newCard: PipeCard = { no: unit, buyer: "Buyer", meta: "Handover " + date };
+    if (!unit.trim()) return;
+    const newCard: PipeCard = { no: unit.trim(), buyer: "\u2014", meta: date.trim() ? "Handover " + date.trim() : "" };
     setCards((c) => ({ ...c, 0: [newCard, ...(c[0] || [])] }));
     setCounts((c) => ({ ...c, 0: (c[0] || 0) + 1 }));
     setOpen(false);
@@ -139,14 +125,14 @@ export default function PipelineScreen() {
     <div>
       {apiError && (
         <div style={{ background: "#FDECEC", color: "#E5484D", borderRadius: 12, padding: "11px 16px", fontSize: 12, fontWeight: 700, marginBottom: 16 }}>
-          Live data unavailable ({apiError}) — showing sample columns
+          Live data unavailable ({apiError}) — columns stay empty until data loads
         </div>
       )}
       {notice && <div style={{ background: "#E9F8F1", color: "#1F9D6B", borderRadius: 12, padding: "11px 16px", fontSize: 12, fontWeight: 700, marginBottom: 16 }}>{notice}</div>}
-      <div style={{ display: "flex", alignItems: "flex-end", gap: 16, marginBottom: 18 }}>
-        <div style={{ flex: 1 }}>
+      <div style={{ display: "flex", flexWrap: "wrap", rowGap: 12, alignItems: "flex-end", gap: 16, marginBottom: 18 }}>
+        <div style={{ flex: 1, minWidth: 220 }}>
           <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: "-.03em", lineHeight: 1.15 }}>Handover pipeline</div>
-          <div style={{ fontSize: 13, color: "#6B7180", fontWeight: 500, marginTop: 5 }}>Wilton Park Residences \u00b7 140 units \u00b7 a unit cannot pass Payment cleared with any balance outstanding</div>
+          <div style={{ fontSize: 13, color: "#6B7180", fontWeight: 500, marginTop: 5 }}>Wilton Park Residences \u00b7 a unit cannot pass Payment cleared with any balance outstanding</div>
         </div>
         <button onClick={goSnag} style={{ height: 38, borderRadius: 12, border: "1px solid #EDEEF3", background: "#fff", padding: "0 14px", fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, color: "#4A5060", cursor: "pointer" }}>Open snag list</button>
         <button onClick={() => setOpen(true)} style={{ height: 38, borderRadius: 12, background: AC, color: "#fff", border: 0, padding: "0 16px", fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}>Schedule handover</button>
@@ -185,8 +171,9 @@ export default function PipelineScreen() {
             <span style={{ fontSize: 15, fontWeight: 700, letterSpacing: "-.015em" }}>Blocked units</span>
             <span style={{ fontSize: 11, fontWeight: 700, background: "#FDECEC", color: "#E5484D", borderRadius: 8, padding: "3px 9px" }}>{overview.blocked} blocked</span>
           </div>
-          <div style={{ fontSize: 11.5, color: "#9AA0AE", fontWeight: 500, marginBottom: 10 }}>Computed live from collections, invoices, snags &amp; title deeds · {overview.ready} of {overview.total} ready</div>
-          {blocked.length === 0 && <div style={{ fontSize: 12, color: "#1F9D6B", fontWeight: 700, padding: "10px 0" }}>All units ready — nothing blocking handover.</div>}
+          <div style={{ fontSize: 11.5, color: "#9AA0AE", fontWeight: 500, marginBottom: 10 }}>Computed live from collections, invoices, snags &amp; title deeds{overview.total ? " \u00b7 " + overview.ready + " of " + overview.total + " ready" : ""}</div>
+          {overview.total > 0 && blocked.length === 0 && <div style={{ fontSize: 12, color: "#1F9D6B", fontWeight: 700, padding: "10px 0" }}>All units ready — nothing blocking handover.</div>}
+          {!overview.total && <div style={{ fontSize: 12, color: "#9AA0AE", fontWeight: 600, padding: "10px 0" }}>No blocked units yet — computed live once the pipeline loads.</div>}
           {blocked.map((b) => (
             <div key={b.unit} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 0", borderBottom: "1px solid #F6F7FA" }}>
               <span style={{ width: 7, height: 7, borderRadius: 4, flex: "none", marginTop: 5, background: b.color }} />
@@ -201,31 +188,39 @@ export default function PipelineScreen() {
 
         <div style={{ background: "#fff", borderRadius: 20, padding: "22px 24px", boxShadow: "0 1px 3px rgba(20,22,31,.04)" }}>
           <div style={{ fontSize: 15, fontWeight: 700, letterSpacing: "-.015em" }}>Average days in stage</div>
-          <div style={{ fontSize: 11.5, color: "#9AA0AE", fontWeight: 500, marginTop: 3 }}>De-snagging and title deed are the bottlenecks</div>
+          <div style={{ fontSize: 11.5, color: "#9AA0AE", fontWeight: 500, marginTop: 3 }}>Computed live once units sit in each stage</div>
           <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 8 }}>
-            {STAGE_DAYS.map((s) => (
-              <div key={s.label} style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <span style={{ width: 110, fontSize: 11, fontWeight: 600, color: "#4A5060", flex: "none" }}>{s.label}</span>
-                <span style={{ flex: 1, height: 8, borderRadius: 4, background: "#F1F2F6", overflow: "hidden" }}>
-                  <span style={{ display: "block", height: "100%", borderRadius: 4, width: (s.days / 21 * 100) + "%", background: s.days > 15 ? "#E2A33C" : AC }} />
-                </span>
-                <span style={{ width: 30, fontSize: 11, fontWeight: 700, color: s.days > 15 ? "#B07B14" : "#4A5060", textAlign: "right" }}>{s.days}d</span>
-              </div>
-            ))}
+            {STAGE_DAYS.length ? (
+              STAGE_DAYS.map((s) => (
+                <div key={s.label} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <span style={{ width: 110, fontSize: 11, fontWeight: 600, color: "#4A5060", flex: "none" }}>{s.label}</span>
+                  <span style={{ flex: 1, height: 8, borderRadius: 4, background: "#F1F2F6", overflow: "hidden" }}>
+                    <span style={{ display: "block", height: "100%", borderRadius: 4, width: (s.days / 21 * 100) + "%", background: s.days > 15 ? "#E2A33C" : AC }} />
+                  </span>
+                  <span style={{ width: 30, fontSize: 11, fontWeight: 700, color: s.days > 15 ? "#B07B14" : "#4A5060", textAlign: "right" }}>{s.days}d</span>
+                </div>
+              ))
+            ) : (
+              <div style={{ fontSize: 12, fontWeight: 600, color: "#9AA0AE" }}>No stage data yet</div>
+            )}
           </div>
         </div>
 
         <div style={{ background: "#fff", borderRadius: 20, padding: "22px 24px", boxShadow: "0 1px 3px rgba(20,22,31,.04)" }}>
           <div style={{ fontSize: 15, fontWeight: 700, letterSpacing: "-.015em" }}>Handovers forecast</div>
-          <div style={{ fontSize: 11.5, color: "#9AA0AE", fontWeight: 500, marginTop: 3 }}>Next 8 weeks \u00b7 93 units scheduled</div>
+          <div style={{ fontSize: 11.5, color: "#9AA0AE", fontWeight: 500, marginTop: 3 }}>Next weeks \u00b7 computed live</div>
           <div style={{ display: "flex", alignItems: "flex-end", gap: 9, height: 150, marginTop: 18 }}>
-            {FORECAST.map((v, i) => (
-              <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", height: "100%" }}>
-                <span style={{ fontSize: 10, fontWeight: 700, color: "#4A5060", marginBottom: 4 }}>{v}</span>
-                <span style={{ width: "100%", borderRadius: "6px 6px 0 0", height: (v / maxF * 110) + "px", background: AC }} />
-                <span style={{ fontSize: 9, color: "#9AA0AE", fontWeight: 600, marginTop: 6 }}>W{i + 1}</span>
-              </div>
-            ))}
+            {FORECAST.length ? (
+              FORECAST.map((v, i) => (
+                <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", height: "100%" }}>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: "#4A5060", marginBottom: 4 }}>{v}</span>
+                  <span style={{ width: "100%", borderRadius: "6px 6px 0 0", height: (v / maxF * 110) + "px", background: AC }} />
+                  <span style={{ fontSize: 9, color: "#9AA0AE", fontWeight: 600, marginTop: 6 }}>W{i + 1}</span>
+                </div>
+              ))
+            ) : (
+              <div style={{ flex: 1, display: "grid", placeItems: "center", fontSize: 12, fontWeight: 600, color: "#9AA0AE" }}>No forecast yet</div>
+            )}
           </div>
         </div>
       </div>
@@ -238,19 +233,13 @@ export default function PipelineScreen() {
             <div style={{ display: "flex", flexDirection: "column", gap: 14, marginTop: 20 }}>
               <div>
                 <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".05em", color: "#9AA0AE", textTransform: "uppercase", marginBottom: 6 }}>Unit</div>
-                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                  {["WPK-T1-0211", "WPK-T1-0509", "WPK-T1-0708", "WPK-T1-0303", "WPK-T1-0610"].map((u) => (
-                    <span key={u} onClick={() => setUnit(u)} style={{ fontFamily: "monospace", fontSize: 11.5, fontWeight: 700, padding: "7px 12px", borderRadius: 10, cursor: "pointer", background: unit === u ? AC : "#F1F2F6", color: unit === u ? "#fff" : "#4A5060" }}>{u}</span>
-                  ))}
-                </div>
+                <input value={unit} onChange={(e) => setUnit(e.target.value)} placeholder="Unit no (e.g. WPK-T1-0211)"
+                  style={{ width: "100%", height: 40, borderRadius: 12, border: "1px solid #E4E6EE", background: "#fff", padding: "0 14px", fontSize: 12.5, fontWeight: 600, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
               </div>
               <div>
                 <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".05em", color: "#9AA0AE", textTransform: "uppercase", marginBottom: 6 }}>Handover date</div>
-                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                  {["06 Sep 26", "08 Sep 26", "10 Sep 26", "13 Sep 26", "15 Sep 26"].map((d) => (
-                    <span key={d} onClick={() => setDate(d)} style={{ fontSize: 11.5, fontWeight: 700, padding: "7px 12px", borderRadius: 10, cursor: "pointer", background: date === d ? AC : "#F1F2F6", color: date === d ? "#fff" : "#4A5060" }}>{d}</span>
-                  ))}
-                </div>
+                <input value={date} onChange={(e) => setDate(e.target.value)} placeholder="e.g. 06 Sep 26"
+                  style={{ width: "100%", height: 40, borderRadius: 12, border: "1px solid #E4E6EE", background: "#fff", padding: "0 14px", fontSize: 12.5, fontWeight: 600, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
               </div>
             </div>
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 22 }}>

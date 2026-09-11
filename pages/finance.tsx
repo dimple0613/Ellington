@@ -18,3 +18,5 @@ export default function Finance() {
     }} />
   );
 }
+
+export const getServerSideProps = async () => ({ props: {} });

@@ -1,11 +1,14 @@
 import { useEffect, useState } from "react";
+import { AC } from "../../lib/format";
 import { fetchJSON } from "../../lib/api";
 
 const TABS = [
   { key: "home", label: "Home", icon: "\u2302" },
   { key: "snap", label: "Projects", icon: "\u25A6" },
+  { key: "pulse", label: "Pulse", icon: "\u26A1" },
   { key: "money", label: "Money", icon: "\u00A3" },
-  { key: "appr", label: "Approvals", icon: "\u2713", badge: 2 },
+  { key: "buyers", label: "Buyers", icon: "\u263A" },
+  { key: "appr", label: "Approvals", icon: "\u2713" },
   { key: "more", label: "More", icon: "\u2261" },
 ];
 
@@ -41,9 +44,13 @@ type MobileAgg = {
     forecast30: number;
     milestones: { project: string; milestone: string; amount: number; due: string }[];
     ageing: { bucket: string; amount: number; pct: number }[];
-    buyer: { name: string; unit: string; amount: number; days: number } | null;
+    buyer: { name: string; unit: string; amount: number; days: number; revealed: boolean } | null;
   };
-  approvals: { count: number; valueM: string };
+  approvals: {
+    count: number;
+    valueM: string;
+    items: { id: number; ref: string; milestone: string; amount: number; cert: string | null; status: string }[];
+  };
 };
 
 const aedM = (v: number) =>
@@ -60,12 +67,15 @@ export default function MobileScreen() {
   const [activeTab, setActiveTab] = useState<Tab>("home");
   const [notice, setNotice] = useState("");
   const [moneyTab, setMoneyTab] = useState<MoneySub>("Ageing");
-  const [resolved, setResolved] = useState<Record<string, string>>({ discount: "", drawdown: "" });
+  const [resolvedIds, setResolvedIds] = useState<number[]>([]);
+  const [rejecting, setRejecting] = useState<number | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
   const [agg, setAgg] = useState<MobileAgg | null>(null);
+  const [revealBuyer, setRevealBuyer] = useState(false);
 
   useEffect(() => {
     let active = true;
-    fetchJSON<MobileAgg>("/api/mobile")
+    fetchJSON<MobileAgg>("/api/mobile" + (revealBuyer ? "?reveal=1" : ""))
       .then((j) => {
         if (active && j) setAgg(j);
       })
@@ -73,11 +83,18 @@ export default function MobileScreen() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [revealBuyer]);
+
+  const pendingItems = (agg ? agg.approvals.items || [] : []).filter((it) => !resolvedIds.includes(it.id));
+  const pendingCount = pendingItems.length;
+  const pendingValueM = pendingItems.reduce((a, it) => a + it.amount, 0) / 1e6;
 
   const ao = agg?.portfolio;
   const aM = agg?.money;
   const proj0 = agg?.projects?.[0];
+  const apprBadge = pendingCount || 0;
+  const todayLabel =
+    new Date().toLocaleDateString("en-US", { weekday: "long" }) + ", " + new Date().getDate() + " " + new Date().toLocaleDateString("en-US", { month: "long" });
 
   const projName = proj0 ? proj0.code + " " + proj0.name : "BLG Belgravia Heights III";
   const ringPct = proj0
@@ -105,21 +122,37 @@ export default function MobileScreen() {
     : [["Current", "#34C08A", "AED 8.2M", "64%"], ["1\u201330 days", "#F5A623", "AED 1.4M", "11%"], ["31\u201360 days", "#F5A623", "AED 0.8M", "6%"], ["61\u201390 days", "#E5484D", "AED 0.4M", "3%"], ["90+ days", "#E5484D", "AED 0.3M", "2%"]];
   const buyerInfo = aM && aM.buyer
     ? { name: aM.buyer.name, sub: "Unit " + aM.buyer.unit + " \u00b7 " + aedM(aM.buyer.amount) + " \u00b7 " + aM.buyer.days + " days overdue", days: aM.buyer.days }
-    : { name: "Rajesh Menon", sub: "Unit BLG-0402 \u00b7 AED 2.1M \u00b7 1 overdue cheque", days: 62 };
+    : { name: "—", sub: "No overdue buyer on record", days: 0 };
 
   const showNotice = (msg: string) => { setNotice(msg); setTimeout(() => setNotice(""), 3000); };
 
-  const resolveApproval = (key: string, outcome: string) => {
-    setResolved((p) => ({ ...p, [key]: outcome }));
-    showNotice((key === "discount" ? "Discount request " : "Drawdown request ") + outcome + (outcome === "approved" ? " \u00b7 requester notified" : " \u00b7 requester notified"));
-  };
-
-  const getPendingCount = () => [resolved.discount, resolved.drawdown].filter((v) => v === "").length;
-  const pendingValueM = () => {
-    let v = 0;
-    if (resolved.discount === "") v += 0.085;
-    if (resolved.drawdown === "") v += 1.2;
-    return v.toFixed(1);
+  const resolveItem = async (item: { id: number; ref: string }, outcome: "approved" | "rejected") => {
+    const reason = outcome === "rejected" ? rejectReason.trim() : "";
+    if (outcome === "rejected" && !reason) { setRejectReason(""); return; }
+    try {
+      const j = await fetchJSON<{ ref: string; resolved: string; count: number; valueM: string }>(
+        "/api/mobile",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: outcome, id: item.id, reason: reason || undefined }),
+        }
+      );
+      setResolvedIds((p) => [...p, item.id]);
+      setRejecting(null);
+      setRejectReason("");
+      setAgg((a) =>
+        a
+          ? {
+              ...a,
+              approvals: { ...a.approvals, count: j.count, valueM: j.valueM, items: a.approvals.items.filter((x) => x.id !== item.id) },
+            }
+          : a
+      );
+      showNotice((outcome === "approved" ? "Drawdown " : "Drawdown ") + (j.ref || "request") + " " + outcome + " \u00b7 audit logged");
+    } catch (e) {
+      showNotice((e as Error)?.message || "Approval failed \u00b7 try again");
+    }
   };
 
   const PhoneShell = ({ children }: { children: React.ReactNode }) => (
@@ -131,14 +164,13 @@ export default function MobileScreen() {
           <span style={{ position: "absolute", right: 20, fontSize: 10, fontWeight: 600, color: "#fff" }}>{"\u25C8"} {"\u25B6"} 100%</span>
         </div>
         <div style={{ flex: 1, overflow: "auto", padding: "12px 14px" }}>{children}</div>
-        <div style={{ borderTop: "1px solid #EDEEF3", display: "flex" }}>
-          {TABS.map((t) => (
-            <div key={t.key} onClick={() => setActiveTab(t.key)} style={{ flex: 1, textAlign: "center", padding: "6px 0", cursor: "pointer", position: "relative" }}>
+        <div style={{ borderTop: "1px solid #EDEEF3", display: "flex", overflowX: "auto" }}>{TABS.map((t) => { const nb = t.key === "appr" ? apprBadge : 0; return (
+            <div key={t.key} onClick={() => setActiveTab(t.key)} style={{ flex: "1 0 auto", minWidth: 46, textAlign: "center", padding: "6px 0", cursor: "pointer", position: "relative" }}>
               <span style={{ fontSize: 15, display: "block", color: activeTab === t.key ? "#4F46E5" : "#9AA0AE" }}>{t.icon}</span>
               <span style={{ fontSize: 8, fontWeight: 700, color: activeTab === t.key ? "#4F46E5" : "#9AA0AE", letterSpacing: ".03em" }}>{t.label}</span>
-              {t.badge && <span style={{ position: "absolute", top: 1, right: "50%", transform: "translateX(14px)", width: 14, height: 14, borderRadius: 7, background: "#E5484D", color: "#fff", fontSize: 8, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center" }}>{t.badge}</span>}
+              {nb > 0 && <span style={{ position: "absolute", top: 1, right: "50%", transform: "translateX(14px)", width: 14, height: 14, borderRadius: 7, background: "#E5484D", color: "#fff", fontSize: 8, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center" }}>{nb}</span>}
             </div>
-          ))}
+          ); })}
         </div>
       </div>
     </div>
@@ -164,33 +196,33 @@ export default function MobileScreen() {
         <div style={{ fontSize: 13, color: "#6B7180", fontWeight: 500, marginTop: 5 }}>iPhone 15 Pro \u00b7 393\u00d7852 \u00b7 read + approve only \u00b7 select a tab to preview each screen</div>
       </div>
 
-      <div style={{ display: "flex", gap: 20, alignItems: "flex-start" }}>
+      <div style={{ display: "flex", gap: 20, alignItems: "flex-start", flexWrap: "wrap" }}>
         <PhoneShell>
           {activeTab === "home" && (
             <div>
-              <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 2 }}>Good morning, Khalid</div>
-              <div style={{ fontSize: 10, color: "#9AA0AE", fontWeight: 600, marginBottom: 12 }}>Thursday, 3 September</div>
+              <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 2 }}>Good morning, {agg ? (agg.me.name || "Executive").split(" ")[0] : "Executive"}</div>
+              <div style={{ fontSize: 10, color: "#9AA0AE", fontWeight: 600, marginBottom: 12 }}>{todayLabel}</div>
               <Card>
                 <div style={{ fontSize: 9, fontWeight: 700, color: "#9AA0AE", letterSpacing: ".05em", textTransform: "uppercase" as const }}>Portfolio value</div>
-                <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: "-.03em", marginTop: 4 }}>{aedM(ao ? ao.value : 1320000000)}</div>
-                <div style={{ fontSize: 9.5, color: "#1F9D6B", fontWeight: 700, marginTop: 2 }}>{"\u25B2"} 2.4% vs last month</div>
+                <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: "-.03em", marginTop: 4 }}>{aedM(ao ? ao.value : 0)}</div>
+                <div style={{ fontSize: 9, color: "#9AA0AE", fontWeight: 600, marginTop: 2 }}>{ao ? Math.round(((ao.collected) / ao.target) * 100) + "% collected" : "Loading…"}</div>
               </Card>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 6 }}>
                 <Card>
                   <div style={{ fontSize: 9, fontWeight: 700, color: "#9AA0AE", letterSpacing: ".05em", textTransform: "uppercase" as const }}>Collected</div>
-                  <div style={{ fontSize: 15, fontWeight: 800, marginTop: 3 }}>{aedM(ao ? ao.collected : 84200000)}</div>
+                  <div style={{ fontSize: 15, fontWeight: 800, marginTop: 3 }}>{aedM(ao ? ao.collected : 0)}</div>
                   <div style={{ fontSize: 9, color: "#1F9D6B", fontWeight: 700 }}>{Math.round(((ao ? ao.collected : 0) / (ao ? ao.target : 1)) * 100)}% of target</div>
                 </Card>
                 <Card>
                   <div style={{ fontSize: 9, fontWeight: 700, color: "#9AA0AE", letterSpacing: ".05em", textTransform: "uppercase" as const }}>Overdue</div>
-                  <div style={{ fontSize: 15, fontWeight: 800, marginTop: 3, color: "#E5484D" }}>{aedM(ao ? ao.overdue : 3100000)}</div>
-                  <div style={{ fontSize: 9, color: "#E5484D", fontWeight: 700 }}>{agg ? agg.portfolio.cheques : 7} cheques</div>
+                  <div style={{ fontSize: 15, fontWeight: 800, marginTop: 3, color: "#E5484D" }}>{aedM(ao ? ao.overdue : 0)}</div>
+                  <div style={{ fontSize: 9, color: "#E5484D", fontWeight: 700 }}>{agg ? agg.portfolio.cheques : "—"} cheques</div>
                 </Card>
               </div>
               <Section title="30-day confidence">
                 <Card>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                    <span style={{ fontSize: 10, fontWeight: 700 }}>Expected {aedM(ao ? ao.confidence.amount : 12400000)}</span>
+                    <span style={{ fontSize: 10, fontWeight: 700 }}>Expected {aedM(ao ? ao.confidence.amount : 0)}</span>
                     <span style={{ fontSize: 9, color: "#1F9D6B", fontWeight: 700 }}>{agg ? agg.portfolio.confidence.pct : 87}% likely</span>
                   </div>
                   <div style={{ height: 6, borderRadius: 3, background: "#F1F2F7", overflow: "hidden" }}>
@@ -221,11 +253,11 @@ export default function MobileScreen() {
                   </div>
                 </div>
               </Card>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
-                <Card><div style={{ fontSize: 8, color: "#9AA0AE", fontWeight: 700, textTransform: "uppercase" as const }}>Collected</div><div style={{ fontSize: 13, fontWeight: 800, marginTop: 2 }}>{aedM(proj0 ? proj0.collected : 52100000)}</div></Card>
-                <Card><div style={{ fontSize: 8, color: "#9AA0AE", fontWeight: 700, textTransform: "uppercase" as const }}>Outstanding</div><div style={{ fontSize: 13, fontWeight: 800, marginTop: 2 }}>{aedM(proj0 ? Math.max(0, proj0.gdv - proj0.collected) : 31800000)}</div></Card>
-                <Card><div style={{ fontSize: 8, color: "#9AA0AE", fontWeight: 700, textTransform: "uppercase" as const }}>Overdue</div><div style={{ fontSize: 13, fontWeight: 800, marginTop: 2, color: "#E5484D" }}>{proj0 ? "AED 0" : "AED 1.2M"}</div></Card>
-                <Card><div style={{ fontSize: 8, color: "#9AA0AE", fontWeight: 700, textTransform: "uppercase" as const }}>Net margin</div><div style={{ fontSize: 13, fontWeight: 800, marginTop: 2 }}>28.4%</div></Card>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 6 }}>
+                <Card><div style={{ fontSize: 8, color: "#9AA0AE", fontWeight: 700, textTransform: "uppercase" as const }}>Collected</div><div style={{ fontSize: 13, fontWeight: 800, marginTop: 2 }}>{aedM(proj0 ? proj0.collected : 0)}</div></Card>
+                <Card><div style={{ fontSize: 8, color: "#9AA0AE", fontWeight: 700, textTransform: "uppercase" as const }}>Outstanding</div><div style={{ fontSize: 13, fontWeight: 800, marginTop: 2 }}>{proj0 ? aedM(Math.max(0, proj0.gdv - proj0.collected)) : "—"}</div></Card>
+                <Card><div style={{ fontSize: 8, color: "#9AA0AE", fontWeight: 700, textTransform: "uppercase" as const }}>Portfolio overdue</div><div style={{ fontSize: 13, fontWeight: 800, marginTop: 2, color: ao && ao.overdue > 0 ? "#E5484D" : undefined }}>{ao ? aedM(ao.overdue) : "—"}</div></Card>
+                <Card><div style={{ fontSize: 8, color: "#9AA0AE", fontWeight: 700, textTransform: "uppercase" as const }}>Collect rate</div><div style={{ fontSize: 13, fontWeight: 800, marginTop: 2 }}>{proj0 ? Math.round((proj0.collected / Math.max(1, proj0.gdv)) * 100) + "%" : "—"}</div></Card>
               </div>
               <Section title="Typology mix">
                 {mix.map(([t, sold, pct]) => (
@@ -237,6 +269,51 @@ export default function MobileScreen() {
                     <span style={{ fontSize: 8, fontWeight: 700, color: "#6B7180" }}>{sold as number} sold</span>
                   </div>
                 ))}
+              </Section>
+            </div>
+          )}
+
+          {activeTab === "pulse" && (
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 8 }}>Inventory Pulse</div>
+              <div style={{ fontSize: 9, color: "#9AA0AE", fontWeight: 600, marginBottom: 8 }}>Live availability across the portfolio · updates every 5 min</div>
+              {(() => { const projs = agg?.projects || []; const ta = projs.reduce((a, p) => a + p.counts.available, 0);
+                const tr = projs.reduce((a, p) => a + p.counts.reserved + p.counts.held, 0); const tb = projs.reduce((a, p) => a + p.counts.blocked, 0);
+                return (
+                <div style={{ display: "flex", gap: 6 }}>
+                  <Card><div style={{ fontSize: 8, color: "#9AA0AE", fontWeight: 700, textTransform: "uppercase" as const }}>Available</div><div style={{ fontSize: 16, fontWeight: 800, marginTop: 2, color: "#34C08A" }}>{agg ? ta : "—"}</div></Card>
+                  <Card><div style={{ fontSize: 8, color: "#9AA0AE", fontWeight: 700, textTransform: "uppercase" as const }}>Reserved</div><div style={{ fontSize: 16, fontWeight: 800, marginTop: 2, color: "#F5A623" }}>{agg ? tr : "—"}</div></Card>
+                  <Card><div style={{ fontSize: 8, color: "#9AA0AE", fontWeight: 700, textTransform: "uppercase" as const }}>Blocked</div><div style={{ fontSize: 16, fontWeight: 800, marginTop: 2, color: "#E5484D" }}>{agg ? tb : "—"}</div></Card>
+                </div>); })()}
+              {aM && aM.milestones.length > 0 ? (
+                <Section title="Next milestones">{aM.milestones.slice(0, 2).map((m) => (
+                  <Card key={m.project + m.milestone}><div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div><div style={{ fontSize: 10, fontWeight: 700 }}>{m.project + " · " + m.milestone}</div>
+                    <div style={{ fontSize: 9, color: "#6B7180", fontWeight: 600 }}>{shortDate(m.due)}</div></div>
+                    <div style={{ fontSize: 9, fontWeight: 700, color: AC }}>{aedM(m.amount)}</div>
+                  </div></Card>
+                ))}</Section>
+              ) : (
+                <Section title="Newly released"><Card><div style={{ fontSize: 10, color: "#9AA0AE", fontWeight: 600 }}>No recently released units</div></Card></Section>
+              )}
+            </div>
+          )}
+
+          {activeTab === "buyers" && (
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 8 }}>Buyer lookup</div>
+              <div style={{ position: "relative", marginBottom: 10 }}>
+                <span style={{ position: "absolute", left: 10, top: 8, fontSize: 12, color: "#9AA0AE" }}>{"\u2315"}</span>
+                <input placeholder="Search buyer, unit, passport…" style={{ width: "100%", boxSizing: "border-box", height: 34, borderRadius: 10, border: "1px solid #EDEEF3", background: "#fff", padding: "0 30px", fontSize: 10.5, fontWeight: 600, outline: "none", fontFamily: "inherit" }} />
+              </div>
+              <Section title="Most overdue">
+                {buyerInfo.name ? (
+                <Card><div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}><div><div style={{ fontSize: 10, fontWeight: 700 }}>{buyerInfo.name}</div><div style={{ fontSize: 9, color: "#6B7180", fontWeight: 600 }}>{buyerInfo.sub}</div></div><span style={{ fontSize: 9, color: "#E5484D", fontWeight: 700 }}>{"\u25CF"} {buyerInfo.days} d</span></div></Card>
+                ) : <Card><div style={{ fontSize: 10, color: "#9AA0AE", fontWeight: 600 }}>No overdue buyers</div></Card>}
+              </Section>
+              <Section title="Fast action">
+                <Card><div style={{ fontSize: 10, fontWeight: 700 }}>View buyer 360</div><div style={{ fontSize: 9, color: "#9AA0AE", fontWeight: 600 }}>Units, ledger, schedule, documents</div></Card>
+                <Card><div style={{ fontSize: 10, fontWeight: 700 }}>Statement of account (PDF)</div><div style={{ fontSize: 9, color: "#9AA0AE", fontWeight: 600 }}>Send a generated statement</div></Card>
               </Section>
             </div>
           )}
@@ -322,9 +399,13 @@ export default function MobileScreen() {
                     <Card>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                         <span style={{ fontSize: 10, fontWeight: 700 }}>{buyerInfo.name}</span>
-                        <span style={{ fontSize: 9, color: "#E5484D", fontWeight: 700 }}>{"\u25CF"} {buyerInfo.days} days</span>
+                        <button
+                          onClick={() => setRevealBuyer((v) => !v)}
+                          title={revealBuyer ? "Mask buyer name" : "Reveal buyer name (audited)"}
+                          style={{ height: 24, borderRadius: 6, border: "1px solid " + (revealBuyer ? AC : "#EDEEF3"), background: revealBuyer ? "#EEF0FF" : "#fff", padding: "0 8px", fontFamily: "inherit", fontSize: 9, fontWeight: 700, color: revealBuyer ? AC : "#6B7180", cursor: "pointer" }}>{revealBuyer ? "Mask" : "\u25C9 Reveal"}</button>
                       </div>
-                      <div style={{ fontSize: 9, color: "#9AA0AE", fontWeight: 600, marginTop: 2 }}>{buyerInfo.sub}</div>
+                      <div style={{ fontSize: 9, color: "#6B7180", fontWeight: 600, marginTop: 2 }}>{buyerInfo.sub}</div>
+                      <div style={{ fontSize: 8, color: "#9AA0AE", fontWeight: 600, marginTop: 3 }}>{revealBuyer ? "\u26A0 Reveal is logged to the audit trail." : "Name masked by default \u00b7 reveal is audited."}</div>
                     </Card>
                   </Section>
                 </div>
@@ -335,53 +416,59 @@ export default function MobileScreen() {
           {activeTab === "appr" && (
             <div>
               <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 8 }}>Approvals inbox</div>
-              {getPendingCount() > 0 ? (
+              {pendingCount > 0 ? (
                 <div style={{ background: "#FDECEC", borderRadius: 10, padding: "8px 10px", marginBottom: 10 }}>
-                  <span style={{ fontSize: 9, fontWeight: 700, color: "#E5484D" }}>{"\u26A0"} {getPendingCount()} pending approvals {"\u00b7"} AED {(agg ? Number(agg.approvals.valueM) + (resolved.discount === "" && resolved.drawdown === "" ? 0.085 : resolved.discount === "" ? 0.085 : 0) : Number(pendingValueM())).toFixed(1)}M</span>
+                  <span style={{ fontSize: 9, fontWeight: 700, color: "#E5484D" }}>{"\u26A0"} {pendingCount} pending approvals {"\u00b7"} AED {pendingValueM.toFixed(1)}M value impact</span>
                 </div>
               ) : (
                 <div style={{ background: "#E9F8F1", borderRadius: 10, padding: "8px 10px", marginBottom: 10 }}>
-                  <span style={{ fontSize: 9, fontWeight: 700, color: "#1F9D6B" }}>{"\u2713"} No pending approvals {"\u00b7"} inbox clear</span>
+                  <span style={{ fontSize: 9, fontWeight: 700, color: "#1F9D6B" }}>{"\u2713"} Nothing waiting on you.</span>
                 </div>
               )}
 
-              {!resolved.discount ? (
-                <Section title="Discount request">
-                  <Card>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start" }}>
-                      <div>
-                        <div style={{ fontSize: 11, fontWeight: 700 }}>BLG-0304</div>
-                        <div style={{ fontSize: 9, color: "#6B7180", fontWeight: 600, marginTop: 2 }}>Buyer: Priya Sharma {"\u00b7"} Agent: Sarah M.</div>
-                        <div style={{ fontSize: 9, color: "#6B7180", fontWeight: 600, marginTop: 1 }}>Discount: 5% {"\u00b7"} AED 85,000</div>
-                      </div>
-                      <span style={{ fontSize: 9, fontWeight: 800, background: "#FFF3E0", color: "#F5A623", borderRadius: 6, padding: "3px 8px" }}>Pending</span>
-                    </div>
-                    <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
-                      <button onClick={() => resolveApproval("discount", "approved")} style={{ flex: 1, height: 28, borderRadius: 8, background: "#34C08A", color: "#fff", border: 0, fontSize: 10, fontWeight: 700, cursor: "pointer" }}>Approve</button>
-                      <button onClick={() => resolveApproval("discount", "rejected")} style={{ flex: 1, height: 28, borderRadius: 8, background: "#fff", color: "#E5484D", border: "1px solid #E5484D", fontSize: 10, fontWeight: 700, cursor: "pointer" }}>Reject</button>
-                    </div>
-                  </Card>
-                </Section>
-              ) : <Section title="Discount request"><Card><div style={{ fontSize: 11, fontWeight: 700, color: resolved.discount === "rejected" ? "#E5484D" : "#1F9D6B" }}>{resolved.discount === "rejected" ? "Discount request rejected" : "Discount request approved"}</div><div style={{ fontSize: 9, color: "#9AA0AE", fontWeight: 600, marginTop: 2 }}>BLG-0304 {"\u00b7"} resolved</div></Card></Section>}
+              {pendingItems.length === 0 && resolvedIds.length === 0 && !agg && (
+                <Section title="Drawdown request"><Card><div style={{ fontSize: 10, color: "#9AA0AE", fontWeight: 600 }}>Loading approvals…</div></Card></Section>
+              )}
 
-              {!resolved.drawdown ? (
-                <Section title="Drawdown request">
+              {pendingItems.map((it) => (
+                <Section key={it.id} title="Drawdown request">
                   <Card>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start" }}>
                       <div>
-                        <div style={{ fontSize: 11, fontWeight: 700 }}>DDR-0003</div>
-                        <div style={{ fontSize: 9, color: "#6B7180", fontWeight: 600, marginTop: 2 }}>Milestone: Structure 40% {"\u00b7"} WPK</div>
-                        <div style={{ fontSize: 9, color: "#6B7180", fontWeight: 600, marginTop: 1 }}>AED 1,200,000</div>
+                        <div style={{ fontSize: 11, fontWeight: 700 }}>{it.milestone || "Drawdown"}</div>
+                        <div style={{ fontSize: 9, color: "#6B7180", fontWeight: 600, marginTop: 2 }}>{it.ref + " \u00b7 " + it.status}{it.cert ? " \u00b7 " + it.cert : ""}</div>
+                        <div style={{ fontSize: 9, color: "#6B7180", fontWeight: 600, marginTop: 1 }}>AED {aedM(it.amount)} escrow release</div>
                       </div>
                       <span style={{ fontSize: 9, fontWeight: 800, background: "#FFF3E0", color: "#F5A623", borderRadius: 6, padding: "3px 8px" }}>Pending</span>
                     </div>
-                    <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
-                      <button onClick={() => resolveApproval("drawdown", "approved")} style={{ flex: 1, height: 28, borderRadius: 8, background: "#34C08A", color: "#fff", border: 0, fontSize: 10, fontWeight: 700, cursor: "pointer" }}>Approve</button>
-                      <button onClick={() => resolveApproval("drawdown", "rejected")} style={{ flex: 1, height: 28, borderRadius: 8, background: "#fff", color: "#E5484D", border: "1px solid #E5484D", fontSize: 10, fontWeight: 700, cursor: "pointer" }}>Reject</button>
-                    </div>
+                    {rejecting === it.id ? (
+                      <div style={{ marginTop: 8 }}>
+                        <input
+                          value={rejectReason}
+                          onChange={(e) => setRejectReason(e.target.value)}
+                          placeholder="Reason is required to reject…"
+                          style={{ width: "100%", boxSizing: "border-box", height: 34, borderRadius: 8, border: "1px solid #EDEEF3", background: "#fff", padding: "0 10px", fontSize: 10.5, fontWeight: 600, outline: "none", fontFamily: "inherit" }}
+                        />
+                        <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
+                          <button onClick={() => resolveItem(it, "rejected")} disabled={!rejectReason.trim()} style={{ flex: 1, height: 28, borderRadius: 8, background: "#E5484D", color: "#fff", border: 0, fontSize: 10, fontWeight: 700, cursor: rejectReason.trim() ? "pointer" : "not-allowed", opacity: rejectReason.trim() ? 1 : 0.5 }}>Confirm reject</button>
+                          <button onClick={() => { setRejecting(null); setRejectReason(""); }} style={{ flex: 1, height: 28, borderRadius: 8, background: "#fff", color: "#6B7180", border: "1px solid #EDEEF3", fontSize: 10, fontWeight: 700, cursor: "pointer" }}>Cancel</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
+                        <button onClick={() => resolveItem(it, "approved")} style={{ flex: 1, height: 28, borderRadius: 8, background: "#34C08A", color: "#fff", border: 0, fontSize: 10, fontWeight: 700, cursor: "pointer" }}>Approve</button>
+                        <button onClick={() => { setRejecting(it.id); setRejectReason(""); }} style={{ flex: 1, height: 28, borderRadius: 8, background: "#fff", color: "#E5484D", border: "1px solid #E5484D", fontSize: 10, fontWeight: 700, cursor: "pointer" }}>Reject</button>
+                      </div>
+                    )}
                   </Card>
                 </Section>
-              ) : <Section title="Drawdown request"><Card><div style={{ fontSize: 11, fontWeight: 700, color: resolved.drawdown === "rejected" ? "#E5484D" : "#1F9D6B" }}>{resolved.drawdown === "rejected" ? "Drawdown rejected" : "Drawdown approved"}</div><div style={{ fontSize: 9, color: "#9AA0AE", fontWeight: 600, marginTop: 2 }}>DDR-0003 {"\u00b7"} resolved</div></Card></Section>}
+              ))}
+
+              {resolvedIds.length > 0 && (
+                <Section title="Resolved">
+                  <Card><div style={{ fontSize: 10, fontWeight: 700, color: "#1F9D6B" }}>{"\u2713"} {resolvedIds.length} approval{resolvedIds.length === 1 ? "" : "s"} sent to the audit log</div></Card>
+                </Section>
+              )}
             </div>
           )}
 
@@ -389,14 +476,14 @@ export default function MobileScreen() {
             <div>
               <Card>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <div style={{ width: 40, height: 40, borderRadius: 20, background: "#4F46E5", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 800, color: "#fff" }}>KA</div>
+                  <div style={{ width: 40, height: 40, borderRadius: 20, background: "#4F46E5", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 800, color: "#fff" }}>{agg ? (agg.me.name || "E").split(" ").map((w: string) => w[0] || "").join("").slice(0, 2) : "E"}</div>
                   <div>
                     <div style={{ fontSize: 12, fontWeight: 700 }}>{agg ? agg.me.name : "Khalid Al Fahim"}</div>
                     <div style={{ fontSize: 9, color: "#9AA0AE", fontWeight: 600 }}>{agg ? (agg.me.role || "CEO").replace(/_/g, " ") : "CEO"} {"\u00b7"} Ellington Properties</div>
                   </div>
                 </div>
               </Card>
-              { [["Notifications", "12 unread"], ["My approvals", "2 pending"], ["Documents", "Shared with me"], ["Help & support", "FAQ + contact"], ["Settings", "App preferences"]].map(([label, note]) => (
+              { [["Notifications", "Center & quiet hours"], ["My approvals", agg ? pendingCount + " pending" : "Loading\u2026"], ["Documents", "Shared with me"], ["Help & support", "FAQ + contact"], ["Settings", "App preferences"]].map(([label, note]) => (
                 <Card key={label}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <span style={{ fontSize: 11, fontWeight: 700 }}>{label}</span>
@@ -414,6 +501,8 @@ export default function MobileScreen() {
             <div style={{ fontSize: 12, color: "#6B7180", fontWeight: 500, lineHeight: 1.7 }}>
               {activeTab === "home" && "Portfolio home shows top-level KPIs (total value, collected, overdue) plus a 30-day confidence indicator. Data refreshes every 5 minutes."}
               {activeTab === "snap" && "Project snapshot gives a quick status overview: sold percentage ring, unit-by-status legend, financial tiles, and typology mix bars. Tap a unit to see its detail."}
+              {activeTab === "pulse" && "Inventory Pulse shows live availability, newly released units, and which types are selling fastest — the boss can see stock health in under 30 seconds."}
+              {activeTab === "buyers" && "Buyer lookup lets you search any buyer by name, unit or passport and jump straight to their 360 / statement. PII is gated in production."}
               {activeTab === "money" && "Money & ageing displays collections, forecast, and ageing tabs. Ageing buckets colour-code overdue periods. Buyer rows are PII-gated in production."}
               {activeTab === "appr" && "Approvals inbox surfaces discount requests and drawdown requests pending executive sign-off. Approve/reject actions send instant notifications to the requesting agent."}
               {activeTab === "more" && "More is the profile + settings menu. Notifications, shared documents, help, and app preferences live here."}
@@ -421,7 +510,7 @@ export default function MobileScreen() {
           </div>
           <div style={{ background: "#fff", borderRadius: 20, padding: "22px 24px", boxShadow: "0 1px 3px rgba(20,22,31,.04)", marginTop: 14 }}>
             <div style={{ fontSize: 15, fontWeight: 700, letterSpacing: "-.015em", marginBottom: 12 }}>All screens</div>
-            {TABS.map((t) => (
+            {TABS.map((t) => { const nb = t.key === "appr" ? apprBadge : 0; return (
               <div key={t.key} onClick={() => setActiveTab(t.key)} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", borderRadius: 10, cursor: "pointer", background: activeTab === t.key ? "#F0EFFE" : undefined, marginBottom: 2 }}>
                 <span style={{ fontSize: 16, width: 22, textAlign: "center", color: activeTab === t.key ? "#4F46E5" : "#9AA0AE" }}>{t.icon}</span>
                 <div>
@@ -429,14 +518,16 @@ export default function MobileScreen() {
                   <div style={{ fontSize: 10, color: "#9AA0AE", fontWeight: 500 }}>
                     {t.key === "home" && "Portfolio overview + KPIs"}
                     {t.key === "snap" && "Per-project unit snapshot"}
+                    {t.key === "pulse" && "Live inventory pulse"}
                     {t.key === "money" && "Collections + ageing view"}
+                    {t.key === "buyers" && "Buyer lookup + 360"}
                     {t.key === "appr" && "Discount + drawdown approvals"}
                     {t.key === "more" && "Profile + settings"}
                   </div>
                 </div>
-                {t.badge && <span style={{ marginLeft: "auto", width: 18, height: 18, borderRadius: 9, background: "#E5484D", color: "#fff", fontSize: 9, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center" }}>{t.badge}</span>}
+                {nb > 0 && <span style={{ marginLeft: "auto", width: 18, height: 18, borderRadius: 9, background: "#E5484D", color: "#fff", fontSize: 9, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center" }}>{nb}</span>}
               </div>
-            ))}
+            ); })}
           </div>
         </div>
       </div>

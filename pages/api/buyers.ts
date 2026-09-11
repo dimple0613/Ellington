@@ -20,7 +20,9 @@ export default withPerm("Sales", "REA", async function (req: NextApiRequest, res
                 COALESCE(u.c, 0)::numeric AS contracted,
                 COALESCE(rc.c, 0)::numeric AS collected,
                 COALESCE(od.c, 0)::numeric AS overdue,
-                nd.amount AS next_amount, nd.due_date AS next_date, nd.unit_no AS next_unit, nd.milestone AS next_milestone
+                nd.amount AS next_amount, nd.due_date AS next_date, nd.unit_no AS next_unit, nd.milestone AS next_milestone,
+                bk.agency AS agency, bk.agent AS agent,
+                COALESCE(d.n, 0)::int AS docs
          FROM buyers b
          LEFT JOIN (
            SELECT buyer_id, COUNT(*)::int AS n, SUM(price) AS c FROM units WHERE buyer_id IS NOT NULL GROUP BY buyer_id
@@ -40,6 +42,17 @@ export default withPerm("Sales", "REA", async function (req: NextApiRequest, res
            WHERE u.buyer_id = b.id AND m.status <> 'paid' AND m.due_date >= CURRENT_DATE
            ORDER BY m.due_date LIMIT 1
          ) nd ON true
+         LEFT JOIN LATERAL (
+           SELECT bk.agency, bk.agent
+           FROM bookings bk
+           WHERE (bk.buyer_id = b.id OR bk.buyer_name = b.name) AND bk.status = 'confirmed'
+           ORDER BY bk.confirmed_at DESC NULLS LAST, bk.id DESC LIMIT 1
+         ) bk ON true
+         LEFT JOIN LATERAL (
+           SELECT COUNT(*)::int AS n
+           FROM documents d
+           WHERE d.buyer = b.name
+         ) d ON true
          ORDER BY contracted DESC NULLS LAST, b.name`
       );
       return ok(res, {
@@ -56,6 +69,9 @@ export default withPerm("Sales", "REA", async function (req: NextApiRequest, res
             collected: num(x.collected),
             outstanding: Math.max(0, contracted - num(x.collected)),
             overdue: num(x.overdue),
+            agent: x.agent || null,
+            agency: x.agency || null,
+            docCount: x.docs || 0,
             next: x.next_amount != null
               ? { amount: num(x.next_amount), date: ymd(x.next_date), unit: x.next_unit, milestone: x.next_milestone }
               : null,
@@ -111,6 +127,21 @@ export default withPerm("Sales", "REA", async function (req: NextApiRequest, res
     ]);
 
     if (head.rows.length === 0) return fail(res, "Buyer not found", 404);
+    const buyerRow = head.rows[0];
+
+    const [docsRows, agentRows] = await Promise.all([
+      query<any>(
+        `SELECT doc_type, unit_no, ref, status, generated_at FROM documents WHERE buyer = $1 ORDER BY generated_at DESC, id DESC`,
+        [buyerRow.name]
+      ),
+      query<any>(
+        `SELECT bk.agency, bk.agent, bk.commission_pct
+         FROM bookings bk
+         WHERE (bk.buyer_id = $1 OR bk.buyer_name = $2) AND bk.status = 'confirmed'
+         ORDER BY bk.confirmed_at DESC NULLS LAST, bk.id DESC LIMIT 1`,
+        [bid, buyerRow.name]
+      ),
+    ]);
 
     const contracted = units.rows.reduce((a: number, x: any) => a + num(x.price), 0);
     const collected = units.rows.reduce((a: number, x: any) => a + num(x.paid), 0);
@@ -141,7 +172,7 @@ export default withPerm("Sales", "REA", async function (req: NextApiRequest, res
       [bid]
     );
 
-    const b = head.rows[0];
+    const b = buyerRow;
     return ok(res, {
       buyer: {
         id: b.id,
@@ -149,6 +180,15 @@ export default withPerm("Sales", "REA", async function (req: NextApiRequest, res
         email: b.email || null,
         phone: b.phone || null,
         kyc: b.kyc_status || "pending",
+        agent: agentRows.rows[0]?.agent || null,
+        agency: agentRows.rows[0]?.agency || null,
+        docs: docsRows.rows.map((d: any) => ({
+          doc_type: d.doc_type,
+          unit_no: d.unit_no || null,
+          ref: d.ref,
+          status: d.status || "generated",
+          generated_at: ymd(d.generated_at),
+        })),
         units: units.rows.map((x: any) => ({
           no: x.no,
           status: x.status,

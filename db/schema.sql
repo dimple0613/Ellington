@@ -105,6 +105,11 @@ ALTER TABLE receipts ADD COLUMN IF NOT EXISTS cheque_date DATE;
 ALTER TABLE receipts ADD COLUMN IF NOT EXISTS bank_name TEXT;
 ALTER TABLE receipts ADD COLUMN IF NOT EXISTS pdc_status TEXT;
 
+-- RC-01: an Oqood reference must be recorded on a unit before it can be marked sold (blocking rule).
+ALTER TABLE units ADD COLUMN IF NOT EXISTS oqood_no TEXT;
+ALTER TABLE units ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ;
+ALTER TABLE units ADD COLUMN IF NOT EXISTS held_until TIMESTAMPTZ;
+
 -- Finance (PLINTH parity T11): bank-statement import queue for escrow reconciliation.
 CREATE TABLE IF NOT EXISTS bank_statements (
   id SERIAL PRIMARY KEY,
@@ -212,10 +217,12 @@ CREATE TABLE IF NOT EXISTS document_templates (
   id SERIAL PRIMARY KEY,
   doc_type TEXT NOT NULL,
   version TEXT NOT NULL,
-  status TEXT DEFAULT 'archived',    -- live / archived
+  status TEXT DEFAULT 'archived',    -- live / draft / archived
+  blocks JSONB,
   changed_at TIMESTAMPTZ DEFAULT now(),
   UNIQUE (doc_type, version)
 );
+ALTER TABLE document_templates ADD COLUMN IF NOT EXISTS blocks JSONB;
 CREATE INDEX IF NOT EXISTS idx_doc_templates_live ON document_templates(doc_type) WHERE status = 'live';
 
 CREATE TABLE IF NOT EXISTS escrow_ledger (
@@ -286,13 +293,39 @@ CREATE TABLE IF NOT EXISTS audit_log (
 );
 CREATE INDEX IF NOT EXISTS idx_audit_ts ON audit_log(ts);
 
+-- DI-02: audit_log is an append-only ledger. Updates, deletes and truncates are
+-- rejected at the database layer so the trail cannot be rewritten after the fact.
+CREATE OR REPLACE FUNCTION fn_audit_log_append_only() RETURNS trigger AS $$
+BEGIN
+  RAISE EXCEPTION 'audit_log is append-only: rows cannot be updated, deleted or truncated';
+END;
+$$ LANGUAGE plpgsql;
+DROP TRIGGER IF EXISTS trg_audit_log_append_only ON audit_log;
+CREATE TRIGGER trg_audit_log_append_only
+  BEFORE UPDATE OR DELETE ON audit_log
+  FOR EACH ROW EXECUTE FUNCTION fn_audit_log_append_only();
+
 CREATE TABLE IF NOT EXISTS app_settings (
   id SMALLINT PRIMARY KEY,
   company JSONB NOT NULL DEFAULT '{}',
   brand JSONB NOT NULL DEFAULT '{}',
   numbering JSONB NOT NULL DEFAULT '{}',
-  notif JSONB NOT NULL DEFAULT '{}'
+  notif JSONB NOT NULL DEFAULT '{}',
+  fx JSONB NOT NULL DEFAULT '[]',
+  vat JSONB NOT NULL DEFAULT '{}',
+  banks JSONB NOT NULL DEFAULT '[]',
+  templates JSONB NOT NULL DEFAULT '[]',
+  retention JSONB NOT NULL DEFAULT '[]',
+  pii JSONB NOT NULL DEFAULT '[]',
+  integrations JSONB NOT NULL DEFAULT '[]'
 );
+ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS fx JSONB NOT NULL DEFAULT '[]';
+ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS vat JSONB NOT NULL DEFAULT '{}';
+ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS banks JSONB NOT NULL DEFAULT '[]';
+ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS templates JSONB NOT NULL DEFAULT '[]';
+ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS retention JSONB NOT NULL DEFAULT '[]';
+ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS pii JSONB NOT NULL DEFAULT '[]';
+ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS integrations JSONB NOT NULL DEFAULT '[]';
 
 -- Finance module (AUD-006): collections ageing ledger, escrow drawdowns, invoice ledger.
 CREATE TABLE IF NOT EXISTS collections (
@@ -350,6 +383,118 @@ CREATE TABLE IF NOT EXISTS construction_milestones (
 );
 CREATE INDEX IF NOT EXISTS idx_construction_project ON construction_milestones(project_id);
 
+-- =====================================================================
+-- Missing/To-Fix features (feat/audit-missing): Project wizard, Unit
+-- Builder, Pricing manager, Buyer/Broker portals. All idempotent.
+-- =====================================================================
+
+-- New project 6-step wizard: legal/escrow compliance + setup config.
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS dld_no TEXT;
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS rera_permit TEXT;
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS escrow_iban TEXT;
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS escrow_bank TEXT;
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS setup JSONB NOT NULL DEFAULT '{}';
+-- setup: { towers[], unit_types[], payment_plan[], team[], compliance{...} }
+
+-- Unit Builder + pricing: bulk price revisions with an approval gate.
+CREATE TABLE IF NOT EXISTS price_revisions (
+  id SERIAL PRIMARY KEY,
+  project_id INT REFERENCES projects(id),
+  change_type TEXT DEFAULT 'pct',         -- pct / flat
+  pct NUMERIC DEFAULT 0,
+  selection TEXT DEFAULT 'unsold',
+  effective_date DATE,
+  reason TEXT,
+  status TEXT DEFAULT 'draft',            -- draft / pending_approval / approved / applied / rejected
+  requested_by TEXT,
+  approved_by TEXT,
+  approved_at TIMESTAMPTZ,
+  applied_at TIMESTAMPTZ,
+  payload JSONB NOT NULL DEFAULT '[]',    -- [{unit_id, no, old_price, new_price}]
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_price_rev_project ON price_revisions(project_id);
+
+CREATE TABLE IF NOT EXISTS release_phases (
+  id SERIAL PRIMARY KEY,
+  project_id INT REFERENCES projects(id),
+  name TEXT NOT NULL,
+  unit_count INT DEFAULT 0,
+  release_date TIMESTAMPTZ,
+  uplift_pct NUMERIC DEFAULT 0,
+  status TEXT DEFAULT 'live'              -- scheduled / live / closed
+);
+CREATE INDEX IF NOT EXISTS idx_release_phases_project ON release_phases(project_id);
+
+CREATE TABLE IF NOT EXISTS price_rates (
+  id SERIAL PRIMARY KEY,
+  project_id INT REFERENCES projects(id),
+  typology TEXT NOT NULL,
+  band TEXT NOT NULL,
+  rate NUMERIC NOT NULL DEFAULT 0,
+  UNIQUE (project_id, typology, band)
+);
+
+-- Portals: buyer + broker login accounts (PBKDF2-hashed like admins).
+CREATE TABLE IF NOT EXISTS buyer_portal_accounts (
+  id SERIAL PRIMARY KEY,
+  buyer_id INT NOT NULL REFERENCES buyers(id) ON DELETE CASCADE,
+  email TEXT UNIQUE,
+  password_hash TEXT NOT NULL,
+  enabled BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS broker_portal_accounts (
+  id SERIAL PRIMARY KEY,
+  agency_id INT NOT NULL REFERENCES broker_agencies(id) ON DELETE CASCADE,
+  email TEXT UNIQUE,
+  password_hash TEXT NOT NULL,
+  enabled BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS broker_reservations (
+  id SERIAL PRIMARY KEY,
+  agency_id INT REFERENCES broker_agencies(id),
+  agency_name TEXT,
+  agent TEXT,
+  unit_id INT REFERENCES units(id),
+  unit_no TEXT,
+  project_code TEXT,
+  buyer_name TEXT,
+  buyer_mobile TEXT,
+  buyer_email TEXT,
+  commission_pct NUMERIC DEFAULT 2.0,
+  status TEXT DEFAULT 'pending',          -- pending / approved / declined / cancelled / expired
+  created_at TIMESTAMPTZ DEFAULT now(),
+  expires_at TIMESTAMPTZ                  -- 24h hold window for reserve-from-portal
+);
+CREATE INDEX IF NOT EXISTS idx_broker_res_agency ON broker_reservations(agency_id);
+
+-- Pricing manager: persisted discount rules + leakage history.
+ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS pricing JSONB NOT NULL DEFAULT '[]';
+
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM app_settings WHERE id = 1)
+     AND NOT EXISTS (SELECT 1 FROM app_settings WHERE id = 1 AND pricing IS NOT NULL AND pricing::text <> '[]') THEN
+    UPDATE app_settings
+    SET pricing = '{
+      "discount_rules": [
+        {"role":"Sales agent","max_pct":3},
+        {"role":"Sales manager","max_pct":5},
+        {"role":"Sales director","max_pct":8},
+        {"role":"Owner","max_pct":null}
+      ],
+      "leakage": [3.1,2.8,3.4,4.1,3.6,4.8,5.2,4.4,3.9,4.6,5.1,4.2]
+    }'::jsonb
+    WHERE id = 1;
+  END IF;
+END $$;
+
 -- Seed handover data on first install (idempotent).
 DO $$
 BEGIN
@@ -386,26 +531,14 @@ BEGIN
       ('WPK-T1-0801','Fatima Al Hashimi','OQD-3362','AED 88,400','Issued','22 Aug 26','Released','Pending'),
       ('WPK-T1-0210','Vikram Shetty','OQD-3370','AED 104,200','Blocked','—','Held','Pending');
   END IF;
-  IF NOT EXISTS (SELECT 1 FROM audit_log) THEN
-    INSERT INTO audit_log (ts, actor, role, action, object, field, before_val, after_val, sensitive) VALUES
-      (now() - interval '5 days 2 hours','Khalid Al Fahim','CEO','Approved','BLG III · Discount request','Discount %','—','5%',false),
-      (now() - interval '5 days 3 hours','Sarah Mitchell','Sales Dir','Created','BLG III · Lead','—','—','Rajesh Menon',false),
-      (now() - interval '6 days 4 hours','Ravi Kumar','Finance Mgr','Updated','H21 · Receipt RCP-H21-004789','Status','Unmatched','Matched',false),
-      (now() - interval '6 days 5 hours','Ravi Kumar','Finance Mgr','Created','DDR-0004','—','—','Structure 60%',false),
-      (now() - interval '6 days 6 hours','Khalid Al Fahim','CEO','Approved','WPK · Phase 2 release','—','—','12 units',false),
-      (now() - interval '7 days 3 hours','Sarah Mitchell','Sales Dir','Updated','BLG III · Price list','Price/psf','AED 2,140','AED 2,200',true),
-      (now() - interval '7 days 5 hours','Omar Saeed','Project Mgr','Created','BLG III · Snag SNG-0412','—','—','Paint crack',false),
-      (now() - interval '8 days 1 hour','Ravi Kumar','Finance Mgr','Exported','Finance · Statement','—','—','47 rows CSV',true),
-      (now() - interval '8 days 4 hours','Khalid Al Fahim','CEO','Updated','System · User','Status','Active','Suspended',true),
-      (now() - interval '9 days 2 hours','Sarah Mitchell','Sales Dir','Created','BLG III · Booking BK-9042','—','—','Unit 0402',false),
-      (now() - interval '10 days 3 hours','Ravi Kumar','Finance Mgr','Updated','Escrow · Reconciliation','Variance','AED 14,200','AED 0',false),
-      (now() - interval '11 days 2 hours','Omar Saeed','Project Mgr','Updated','WPK · Milestone','Status','Pending','Certified',false);
-  END IF;
+  -- RC-01: link any seeded unit back to the Oqood reference recorded in the deeds register.
+  UPDATE units u SET oqood_no = d.oqood
+    FROM deeds d WHERE d.unit_no = u.no AND u.oqood_no IS NULL;
   IF NOT EXISTS (SELECT 1 FROM app_settings) THEN
     INSERT INTO app_settings (id, company, brand, numbering, notif) VALUES (1,
       '{"Legal name":"Ellington Properties Development LLC","Trade licence":"CN-2847192","ORN":"21281","RERA":"1884","VAT TRN":"100234567800003"}'::jsonb,
       '{"Primary color":"#4F46F5","Currency":"AED","Date format":"DD MMM YYYY","Timezone":"Asia/Dubai (GMT+4)","Fiscal year":"Jan – Dec"}'::jsonb,
-      '[{"object":"Unit","prefix":"{project}-T{tower}-{seq}","pattern":"WPK-T1-0402 — auto-increment per tower","next":403},{"object":"Receipt","prefix":"RCP-{project}-{seq}","pattern":"RCP-H21-004712 — sequential","next":4713},{"object":"Cheque","prefix":"CHQ-{seq}","pattern":"CHQ-884102 — sequential across all projects","next":884103},{"object":"Drawdown","prefix":"DDR-{seq}","pattern":"DDR-0004 — sequential per project","next":5},{"object":"Escrow ref","prefix":"ESC-{year}-{seq}","pattern":"ESC-2026-9014 — yearly reset","next":9015},{"object":"Notice","prefix":"NTC-{type}-{unit}","pattern":"NTC-30D-WPK-T1-0210","next":1}]'::jsonb,
+      '[{"object":"Unit","prefix":"{project}-T{tower}-{seq}","pattern":"WPK-T1-0402 — auto-increment per tower"},{"object":"Receipt","prefix":"RCP-{seq}","pattern":"RCP-000060 — row ID, zero-padded to 6 digits"},{"object":"Cheque","prefix":"CHQ-{seq}","pattern":"CHQ-884102 — row ID, zero-padded to 6 digits"},{"object":"Drawdown","prefix":"DDR-{seq}","pattern":"DDR-0004 — sequential"},{"object":"Escrow ref","prefix":"ESC-{year}-{seq}","pattern":"ESC-2026-9014 — yearly reset"},{"object":"Notice","prefix":"NTC-{type}-{unit}","pattern":"NTC-30D-WPK-T1-0210"}]'::jsonb,
       '[{"event":"New booking created","inapp":true,"email":true,"slack":false},{"event":"Payment received","inapp":true,"email":true,"slack":true},{"event":"Milestone certified","inapp":true,"email":true,"slack":false},{"event":"Drawdown request","inapp":true,"email":true,"slack":true},{"event":"Snag raised","inapp":false,"email":true,"slack":false},{"event":"Title deed issued","inapp":true,"email":true,"slack":false},{"event":"Unit price changed","inapp":true,"email":true,"slack":false},{"event":"User invited","inapp":true,"email":false,"slack":false}]'::jsonb);
   END IF;
   IF NOT EXISTS (SELECT 1 FROM collections) THEN

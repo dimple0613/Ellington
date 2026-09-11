@@ -3,7 +3,6 @@ import { useRouter } from "next/router";
 import Shell, { GroupId } from "../Shell";
 import { GROUP_PAGE, GROUP_LABEL } from "../../lib/nav";
 import { SCR_TITLES } from "../../lib/screens";
-import { PROJECTS } from "../../lib/data";
 import { AC } from "../../lib/format";
 import { Stub } from "./Stub";
 
@@ -18,10 +17,20 @@ export default function GroupPage({
   const s = (typeof router.query.s === "string" ? router.query.s : null) || GROUP_PAGE[group].home;
   const scopeFromUrl = typeof router.query.scope === "string" ? router.query.scope : "ALL";
   const [scope, setScope] = useState(scopeFromUrl);
+  const [projs, setProjs] = useState<{ code: string; name: string }[]>([]);
 
   useEffect(() => {
     setScope(scopeFromUrl);
   }, [scopeFromUrl]);
+
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/projects")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => { if (alive && j && j.ok && Array.isArray(j.data.projects)) setProjs(j.data.projects); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, []);
 
   const setScopeAndPush = (code: string) => {
     const q: Record<string, string> = { ...(router.query as Record<string, string>), s };
@@ -30,8 +39,8 @@ export default function GroupPage({
     router.replace({ pathname: GROUP_PAGE[group].path, query: q }, undefined, { shallow: true });
   };
 
-  const proj = PROJECTS.find((p) => p.code === scope);
-  const projName = proj ? proj.name : "All projects";
+  const proj = projs.find((p) => p.code === scope);
+  const projName = proj ? proj.name : scope !== "ALL" ? scope : "All projects";
   const crumbLabels = group === "portfolio" ? ["Portfolio"] : group === "project" ? ["Portfolio", projName] : ["Portfolio", projName];
   const crumbs = crumbLabels.concat([SCR_TITLES[s] || "Module"]);
   const title = SCR_TITLES[s] || "Module";

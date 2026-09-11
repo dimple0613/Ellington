@@ -16,13 +16,26 @@ export default withPerm("Sales", "REA", async function (req: NextApiRequest, res
   }
 });
 
-async function listDocuments(_: NextApiRequest, res: NextApiResponse) {
+async function listDocuments(req: NextApiRequest, res: NextApiResponse) {
+  const project = (req.query.project as string) || "";
+  const conds: string[] = [];
+  const params: any[] = [];
+  if (project && project !== "all") {
+    params.push(project);
+    conds.push(`p.code = $${params.length}`);
+  }
+  const where = conds.length ? " WHERE " + conds.join(" AND ") : "";
   const docs = await query<any>(
-    `SELECT id, doc_type, unit_no, buyer, ref, status, generated_at
-     FROM documents ORDER BY generated_at DESC, id DESC LIMIT 20`
+    `SELECT d.id, d.doc_type, d.unit_no, d.buyer, d.ref, d.status, d.generated_at
+     FROM documents d
+     LEFT JOIN units u ON u.no = d.unit_no
+     LEFT JOIN projects p ON p.id = u.project_id
+     ${where}
+     ORDER BY d.generated_at DESC, d.id DESC LIMIT 20`,
+    params
   );
   const templates = await query<any>(
-    `SELECT doc_type, version, status, changed_at
+    `SELECT doc_type, version, status, blocks, changed_at
      FROM document_templates ORDER BY doc_type, version`
   );
   return ok(res, {
@@ -39,6 +52,7 @@ async function listDocuments(_: NextApiRequest, res: NextApiResponse) {
       doc_type: t.doc_type,
       version: t.version,
       status: t.status,
+      blocks: t.blocks,
       changed_at: t.changed_at,
     })),
   });
@@ -66,8 +80,12 @@ async function generateDocument(req: NextApiRequest, res: NextApiResponse) {
 async function activateTemplate(req: NextApiRequest, res: NextApiResponse) {
   const docType = (req.query.doc_type as string) || "";
   const action = (req.query.action as string) || "";
+  const status = (req.query.status as string) || "live";
   if (!docType || action !== "activate") {
     return fail(res, "doc_type and action=activate are required");
+  }
+  if (status !== "live" && status !== "draft") {
+    return fail(res, "status must be live or draft");
   }
 
   const current = await query<any>(
@@ -76,21 +94,26 @@ async function activateTemplate(req: NextApiRequest, res: NextApiResponse) {
   );
   const next = "v" + (parseInt((current.rows[0]?.version || "v3").replace(/^v/, ""), 10) + 1);
 
-  await query(`UPDATE document_templates SET status = 'archived' WHERE doc_type = $1 AND status = 'live'`, [docType]);
+  const blocks = (req.body && (req.body as any).blocks) || null;
+
+  if (status === "live") {
+    await query(`UPDATE document_templates SET status = 'archived' WHERE doc_type = $1 AND status = 'live'`, [docType]);
+  }
+
   await query(
-    `INSERT INTO document_templates (doc_type, version, status, changed_at)
-     VALUES ($1, $2, 'live', now())
-     ON CONFLICT (doc_type, version) DO UPDATE SET status = 'live', changed_at = now()`,
-    [docType, next]
+    `INSERT INTO document_templates (doc_type, version, status, blocks, changed_at)
+     VALUES ($1, $2, $3, $4, now())
+     ON CONFLICT (doc_type, version) DO UPDATE SET status = $3, blocks = $4, changed_at = now()`,
+    [docType, next, status, blocks ? JSON.stringify(blocks) : null]
   );
 
   const list = await query<any>(
-    `SELECT doc_type, version, status, changed_at
+    `SELECT doc_type, version, status, blocks, changed_at
      FROM document_templates WHERE doc_type = $1 ORDER BY version DESC`,
     [docType]
   );
   return ok(res, {
     version: next,
-    templates: list.rows.map((t) => ({ doc_type: t.doc_type, version: t.version, status: t.status, changed_at: t.changed_at })),
+    templates: list.rows.map((t) => ({ doc_type: t.doc_type, version: t.version, status: t.status, blocks: t.blocks, changed_at: t.changed_at })),
   });
 }

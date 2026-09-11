@@ -1,11 +1,12 @@
 import { useRouter } from "next/router";
 import { useCallback, useEffect, useRef, useState, ReactNode, CSSProperties } from "react";
-import { PROJECTS, UNITS, BUYERS, ST, Unit } from "../lib/data";
+import { ST, stKey } from "../lib/unit";
 import { money, AC } from "../lib/format";
 import { groupUrl, screenUrl, GROUP_PAGE } from "../lib/nav";
 import { useWindowSize } from "../lib/useWindowSize";
 import { useSession, SessionUser } from "../lib/useSession";
 import { roleHasPerm, type PermModule } from "../lib/permission-map";
+import ProjectWizard from "./app/ProjectWizard";
 
 export type GroupId =
   | "portfolio"
@@ -44,7 +45,8 @@ const NAV: Record<GroupId, { label: string; items: NavItem[] }> = {
   project: {
     label: "Project · BLG",
     items: [
-      { screen: "inventory", label: "Inventory", count: String(UNITS.filter((u) => u.status === "Available").length) },
+      { screen: "inventory", label: "Inventory" },
+      { screen: "unit-builder", label: "Unit Builder" },
       { screen: "pricing", label: "Pricing & availability" },
       { screen: "construction", label: "Construction" },
     ],
@@ -103,7 +105,7 @@ const railBtn = (on: boolean, color: string) =>
     width: 42,
     height: 42,
     border: 0,
-    background: "transparent",
+    background: on ? "#14161F" : "transparent",
     borderRadius: 13,
     cursor: "pointer",
     display: "grid",
@@ -125,14 +127,7 @@ type Props = {
   scopeCode?: string;
 };
 
-const NOTIFS = [
-  { id: "n1", who: "R. Menon", what: "requested a 7.5% discount on T2-0806", time: "2 min ago", unread: true },
-  { id: "n2", who: "Oqood", what: "3 registrations pending >14 days", time: "18 min ago", unread: true },
-  { id: "n3", who: "Escrow", what: "AED 340,000 variance unmatched", time: "41 min ago", unread: true },
-  { id: "n4", who: "Collections", what: "4 units overdue >90 days — AED 8.2M", time: "1 hr ago", unread: true },
-  { id: "n5", who: "Handover", what: "Wilton Park — 12 SPAs unsigned beyond 21 days", time: "2 hr ago", unread: false },
-  { id: "n6", who: "Compliance", what: "6 buyer passports expiring within 60 days", time: "Yesterday", unread: false },
-];
+type Notif = { id: string; who: string; what: string; time: string; unread: boolean };
 
 export default function Shell({
   group,
@@ -162,7 +157,7 @@ export default function Shell({
     return roleHasPerm(role, mod, "REA");
   };
   const visibleGroups = RAIL.filter((g) => canRead(g.id));
-  const gi = visibleGroups.findIndex((g) => g.id === group);
+  const [hoverIdx, setHoverIdx] = useState<number | null>(null);
   const authChecked = useRef(false);
   useEffect(() => {
     if (!ready || authChecked.current) return;
@@ -192,9 +187,43 @@ export default function Shell({
   const [newProj, setNewProj] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [rtl, setRtl] = useState(false);
-  const [notifs, setNotifs] = useState(NOTIFS);
+  const [notifs, setNotifs] = useState<Notif[]>([]);
+  const [ticker, setTicker] = useState("");
   const [live, setLive] = useState<{ receipts: any[]; docs: any[]; bookings: any[] }>({ receipts: [], docs: [], bookings: [] });
   const [focusIdx, setFocusIdx] = useState(0);
+  const [inv, setInv] = useState<{ units: any[]; projects: { code: string; name: string }[] }>({ units: [], projects: [] });
+  const [buyerNames, setBuyerNames] = useState<string[]>([]);
+  const [badgeCounts, setBadgeCounts] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    let alive = true;
+    Promise.all([
+      fetch("/api/inventory").then((r) => r.ok ? r.json() : null).then((j) => (j && j.ok ? j.data : null)).catch(() => null),
+      fetch("/api/buyers").then((r) => r.ok ? r.json() : null).then((j) => (j && j.ok ? j.data.buyers : [])).catch(() => []),
+      fetch("/api/leads").then((r) => r.ok ? r.json() : null).then((j) => (j && j.ok && Array.isArray(j.data.leads) ? j.data.leads : null)).catch(() => null),
+      fetch("/api/finance").then((r) => r.ok ? r.json() : null).then((j) => (j && j.ok ? j.data : null)).catch(() => null),
+    ]).then(([data, buyers, leads, fin]) => {
+      if (!alive) return;
+      if (data && Array.isArray(data.units)) setInv({ units: data.units, projects: data.projects || [] });
+      const names: string[] = [];
+      (buyers || []).forEach((b: any) => { if (b && b.name) names.push(String(b.name)); });
+      setBuyerNames(names);
+      const c: Record<string, string> = {};
+      if (leads) {
+        const n = leads.filter((l: any) => l && l.live !== false).length;
+        if (n > 0) c.leads = String(n);
+      }
+      if (fin) {
+        const escrowQueue = (fin.escrow && Array.isArray(fin.escrow.queue) ? fin.escrow.queue : []).length;
+        const escrowDdrs = (fin.escrow && Array.isArray(fin.escrow.drawdowns) ? fin.escrow.drawdowns : []).length;
+        if (escrowQueue + escrowDdrs > 0) c.escrow = String(escrowQueue + escrowDdrs);
+        const collectionsDue = (fin.collections || []).reduce((a: number, x: any) => a + (x && x.days_due > 0 ? 1 : 0), 0);
+        if (collectionsDue > 0) c.collections = String(collectionsDue);
+      }
+      setBadgeCounts(c);
+    });
+    return () => { alive = false; };
+  }, []);
 
   useEffect(() => {
     if (!cmdk) return;
@@ -207,12 +236,95 @@ export default function Shell({
     return () => { alive = false; };
   }, [cmdk]);
 
+  const loadNotifs = useCallback(() => {
+    const key = "ellington_notif_" + (user?.userId ?? "guest");
+    const loadState = (): { read: string[]; dismissed: string[] } => {
+      try {
+        const raw = window.localStorage.getItem(key);
+        if (!raw) return { read: [], dismissed: [] };
+        const p = JSON.parse(raw);
+        return {
+          read: Array.isArray(p.read) ? (p.read.filter((x: unknown) => typeof x === "string") as string[]) : [],
+          dismissed: Array.isArray(p.dismissed) ? (p.dismissed.filter((x: unknown) => typeof x === "string") as string[]) : [],
+        };
+      } catch {
+        return { read: [], dismissed: [] };
+      }
+    };
+    const saveState = (read: string[], dismissed: string[]) => {
+      try { window.localStorage.setItem(key, JSON.stringify({ read, dismissed })); } catch { /* private mode */ }
+    };
+    fetch("/api/finance")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => {
+        if (!j || !j.ok) return;
+        const d = j.data || {};
+        const collections: any[] = d.collections || [];
+        const escrow: any[] = (d.escrow && d.escrow.queue) || [];
+        const drawdowns: any[] = (d.escrow && d.escrow.drawdowns) || [];
+        const fmtM = (v: number) => (v >= 1e6 ? "AED " + (v / 1e6).toFixed(1).replace(/\.0$/, "") + "M" : money(Math.round(v)));
+        const due = collections.reduce((a: number, c: any) => a + (Number(c.amount) || 0), 0);
+        const over90 = collections.filter((c: any) => (Number(c.days_due) || 0) >= 90);
+        const variance = escrow.reduce((a: number, e: any) => a + (Number(e.amount) || 0), 0);
+        const awaiting = drawdowns.filter((x: any) => String(x.status || "") === "Awaiting trustee").length;
+        if (due > 0) setTicker(fmtM(due));
+        else setTicker("");
+        const ns: Notif[] = [];
+        const note = (id: string, who: string, what: string, unread: boolean) => { ns.push({ id, who, what, time: unread ? "now" : "today", unread }); };
+        if (over90.length) note("collections-overdue", "Collections", over90.length + " units overdue >90 days \u2014 " + fmtM(over90.reduce((a: number, c: any) => a + (Number(c.amount) || 0), 0)), true);
+        if (escrow.length) note("escrow-unmatched", "Escrow", escrow.length + " escrow entries unmatched \u2014 " + fmtM(variance), true);
+        if (awaiting) note("drawdowns-awaiting", "Drawdowns", awaiting + " drawdowns awaiting trustee approval", false);
+        if (collections.length) note("collections-worklist", "Collections", collections.length + " items on the collections worklist", false);
+        const st = loadState();
+        const present = new Set(ns.map((n) => n.id));
+        const read = st.read.filter((id) => present.has(id));
+        const dismissed = st.dismissed.filter((id) => present.has(id));
+        const view = ns.filter((n) => !dismissed.includes(n.id)).map((n) => ({ ...n, unread: n.unread && !read.includes(n.id) }));
+        saveState(read, dismissed);
+        setNotifs(view);
+      })
+      .catch(() => {});
+  }, [user?.userId]);
+
+  useEffect(() => {
+    loadNotifs();
+    const onFocus = () => loadNotifs();
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [loadNotifs]);
+
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const showToast = useCallback((m: string) => {
     setToast(m);
     if (toastTimer.current) clearTimeout(toastTimer.current);
     toastTimer.current = setTimeout(() => setToast(null), 2600);
   }, []);
+
+  const markAllRead = () => {
+    const key = "ellington_notif_" + (user?.userId ?? "guest");
+    let prev: { read: string[]; dismissed: string[] } = { read: [], dismissed: [] };
+    try {
+      const raw = window.localStorage.getItem(key);
+      if (raw) { const p = JSON.parse(raw); prev = { read: Array.isArray(p.read) ? p.read : [], dismissed: Array.isArray(p.dismissed) ? p.dismissed : [] }; }
+    } catch { /* ignore */ }
+    const read = [...new Set([...prev.read, ...notifs.map((n) => n.id)])];
+    try { window.localStorage.setItem(key, JSON.stringify({ read, dismissed: prev.dismissed })); } catch { /* ignore */ }
+    setNotifs((ns) => ns.map((n) => ({ ...n, unread: false })));
+  };
+
+  const dismissNotif = (id: string) => {
+    const key = "ellington_notif_" + (user?.userId ?? "guest");
+    let prev: { read: string[]; dismissed: string[] } = { read: [], dismissed: [] };
+    try {
+      const raw = window.localStorage.getItem(key);
+      if (raw) { const p = JSON.parse(raw); prev = { read: Array.isArray(p.read) ? p.read : [], dismissed: Array.isArray(p.dismissed) ? p.dismissed : [] }; }
+    } catch { /* ignore */ }
+    const remaining = notifs.filter((n) => n.id !== id);
+    const presentIds = new Set(remaining.map((n) => n.id));
+    const dismissed = [...new Set([...prev.dismissed, id])];
+    try { window.localStorage.setItem(key, JSON.stringify({ read: prev.read.filter((i) => presentIds.has(i)), dismissed })); } catch { /* ignore */ }
+    setNotifs((ns) => ns.filter((n) => n.id !== id));
+  };
 
   const unread = notifs.filter((n) => n.unread).length;
 
@@ -271,25 +383,25 @@ export default function Shell({
     router.push("/profile");
   };
 
-  const countMap: Record<string, { n: number; v: number }> = {};
-  UNITS.forEach((u) => {
-    countMap[u.status] = countMap[u.status] || { n: 0, v: 0 };
-    countMap[u.status].n++;
-    countMap[u.status].v += u.price;
-  });
-  const total = UNITS.length;
+  const openPrefs = () => {
+    setProfileMenu(false);
+    router.push("/system?s=settings&tab=notif");
+  };
+
+  const liveAvailable = inv.units.filter((u: any) => String(u.status || "").toLowerCase() === "available").length;
 
   const scopeLocked = (scopeCode || "ALL") === "ALL";
   const groupLocked = (group === "project" || group === "sales") && scopeLocked;
 
-  const navItems = NAV[group].items.map((it) => {
+  const navItems = NAV[group].items.map((it, i) => {
     const on = active === it.screen;
     const red = it.label === "Collections" || it.label === "Escrow";
     const locked = groupLocked && it.screen !== "buyer";
+    const hover = !locked && !on && hoverIdx === i;
     return {
       screen: it.screen,
       label: it.label,
-      count: it.count || "",
+      count: it.screen === "inventory" && liveAvailable > 0 ? String(liveAvailable) : (badgeCounts[it.screen] || ""),
       locked,
       btn: {
         display: "flex",
@@ -303,7 +415,7 @@ export default function Shell({
         fontSize: "12.5px",
         fontWeight: on ? "700" : "500",
         color: locked ? "#B8BDC9" : on ? "#14161F" : "#6B7180",
-        background: on && !locked ? "#F0EFFE" : "transparent",
+        background: on && !locked ? "#F0EFFE" : hover ? "#F5F6FA" : "transparent",
         width: "100%",
         opacity: locked ? 0.7 : 1,
       } as CSSProperties,
@@ -330,20 +442,29 @@ export default function Shell({
     };
   });
 
+  const invStats = (code: string) => {
+    const us = inv.units.filter((u: any) => String(u.project_code || "") === code);
+    const sold = us.filter((u: any) => u.status === "sold" || u.status === "booked").length;
+    return { total: us.length, sold };
+  };
   const scopes = [
-    { code: "ALL", name: "All projects (Portfolio)", pct: 68, units: 850 },
-    ...PROJECTS.map((p) => ({ code: p.code, name: p.name, pct: Math.round((p.sold / p.units) * 100), units: p.units })),
+    { code: "ALL", name: "All projects (Portfolio)", pct: inv.units.length ? Math.round((inv.units.filter((u: any) => u.status === "sold" || u.status === "booked").length / inv.units.length) * 100) : 0, units: inv.units.length },
+    ...inv.projects.map((p) => {
+      const st2 = invStats(p.code);
+      return { code: p.code, name: p.name, pct: st2.total ? Math.round((st2.sold / st2.total) * 100) : 0, units: st2.total };
+    }),
   ];
   const [swq, setSwq] = useState("");
   const scopeHits = scopes.filter((s) => !swq || (s.code + " " + s.name).toLowerCase().includes(swq.toLowerCase()));
-  const proj = PROJECTS.find((p) => p.code === scopeCode);
+  const proj = inv.projects.find((p) => p.code === scopeCode);
+  const scopeStats = scopeCode && scopeCode !== "ALL" ? invStats(scopeCode) : { total: inv.units.length, sold: inv.units.filter((u: any) => u.status === "sold" || u.status === "booked").length };
   const groupLabel = group === "project" ? "Project · " + (proj ? proj.code : scopeCode || "ALL") : NAV[group].label;
 
-  const hitUnits = UNITS.filter(
-    (u) => !q || u.id.toLowerCase().includes(q.toLowerCase()) || u.typ.toLowerCase().includes(q.toLowerCase())
-  ).slice(0, 4);
-  const hitBuyers = BUYERS.filter((b) => !q || b.toLowerCase().includes(q.toLowerCase())).slice(0, 3);
-  const hitProjects = PROJECTS.filter((p) => !q || (p.code + " " + p.name + " " + p.loc).toLowerCase().includes(q.toLowerCase())).slice(0, 4);
+  const hitUnits = inv.units
+    .filter((u: any) => !q || String(u.id || "").toLowerCase().includes(q.toLowerCase()) || String(u.type || "").toLowerCase().includes(q.toLowerCase()))
+    .slice(0, 4);
+  const hitBuyers = buyerNames.filter((b) => !q || b.toLowerCase().includes(q.toLowerCase())).slice(0, 3);
+  const hitProjects = inv.projects.filter((p) => !q || (p.code + " " + p.name).toLowerCase().includes(q.toLowerCase())).slice(0, 4);
   const hitReceipts = (live.receipts || []).filter((r: any) => !q || (String(r.reference || "") + " " + (r.buyer || "") + " " + (r.unit || "")).toLowerCase().includes(q.toLowerCase())).slice(0, 4);
   const hitDocs = (live.docs || []).filter((d: any) => !q || (String(d.ref || "") + " " + (d.type || "") + " " + (d.buyer || "")).toLowerCase().includes(q.toLowerCase())).slice(0, 4);
   const hitBookings = (live.bookings || []).filter((b: any) => !q || (String(b.ref || "") + " " + String(b.unit_no || "") + " " + (b.buyer || "")).toLowerCase().includes(q.toLowerCase())).slice(0, 4);
@@ -359,9 +480,12 @@ export default function Shell({
 
   type PalItem = { group: string; key: string; title: string; sub: string; trail: string; icon: string; bg: string; fg: string; onClick: () => void };
   const palette: PalItem[] = [
-    ...hitUnits.map((u) => ({ group: "Units", key: u.id, title: u.id, sub: u.typ + " · L" + u.f + " · " + u.area + " sq.ft", trail: money(u.price), icon: "⌗", bg: ST[u.status][1], fg: ST[u.status][0], onClick: () => { closeCmdk(); navigate("unit", "project", { unit: u.id }); } })),
-    ...hitBuyers.map((b, i) => ({ group: "Buyers", key: b, title: b, sub: "H21-B-00" + (147 + i) + " · 2 units", trail: "AED " + (1.9 - i * 0.4).toFixed(1) + "M out", icon: b[0], bg: "#E7E9F0", fg: "#4A5060", onClick: () => { closeCmdk(); navigate("buyer", "sales", { name: b }); } })),
-    ...hitProjects.map((p) => ({ group: "Projects", key: p.code, title: p.name, sub: p.code + " · " + p.loc, trail: Math.round((p.sold / p.units) * 100) + "% sold", icon: p.code[0], bg: "#EDECFE", fg: AC, onClick: () => { closeCmdk(); onScope && onScope(p.code); } })),
+    ...hitUnits.map((u: any) => ({ group: "Units", key: String(u.id), title: String(u.id), sub: (u.type || "2BR") + " · " + (Number(u.area) || 0) + " sq.ft", trail: money(Number(u.price) || 0), icon: "⌗", bg: ST[stKey(u.status)][1], fg: ST[stKey(u.status)][0], onClick: () => { closeCmdk(); navigate("unit", "project", { unit: String(u.id) }); } })),
+    ...hitBuyers.map((b, i) => ({ group: "Buyers", key: b, title: b, sub: "Click to open buyer profile", trail: "", icon: b[0], bg: "#E7E9F0", fg: "#4A5060", onClick: () => { closeCmdk(); navigate("buyer", "sales", { name: b }); } })),
+    ...hitProjects.map((p) => {
+      const st2 = invStats(p.code);
+      return { group: "Projects", key: p.code, title: p.name, sub: p.code + " · " + st2.total + " units", trail: st2.total ? Math.round((st2.sold / st2.total) * 100) + "% sold" : "—", icon: p.code[0], bg: "#EDECFE", fg: AC, onClick: () => { closeCmdk(); onScope && onScope(p.code); } };
+    }),
     ...hitReceipts.map((r: any) => ({ group: "Receipts", key: "R" + r.id + (r.reference || ""), title: r.reference || "RCP-…", sub: (r.buyer || "—") + " · " + (r.unit || r.project || "") + " · " + r.date, trail: money(r.amount), icon: "₪", bg: "#E9F8F1", fg: "#1F9D6B", onClick: () => { closeCmdk(); navigate("payments", "finance"); } })),
     ...hitDocs.map((d: any) => ({ group: "Documents", key: d.ref + d.type, title: d.ref, sub: (d.type || "") + " · " + (d.buyer || ""), trail: d.status || "", icon: "◳", bg: "#FDF4E5", fg: "#B07B14", onClick: () => { closeCmdk(); navigate("documents", "sales"); } })),
     ...hitBookings.map((b: any) => ({ group: "Bookings", key: b.ref + b.unit_no, title: b.ref || "BKG-…", sub: (b.unit_no || "") + " · " + (b.buyer || ""), trail: money(b.net_price || 0), icon: "▤", bg: "#F1EEFE", fg: AC, onClick: () => { closeCmdk(); navigate("booking", "sales"); } })),
@@ -384,7 +508,7 @@ export default function Shell({
   const renderSidebar = () => (
     <>
       <div style={{ fontSize: 15, fontWeight: 800, letterSpacing: "-.02em", padding: "0 8px" }}>Ellington</div>
-      <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: ".06em", color: "#9AA0AE", textTransform: "uppercase", padding: "3px 8px 0" }}>ORN 21281 · H21</div>
+      <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: ".06em", color: "#9AA0AE", textTransform: "uppercase", padding: "3px 8px 0" }}>ORN 21281 \u00b7 {scopeCode || "ALL"}</div>
       <button
         onClick={() => {
           closeMenus();
@@ -395,7 +519,7 @@ export default function Shell({
         <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10, fontWeight: 700, padding: "4px 6px", borderRadius: 8, background: "#EDECFE", color: AC }}>{scopeCode || (onScope ? "ALL" : "")}</span>
         <span style={{ flex: 1, minWidth: 0 }}>
           <span style={{ display: "block", fontSize: 12.5, fontWeight: 700, letterSpacing: "-.01em", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{proj ? proj.name : "All projects"}</span>
-          <span style={{ display: "block", fontSize: 10.5, color: "#6B7180", fontWeight: 500, marginTop: 2 }}>{proj ? proj.units + " units · " + Math.round((proj.sold / proj.units) * 100) + "% sold" : "850 units · 68% sold"}</span>
+          <span style={{ display: "block", fontSize: 10.5, color: "#6B7180", fontWeight: 500, marginTop: 2 }}>{scopeStats.total > 0 ? scopeStats.total + " units · " + Math.round((scopeStats.sold / scopeStats.total) * 100) + "% sold" : "no units on record"}</span>
         </span>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9AA0AE" strokeWidth="2" strokeLinecap="round"><path d="m6 9 6 6 6-6" /></svg>
       </button>
@@ -423,8 +547,8 @@ export default function Shell({
       )}
       <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 2 }}>
         <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: ".09em", color: "#9AA0AE", textTransform: "uppercase", padding: "6px 10px 8px" }}>{groupLabel}</div>
-        {navItems.map((n) => (
-          <button key={n.screen} title={n.locked ? "Select a project to access" : undefined} disabled={n.locked} onClick={() => { if (n.locked) { showToast("Select a project to access the " + n.label + " screen"); return; } navigate(n.screen, group); }} style={n.btn} onMouseEnter={(e) => { if (!n.locked) e.currentTarget.style.background = "#F5F6FA"; }} onMouseLeave={(e) => { if (!n.locked) e.currentTarget.style.background = n.btn.background as string; }}>
+        {navItems.map((n, i) => (
+          <button key={n.screen} title={n.locked ? "Select a project to access" : undefined} disabled={n.locked} onClick={() => { if (n.locked) { showToast("Select a project to access the " + n.label + " screen"); return; } navigate(n.screen, group); }} style={n.btn} onMouseEnter={() => { if (!n.locked) setHoverIdx(i); }} onMouseLeave={() => { if (!n.locked) setHoverIdx(null); }}>
             <span style={n.dot} />
             <span style={{ flex: 1, textAlign: "left" }}>{n.label}</span>
             <span style={n.badge}>{n.count}</span>
@@ -458,7 +582,6 @@ export default function Shell({
       <Rail
         groups={visibleGroups}
         group={group}
-        gi={gi}
         locked={scopeLocked}
         onGo={(id) => {
           if ((id === "project" || id === "sales") && scopeLocked) {
@@ -492,6 +615,7 @@ export default function Shell({
           onHelp={() => { closeMenus(); setHelp((h) => !h); }}
           onMenu={dlg || win.bp === "tablet" ? () => setDrawer(true) : undefined}
           group={group}
+          ticker={ticker}
           user={user}
         /> 
 
@@ -529,14 +653,15 @@ export default function Shell({
         notifOpen={notif}
         unread={unread}
         notifs={notifs}
-        onMarkAll={() => setNotifs((ns) => ns.map((n) => ({ ...n, unread: false })))}
-        onDismiss={(id) => setNotifs((ns) => ns.filter((n) => n.id !== id))}
+        onMarkAll={markAllRead}
+        onDismiss={dismissNotif}
         onClose={() => setNotif(false)}
         helpOpen={help}
         onCloseHelp={() => setHelp(false)}
         profileOpen={profileMenu}
         onCloseProfile={() => setProfileMenu(false)}
         onProfile={openProfile}
+        onPrefs={openPrefs}
         rtl={rtl}
         onToggleRtl={() => setRtl((r) => !r)}
         onSignOut={signOut}
@@ -593,12 +718,13 @@ export default function Shell({
         </div>
       )}
 
-      {newProj && (
-        <NewProjectModal
+{newProj && (
+        <ProjectWizard
+          open={newProj}
           onClose={() => setNewProj(false)}
-          onCreate={(name, code) => {
+          onCreated={(p) => {
             setNewProj(false);
-            showToast("Project " + code + " · " + name + " created");
+            showToast("Project " + p.code + " \u00b7 " + p.name + " created");
           }}
         />
       )}
@@ -625,42 +751,11 @@ function MenuRow({ icon, label, sub, onClick }: { icon: string; label: string; s
   );
 }
 
-function NewProjectModal({ onClose, onCreate }: { onClose: () => void; onCreate: (name: string, code: string) => void }) {
-  const [name, setName] = useState("");
-  const [code, setCode] = useState("");
-  return (
-    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(20,22,31,.4)", zIndex: 60, display: "grid", placeItems: "center" }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ width: 440, maxWidth: "calc(100vw - 40px)", background: "#fff", borderRadius: 18, boxShadow: "0 24px 64px rgba(20,22,31,.22)", padding: 24 }}>
-        <div style={{ fontSize: 17, fontWeight: 800, letterSpacing: "-.02em" }}>New project</div>
-        <div style={{ fontSize: 12.5, color: "#6B7180", fontWeight: 500, marginTop: 4 }}>Set up a new development project.</div>
-        <label style={{ display: "block", marginTop: 18 }}>
-          <span style={{ display: "block", fontSize: 11, fontWeight: 700, color: "#6B7180", marginBottom: 6 }}>Project name</span>
-          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Cordoba Residences" style={{ width: "100%", height: 40, border: "1px solid #EDEEF3", borderRadius: 12, padding: "0 12px", fontFamily: "inherit", fontSize: 13, outline: "none", background: "#F8F9FB" }} />
-        </label>
-        <label style={{ display: "block", marginTop: 12 }}>
-          <span style={{ display: "block", fontSize: 11, fontWeight: 700, color: "#6B7180", marginBottom: 6 }}>Project code (3 letters)</span>
-          <input value={code} onChange={(e) => setCode(e.target.value.toUpperCase().slice(0, 3))} placeholder="CRD" style={{ width: "100%", height: 40, border: "1px solid #EDEEF3", borderRadius: 12, padding: "0 12px", fontFamily: "'JetBrains Mono',monospace", fontSize: 13, outline: "none", background: "#F8F9FB" }} />
-        </label>
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 24 }}>
-          <button onClick={onClose} style={{ height: 38, border: "1px solid #EDEEF3", background: "#fff", borderRadius: 12, padding: "0 16px", fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}>Cancel</button>
-          <button
-            onClick={() => onCreate(name || "Untitled project", code || "NEW")}
-            style={{ height: 38, border: 0, background: "#14161F", color: "#fff", borderRadius: 12, padding: "0 16px", fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}
-          >
-            Create project
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function Rail({ groups, group, gi, locked, onGo, onSignOut }: { groups: RailDef[]; group: GroupId; gi: number; locked: boolean; onGo: (id: GroupId) => void; onSignOut: () => void }) {
+function Rail({ groups, group, locked, onGo, onSignOut }: { groups: RailDef[]; group: GroupId; locked: boolean; onGo: (id: GroupId) => void; onSignOut: () => void }) {
   return (
     <div style={{ width: 76, flex: "none", background: "#fff", display: "flex", flexDirection: "column", alignItems: "center", padding: "18px 0 14px", borderRight: "1px solid #EDEEF3" }}>
       <div style={{ width: 40, height: 40, borderRadius: 13, background: "#14161F", color: "#fff", display: "grid", placeItems: "center", fontWeight: 800, fontSize: 14, letterSpacing: "-.02em", marginBottom: 22 }}>EH</div>
       <div style={{ position: "relative", display: "flex", flexDirection: "column", gap: 10 }}>
-        <div style={{ position: "absolute", left: 0, top: gi * 52, width: 42, height: 42, borderRadius: 13, background: "#14161F", transition: "top 200ms cubic-bezier(.2,0,0,1)", zIndex: 1 }} />
         {groups.map((g) => {
           const isLocked = (g.id === "project" || g.id === "sales") && locked;
           return (
@@ -700,6 +795,7 @@ function Topbar({
   onHelp,
   onMenu,
   group,
+  ticker,
   user,
 }: {
   crumbs: string[];
@@ -714,6 +810,7 @@ function Topbar({
   onHelp: () => void;
   onMenu?: () => void;
   group?: GroupId;
+  ticker?: string;
   user: SessionUser | null | undefined;
 }) {
   const name = user?.full_name || "";
@@ -747,7 +844,7 @@ function Topbar({
         <button onClick={() => { onCollections(); }} style={{ height: 34, border: "1px solid #EDEEF3", background: "#F5F6FA", borderRadius: 11, padding: "0 12px", display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontFamily: "inherit" }}>
           <span style={{ width: 6, height: 6, borderRadius: 6, background: "#34C08A" }} />
           <span style={{ fontSize: 11.5, fontWeight: 600, color: "#6B7180" }}>Due today</span>
-          <span style={{ fontSize: 12, fontWeight: 800, letterSpacing: "-.01em" }}>AED 4.2M</span>
+          <span style={{ fontSize: 12, fontWeight: 800, letterSpacing: "-.01em" }}>{ticker || "AED 0"}</span>
         </button>
         <button
           onClick={() => { onHelp(); }}
@@ -808,6 +905,7 @@ function TopbarFloating({
   profileOpen,
   onCloseProfile,
   onProfile,
+  onPrefs,
   rtl,
   onToggleRtl,
   onSignOut,
@@ -825,6 +923,7 @@ function TopbarFloating({
   profileOpen: boolean;
   onCloseProfile: () => void;
   onProfile: () => void;
+  onPrefs: () => void;
   rtl: boolean;
   onToggleRtl: () => void;
   onSignOut: () => void;
@@ -843,8 +942,8 @@ function TopbarFloating({
           </div>
           <div style={{ borderTop: "1px solid #EDEEF3", margin: "6px 8px" }} />
           <MenuRow icon="◎" label="My profile" sub="Identity & credentials" onClick={() => { onCloseProfile(); onProfile(); }} />
-          <MenuRow icon="⚙" label="Preferences" sub="Notifications & quiet hours" onClick={() => { onCloseProfile(); onToast("Preferences opened"); }} />
-          <MenuRow icon="⟳" label="Offline cache" sub="Last synced 09:39" onClick={() => { onCloseProfile(); onToast("Offline cache synced"); }} />
+          <MenuRow icon="⚙" label="Preferences" sub="Notifications & quiet hours" onClick={() => { onCloseProfile(); onPrefs(); }} />
+          <MenuRow icon="⟳" label="Offline cache" sub="Stored on this device" onClick={() => { onCloseProfile(); onToast("Offline cache synced"); }} />
           <MenuRow icon="⇄" label={rtl ? "Direction: RTL" : "Direction: LTR"} sub="Mirror the shell" onClick={() => { onToggleRtl(); onCloseProfile(); }} />
           <div style={{ borderTop: "1px solid #EDEEF3", margin: "6px 8px" }} />
           <button onClick={() => { onCloseProfile(); onSignOut(); }} style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 10px", border: 0, background: "transparent", borderRadius: 10, cursor: "pointer", fontFamily: "inherit", color: "#E5484D", fontSize: 12, fontWeight: 700, textAlign: "left", width: "100%" }}>

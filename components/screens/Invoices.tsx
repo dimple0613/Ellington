@@ -6,28 +6,9 @@ import { KpiSkeleton, PanelSkeleton } from "../Loading";
 
 type InvRow = { id: number; no: string; buyer: string; unit: string; inst: string; issued: string; due: string; amount: string; paid: string; status: string; viewed: string };
 
-const INV_ROWS: InvRow[] = [
-  { id: 1, no: "INV-H21-003318", buyer: "Rajesh Menon", unit: "H21-T1-1204", inst: "04  \u00b7  Structure 40%", issued: "31 Aug 26", due: "14 Sep 26", amount: "465,500", paid: "0", status: "Sent", viewed: "Viewed" },
-  { id: 2, no: "INV-H21-003317", buyer: "Aisha Al Marri", unit: "H21-T1-2801", inst: "03  \u00b7  Excavation 20%", issued: "31 Aug 26", due: "14 Sep 26", amount: "512,000", paid: "512,000", status: "Paid", viewed: "Viewed" },
-  { id: 3, no: "INV-H21-003316", buyer: "Sunil Rathore", unit: "H21-T1-2705", inst: "04  \u00b7  Structure 40%", issued: "02 Jun 26", due: "16 Jun 26", amount: "824,000", paid: "0", status: "Overdue", viewed: "Viewed" },
-  { id: 4, no: "INV-H21-003315", buyer: "Elena Petrova", unit: "H21-T1-4102", inst: "03  \u00b7  Excavation 20%", issued: "18 May 26", due: "01 Jun 26", amount: "1,204,000", paid: "0", status: "Overdue", viewed: "Not viewed" },
-  { id: 5, no: "INV-H21-003314", buyer: "Daniel Whitfield", unit: "H21-T1-1905", inst: "04  \u00b7  Structure 40%", issued: "31 Aug 26", due: "14 Sep 26", amount: "842,500", paid: "842,500", status: "Paid", viewed: "Viewed" },
-  { id: 6, no: "INV-H21-003313", buyer: "Grace Okonkwo", unit: "H21-T1-1103", inst: "02  \u00b7  SPA execution", issued: "12 Aug 26", due: "26 Aug 26", amount: "186,250", paid: "186,250", status: "Paid", viewed: "Viewed" },
-  { id: 7, no: "INV-H21-003312", buyer: "Wei Chen", unit: "H21-T1-1602", inst: "04  \u00b7  Structure 40%", issued: "24 May 26", due: "07 Jun 26", amount: "722,000", paid: "268,000", status: "Part paid", viewed: "Viewed" },
-  { id: 8, no: "INV-H21-003311", buyer: "Priya Nair", unit: "H21-T1-0904", inst: "03  \u00b7  Excavation 20%", issued: "31 Aug 26", due: "14 Sep 26", amount: "234,500", paid: "0", status: "Sent", viewed: "Not viewed" },
-];
-
-const INV_KPIS: [string, string, string, boolean?][] = [
-  ["Issued this month", "AED 96.4M", "148 invoices"],
-  ["Paid", "AED 61.2M", "63.5% of issued"],
-  ["Outstanding", "AED 35.2M", "52 invoices open"],
-  ["Overdue", "AED 31.4M", "31 invoices", true],
-  ["Awaiting issue", "AED 62.4M", "on Structure 40% certification"],
-];
-
 const SOA_FIELDS: [string, string][] = [
-  ["Scope", "Buyer \u00b7 Rajesh Menon"],
-  ["Date range", "01 Jan 2026 \u2013 25 Aug 2026"],
+  ["Scope", "Buyer on file"],
+  ["Date range", "Ledger to date"],
   ["Include", "Ledger, ageing, forward schedule"],
   ["Letterhead", "Ellington \u00b7 English"],
   ["Delivery", "Email + portal"],
@@ -50,7 +31,7 @@ export default function InvoicesScreen() {
   const generateStatement = () => {
     exportInvoicesLedger(
       rows.map((r) => ({ no: r.no, buyer: r.buyer, unit: r.unit, inst: r.inst, issued: r.issued, due: r.due, amount: r.amount, paid: r.paid, status: r.status })),
-      { issued: "AED 96.4M", paid: "AED 61.2M", outstanding: "AED 35.2M", overdue: "AED 31.4M" }
+      { issued: "AED " + issuedAmt.toLocaleString(), paid: "AED " + paidAmt.toLocaleString(), outstanding: "AED " + (issuedAmt - paidAmt).toLocaleString(), overdue: "AED " + overdueRows.reduce((a, r) => a + toN(r.amount), 0).toLocaleString() }
     );
     show("Invoice ledger PDF generated");
   };
@@ -84,8 +65,10 @@ export default function InvoicesScreen() {
   const load = () => {
     let active = true;
     fetchJSON<{ invoices: any[] }>("/api/finance")
-      .then((j) => { if (active) { setLoaded(true); if (j?.invoices?.length) setRows(mapRows(j.invoices)); else setRows([]); } })
-      .catch((e) => { if (active) { setLoaded(true); setApiError(e?.message || "Failed to load invoices"); setRows(INV_ROWS); } });
+      .then((j) => {
+        if (active) { setLoaded(true); if (j?.invoices?.length) setRows(mapRows(j.invoices)); else setRows([]); }
+      })
+      .catch((e) => { if (active) { setLoaded(true); setApiError(e?.message || "Failed to load invoices"); setRows([]); } });
     return () => { active = false; };
   };
 
@@ -134,17 +117,31 @@ export default function InvoicesScreen() {
     );
   }
 
+  const toN = (s: string) => Number(String(s).replace(/[^0-9]/g, "")) || 0;
+  const issuedAmt = rows.reduce((a, r) => a + toN(r.amount), 0);
+  const paidAmt = rows.reduce((a, r) => a + toN(r.paid), 0);
+  const overdueRows = rows.filter((r) => r.status === "Overdue");
+  const openRows = rows.filter((r) => r.status !== "Paid" && r.status !== "Void" && r.status !== "Draft");
+  const draftRows = rows.filter((r) => r.status === "Draft");
+  const INV_KPIS: [string, string, string, boolean?][] = [
+    ["Issued", "AED " + issuedAmt.toLocaleString(), rows.length + " invoices"],
+    ["Paid", "AED " + paidAmt.toLocaleString(), Math.round(issuedAmt ? paidAmt / issuedAmt * 100 : 0) + "% of issued"],
+    ["Outstanding", "AED " + (issuedAmt - paidAmt).toLocaleString(), openRows.length + " invoices open"],
+    ["Overdue", "AED " + overdueRows.reduce((a, r) => a + toN(r.amount), 0).toLocaleString(), overdueRows.length + " invoices", overdueRows.length > 0],
+    ["Draft", String(draftRows.length), "awaiting issue"],
+  ];
+
   return (
     <div>
       {apiError && (
         <div style={{ background: "#FDECEC", color: "#E5484D", borderRadius: 12, padding: "11px 16px", fontSize: 12, fontWeight: 700, marginBottom: 16 }}>
-          Live data unavailable ({apiError}) — showing sample rows
+          Live data unavailable ({apiError}) — invoices are empty until data loads
         </div>
       )}
       {notice && <div style={{ background: "#E9F8F1", color: "#1F9D6B", borderRadius: 12, padding: "11px 16px", fontSize: 12, fontWeight: 700, marginBottom: 16 }}>{notice}</div>}
 
-      <div style={{ display: "flex", alignItems: "flex-end", gap: 16, marginBottom: 18 }}>
-        <div style={{ flex: 1 }}>
+      <div style={{ display: "flex", flexWrap: "wrap", rowGap: 12, alignItems: "flex-end", gap: 16, marginBottom: 18 }}>
+        <div style={{ flex: 1, minWidth: 220 }}>
           <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: "-.03em", lineHeight: 1.15 }}>Invoices &amp; statements</div>
           <div style={{ fontSize: 13, color: "#6B7180", fontWeight: 500, marginTop: 5 }}>Auto-issued 14 days before due \u00b7 VAT shown as a separate line, never baked into the instalment</div>
         </div>
@@ -164,11 +161,12 @@ export default function InvoicesScreen() {
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 300px", gap: 16, marginTop: 16, alignItems: "start" }}>
         <div style={{ background: "#fff", borderRadius: 20, boxShadow: "0 1px 3px rgba(20,22,31,.04)", overflow: "hidden" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "126px 1fr 96px 1.1fr 86px 86px 96px 96px 88px 76px 76px", gap: 8, padding: "14px 22px", fontSize: 9.5, fontWeight: 700, letterSpacing: ".07em", color: "#9AA0AE", textTransform: "uppercase" as const, background: "#FAFBFD", borderBottom: "1px solid #EDEEF3" }}>
+          <div style={{ overflowX: "auto" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "126px 1fr 96px 1.1fr 86px 86px 96px 96px 88px 76px 76px", minWidth: 1000, gap: 8, padding: "14px 22px", fontSize: 9.5, fontWeight: 700, letterSpacing: ".07em", color: "#9AA0AE", textTransform: "uppercase" as const, background: "#FAFBFD", borderBottom: "1px solid #EDEEF3" }}>
             <span>Invoice</span><span>Buyer</span><span>Unit</span><span>Instalment</span><span>Issued</span><span>Due</span><span style={{ textAlign: "right" }}>Amount</span><span style={{ textAlign: "right" }}>Paid</span><span>Status</span><span>Viewed</span><span style={{ textAlign: "right" }}>Actions</span>
           </div>
           {rows.map((r) => (
-            <div key={r.no} style={{ display: "grid", gridTemplateColumns: "126px 1fr 96px 1.1fr 86px 86px 96px 96px 88px 76px 76px", gap: 8, alignItems: "center", padding: "0 22px", height: 42, borderBottom: "1px solid #F6F7FA" }}>
+            <div key={r.no} style={{ display: "grid", gridTemplateColumns: "126px 1fr 96px 1.1fr 86px 86px 96px 96px 88px 76px 76px", minWidth: 1000, gap: 8, alignItems: "center", padding: "0 22px", height: 42, borderBottom: "1px solid #F6F7FA" }}>
               <span style={{ fontFamily: "monospace", fontSize: 10.5, fontWeight: 600 }}>{r.no}</span>
               <span style={{ fontSize: 11.5, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.buyer}</span>
               <span style={{ fontFamily: "monospace", fontSize: 10, color: "#4A5060" }}>{r.unit}</span>
@@ -189,6 +187,7 @@ export default function InvoicesScreen() {
               </div>
             </div>
           ))}
+          </div>
         </div>
 
         <div style={{ background: "#fff", borderRadius: 20, padding: "22px 24px", boxShadow: "0 1px 3px rgba(20,22,31,.04)" }}>

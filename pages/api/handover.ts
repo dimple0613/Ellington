@@ -3,29 +3,39 @@ import { withPerm } from "../../lib/permissions";
 import { query } from "../../lib/db";
 import { ok } from "../../lib/api";
 
-export default withPerm("Handover", "REA", async function (_req: NextApiRequest, res: NextApiResponse) {
+export default withPerm("Handover", "REA", async function (req: NextApiRequest, res: NextApiResponse) {
+  const project = (req.query.project as string) || "";
+  const isProject = project && project !== "all";
+  const prefix = isProject ? project + "-%" : "%";
+  const p: any[] = isProject ? [prefix] : [];
+
   const [pipeline, snagging, deeds, unpaidInvoices, overdue] = await Promise.all([
     query<any>(
       `SELECT unit_no, buyer, stage, meta, updated_at
-       FROM pipeline_items ORDER BY updated_at DESC`
+       FROM pipeline_items ${isProject ? "WHERE unit_no ILIKE $1" : ""} ORDER BY updated_at DESC`,
+      p
     ),
     query<any>(
       `SELECT id, unit_no, loc, trade, description AS "desc", sev, contractor, status, reinspect
-       FROM snag_items ORDER BY id`
+       FROM snag_items ${isProject ? "WHERE unit_no ILIKE $1" : ""} ORDER BY id`,
+      p
     ),
     query<any>(
       `SELECT id, unit_no, buyer, oqood, dld, deed, issued, keys, oa
-       FROM deeds ORDER BY id`
+       FROM deeds ${isProject ? "WHERE unit_no ILIKE $1" : ""} ORDER BY id`,
+      p
     ),
     query<any>(
       `SELECT unit_no, COALESCE(SUM(amount),0) AS outstanding, COUNT(*) AS n
-       FROM invoices WHERE paid = false AND voided_at IS NULL
-       GROUP BY unit_no`
+       FROM invoices WHERE paid = false AND voided_at IS NULL ${isProject ? "AND unit_no ILIKE $1" : ""}
+       GROUP BY unit_no`,
+      p
     ),
     query<any>(
       `SELECT c.unit_no, COALESCE(SUM(c.amount),0) AS overdue, (array_agg(c.buyer))[1] AS buyer
-       FROM collections c
-       GROUP BY c.unit_no`
+       FROM collections c ${isProject ? "WHERE c.unit_no ILIKE $1" : ""}
+       GROUP BY c.unit_no`,
+      p
     ),
   ]);
 
@@ -63,8 +73,9 @@ export default withPerm("Handover", "REA", async function (_req: NextApiRequest,
   const fmt = (n: number) => (n || 0).toLocaleString("en-US");
 
   const readiness: any[] = [];
+  const scopeRe = new RegExp("^" + (isProject ? project : "WPK"), "i");
   for (const unit_no of units) {
-    if (!/^WPK/i.test(unit_no)) continue;
+    if (!scopeRe.test(unit_no)) continue;
     const outstanding = outstandingByUnit[unit_no] || 0;
     const overdueAmt = overdueByUnit[unit_no]?.amt || 0;
     const paymentOk = !(outstanding > 0 || overdueAmt > 0);

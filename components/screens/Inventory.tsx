@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/router";
 import { AC, compact, money } from "../../lib/format";
-import { ST, UnitStatus, UNITS, Unit } from "../../lib/data";
+import { ST, UnitStatus, Unit } from "../../lib/unit";
 import { fetchJSON } from "../../lib/api";
 
 type UnitRow = {
@@ -67,6 +68,20 @@ const CHIPS: [string, string][] = [
 const psfMin = 1435 + 13;
 const psfMax = 1610 + 45 * 13;
 
+const tabBtn = (on: boolean) => ({
+  height: 32,
+  borderRadius: 10,
+  padding: "0 14px",
+  cursor: "pointer",
+  fontFamily: "inherit",
+  fontSize: 11.5,
+  fontWeight: 700,
+  whiteSpace: "nowrap" as const,
+  background: on ? "#F0EFFE" : "#fff",
+  color: on ? AC : "#6B7180",
+  border: "1px solid " + (on ? AC : "#EDEEF3"),
+});
+
 function heatColor(psf: number): string {
   const t = Math.max(0, Math.min(1, (psf - psfMin) / (psfMax - psfMin)));
   const A = [240, 239, 254];
@@ -80,9 +95,13 @@ function heatColor(psf: number): string {
 
 export function exportedRows(units: Unit[]) {
   const head = ["Unit", "Typology", "Floor", "Sq.ft", "AED/ft", "Price", "View", "Status", "Buyer"];
+  const esc = (v: string) => {
+    const s = /^[=+\-@]/.test(v) ? "'" + v : v;
+    return '"' + s.replace(/"/g, '""') + '"';
+  };
   const body = units.map((u) =>
     [u.id, u.typ, "L" + u.f, u.area.toLocaleString("en-US"), u.psf.toLocaleString("en-US"), u.price.toLocaleString("en-US"), u.view, u.status, u.buyer]
-      .map((v) => '"' + v.replace(/"/g, '"') + '"')
+      .map((v) => esc(v))
       .join(",")
   );
   return head.join(",") + "\n" + body.join("\n");
@@ -100,13 +119,16 @@ export default function InventoryScreen({
   const [heat, setHeat] = useState(false);
   const [dbUnits, setDbUnits] = useState<Unit[]>([]);
   const [apiError, setApiError] = useState("");
+  const router = useRouter();
+  const [meta, setMeta] = useState<{ projects: { code: string; name: string }[] } | null>(null);
 
   useEffect(() => {
     let active = true;
-    fetchJSON<{ units: UnitRow[] }>("/api/inventory" + (scope && scope !== "ALL" ? "?project=" + encodeURIComponent(scope) : ""))
+    fetchJSON<{ units: UnitRow[]; projects?: { code: string; name: string }[] }>("/api/inventory" + (scope && scope !== "ALL" ? "?project=" + encodeURIComponent(scope) : ""))
       .then((j) => {
         if (!active || !Array.isArray(j.units)) return;
         setDbUnits(j.units.map(toUnitShape));
+        if (Array.isArray(j.projects)) setMeta({ projects: j.projects });
       })
       .catch((e) => {
         if (active) setApiError(e?.message || "Failed to load units");
@@ -114,7 +136,7 @@ export default function InventoryScreen({
     return () => { active = false; };
   }, [scope]);
 
-  const source = dbUnits.length ? dbUnits : UNITS;
+  const source = dbUnits;
 
   const units = useMemo(() => {
     const list = filter === "all" ? source : source.filter((u) => u.status === filter);
@@ -147,17 +169,59 @@ export default function InventoryScreen({
       });
   }, [source]);
 
-  const scopeName = "Tower 1";
+  const scopeName = useMemo(() => {
+    if (!meta || !meta.projects.length) return scope && scope !== "ALL" ? (scope === "H21" ? "Tower 1" : scope) : "All projects";
+    const p = meta.projects.find((x) => x.code === scope);
+    return p ? p.name : "All projects";
+  }, [meta, scope]);
+  const scoped = !!(scope && scope !== "ALL");
+
+  const switchProj = (code: string) => {
+    const q: Record<string, string> = { s: "inventory" };
+    if (code && code !== "ALL") q.scope = code;
+    router.replace({ pathname: "/project", query: q }, undefined, { shallow: true });
+  };
+
+  const chipVals = useMemo<[string, string][]>(() => {
+    if (!source.length) return CHIPS;
+    const types = Array.from(new Set(source.map((u) => u.typ)));
+    const bedVals = source.map((u) => u.beds);
+    const priceVals = source.map((u) => u.price);
+    const viewVals = Array.from(new Set(source.map((u) => u.view).filter(Boolean)));
+    const floorVals = floors.map((f) => f.f);
+    const fmt = (v: number) => (v >= 1e6 ? "AED " + (v / 1e6).toFixed(1).replace(/\.0$/, "") + "M" : "AED " + Math.round(v / 1e3) + "K");
+    return [
+      ["Typology", "All " + types.length],
+      ["Beds", Math.min(...bedVals) + "\u2013" + Math.max(...bedVals)],
+      ["Floors", Math.min(...floorVals) + "\u2013" + Math.max(...floorVals)],
+      ["Price", fmt(Math.min(...priceVals)) + "\u2013" + fmt(Math.max(...priceVals))],
+      ["View", viewVals.slice(0, 2).join(" \u00b7 ") || "Any"],
+      ["Agent", "Any"],
+    ];
+  }, [source, floors]);
+
+  const summary = useMemo(() => {
+    const totalVal = source.reduce((a, u) => a + u.price, 0);
+    const avail = source.filter((u) => u.status === "Available").length;
+    const avgPsf = source.length ? Math.round(source.reduce((a, u) => a + u.psf, 0) / source.length) : 0;
+    return [
+      { l: "Units", v: String(source.length), n: scoped ? "in this building" : (meta?.projects.length ? "across " + meta.projects.length + " projects" : "total") },
+      { l: "Available", v: String(avail), n: scoped ? "ready to sell now" : "across portfolio" },
+      { l: "Total value", v: compact(totalVal), n: "at list price" },
+      { l: "Avg AED/sq.ft", v: avgPsf.toLocaleString("en-US"), n: "across priced units" },
+    ];
+  }, [source, meta, scoped]);
 
   const order = { Available: 0, Held: 1, Reserved: 2, Booked: 3, Sold: 4, Blocked: 5, Overdue: 6 };
   const ordered = [...units].sort((a, b) => order[a.status] - order[b.status]);
+  const unitCode = (u: Unit) => u.id.includes("-") ? u.id.slice(u.id.lastIndexOf("-") + 1) : u.no || u.id;
 
   const exportCsv = () => {
-    const blob = new Blob([exportedRows(units)], { type: "text/csv;charset=utf-8;" });
+    const blob = new Blob([exportedRows(source)], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "ellington-price-list.csv";
+    a.download = "ellington-inventory.csv";
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -202,11 +266,11 @@ export default function InventoryScreen({
           Live data unavailable ({apiError}) — showing sample units
         </div>
       )}
-      <div style={{ display: "flex", alignItems: "flex-end", gap: 16, marginBottom: 18 }}>
-        <div style={{ flex: 1 }}>
+      <div style={{ display: "flex", flexWrap: "wrap", rowGap: 12, alignItems: "flex-end", gap: 16, marginBottom: 18 }}>
+        <div style={{ flex: 1, minWidth: 220 }}>
           <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: "-.03em", lineHeight: 1.15 }}>Inventory</div>
           <div style={{ fontSize: 13, color: "#6B7180", fontWeight: 500, marginTop: 5 }}>
-            {scopeName} \u00b7 {UNITS.length} units
+            {scopeName} \u00b7 {source.length} units
           </div>
         </div>
         <div style={{ display: "flex", gap: 4, background: "#fff", border: "1px solid #EDEEF3", borderRadius: 12, padding: 4 }}>
@@ -272,6 +336,27 @@ export default function InventoryScreen({
         </button>
       </div>
 
+      <div style={{ display: "flex", gap: 8, marginBottom: 14, overflowX: "auto", paddingBottom: 2 }}>
+        {meta && meta.projects.length > 1 && (
+          <>
+          <button onClick={() => switchProj("ALL")} style={tabBtn(scope === "ALL")}>All projects</button>
+          {meta.projects.map((p) => (
+            <button key={p.code} onClick={() => switchProj(p.code)} style={tabBtn(scope === p.code)}>{p.name}</button>
+          ))}
+          </>
+        )}
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12, marginBottom: 16 }}>
+        {summary.map((s) => (
+          <div key={s.l} style={{ background: "#fff", borderRadius: 16, padding: "14px 16px", boxShadow: "0 1px 3px rgba(20,22,31,.04)" }}>
+            <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".05em", color: "#9AA0AE", textTransform: "uppercase" }}>{s.l}</div>
+            <div style={{ fontSize: 20, fontWeight: 800, letterSpacing: "-.03em", marginTop: 6 }}>{s.v}</div>
+            <div style={{ fontSize: 10.5, color: "#9AA0AE", fontWeight: 600, marginTop: 3 }}>{s.n}</div>
+          </div>
+        ))}
+      </div>
+
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 14 }}>
         {statusChips.map((k) => {
           const c = counts[k] || { n: 0, v: 0 };
@@ -308,7 +393,7 @@ export default function InventoryScreen({
       </div>
 
       <div style={{ display: "flex", gap: 9, flexWrap: "wrap", alignItems: "center", marginBottom: 16 }}>
-        {CHIPS.map((c) => (
+        {chipVals.map((c) => (
           <button
             key={c[0]}
             style={{
@@ -406,7 +491,7 @@ export default function InventoryScreen({
               const b = cellBtn(u);
               return (
                 <button key={u.id} onClick={b.onClick} title={b.title} style={{ ...b.style, height: 62, borderLeftWidth: 3 }}>
-                  <span style={{ fontSize: 12.5, fontWeight: 800, letterSpacing: "-.01em" }}>{u.id.replace("H21-T1-", "")}</span>
+                  <span style={{ fontSize: 12.5, fontWeight: 800, letterSpacing: "-.01em" }}>{unitCode(u)}</span>
                   <span style={{ fontSize: 10, fontWeight: 600, color: "#14161F" }}>{u.typ}</span>
                   <span style={{ fontSize: 9.5, fontWeight: 600, color: "#14161F", opacity: 0.75 }}>{b.meta} \u00b7 {money(u.price)}</span>
                 </button>
@@ -418,7 +503,8 @@ export default function InventoryScreen({
 
       {view === "list" && (
         <div style={{ background: "#fff", borderRadius: 20, boxShadow: "0 1px 3px rgba(20,22,31,.04)", overflow: "hidden" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "96px 84px 52px 78px 70px 82px 74px 92px 96px", gap: 8, padding: "14px 22px", fontSize: 9.5, fontWeight: 700, letterSpacing: ".07em", color: "#9AA0AE", textTransform: "uppercase", borderBottom: "1px solid #EDEEF3", background: "#FAFBFD" }}>
+          <div style={{ overflowX: "auto" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "96px 84px 52px 78px 70px 82px 74px 92px 96px", minWidth: 760, gap: 8, padding: "14px 22px", fontSize: 9.5, fontWeight: 700, letterSpacing: ".07em", color: "#9AA0AE", textTransform: "uppercase", borderBottom: "1px solid #EDEEF3", background: "#FAFBFD" }}>
             <span>Unit</span><span>Typology</span><span style={{ textAlign: "right" }}>Floor</span><span style={{ textAlign: "right" }}>Sq.ft</span><span style={{ textAlign: "right" }}>AED/ft</span><span style={{ textAlign: "right" }}>Price</span><span>View</span><span>Status</span><span>Buyer</span>
           </div>
           <div style={{ maxHeight: 560, overflow: "auto" }}>
@@ -426,7 +512,7 @@ export default function InventoryScreen({
               <button
                 key={u.id}
                 onClick={() => onSelectUnit && onSelectUnit(u.id)}
-                style={{ width: "100%", display: "grid", gridTemplateColumns: "96px 84px 52px 78px 70px 82px 74px 92px 96px", gap: 8, alignItems: "center", padding: "0 22px", height: 38, border: 0, background: "transparent", borderBottom: "1px solid #F6F7FA", cursor: "pointer", fontFamily: "inherit", textAlign: "left" }}
+                style={{ minWidth: 760, width: "100%", display: "grid", gridTemplateColumns: "96px 84px 52px 78px 70px 82px 74px 92px 96px", gap: 8, alignItems: "center", padding: "0 22px", height: 38, border: 0, background: "transparent", borderBottom: "1px solid #F6F7FA", cursor: "pointer", fontFamily: "inherit", textAlign: "left" }}
               >
                 <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, fontWeight: 600 }}>{u.id}</span>
                 <span style={{ fontSize: 11.5, fontWeight: 600, color: "#4A5060" }}>{u.typ}</span>
@@ -439,6 +525,7 @@ export default function InventoryScreen({
                 <span style={{ fontSize: 11, color: "#6B7180", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{u.buyer}</span>
               </button>
             ))}
+          </div>
           </div>
         </div>
       )}
@@ -454,7 +541,7 @@ export default function InventoryScreen({
                 style={{ textAlign: "left", background: "#fff", borderRadius: 16, padding: "16px 18px", boxShadow: "0 1px 3px rgba(20,22,31,.04)", border: "1px solid #EDEEF3", cursor: "pointer", fontFamily: "inherit" }}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 13, fontWeight: 700 }}>{u.id.replace("H21-T1-", "")}</span>
+                  <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 13, fontWeight: 700 }}>{unitCode(u)}</span>
                   <span style={{ marginLeft: "auto", fontSize: 10, fontWeight: 700, borderRadius: 7, padding: "3px 8px", background: ST[u.status][1], color: ST[u.status][0] }}>{u.status}</span>
                 </div>
                 <div style={{ fontSize: 11.5, color: "#6B7180", fontWeight: 600, marginTop: 8 }}>

@@ -68,7 +68,7 @@ const FALLBACK: Record<string, { sql: string; label: string }> = {
   "Construction progress": { sql: `SELECT status, COUNT(*)::int AS n FROM projects GROUP BY status`, label: "Projects by status" },
   "Milestone variance": { sql: `SELECT COUNT(*)::int AS n FROM payment_milestones WHERE status = 'due'`, label: "Due milestones" },
   "Handover readiness": { sql: `SELECT COUNT(*)::int AS n FROM pipeline_items`, label: "Pipeline items" },
-  "Snagging summary": { sql: `SELECT severity, COUNT(*)::int AS n FROM snag_items GROUP BY severity`, label: "Snag items by severity" },
+  "Snagging summary": { sql: `SELECT sev AS severity, COUNT(*)::int AS n FROM snag_items GROUP BY sev`, label: "Snag items by severity" },
 };
 
 const esc = (v: any) => {
