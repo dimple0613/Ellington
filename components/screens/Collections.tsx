@@ -135,6 +135,11 @@ export default function CollectionsScreen() {
   const escalate = (row: CollRow) => { router.push({ pathname: "/finance", query: { s: "escrow" } }, undefined, { shallow: true }); };
   const genNotice = () => {
     const c = calc;
+    if (!c) {
+      setNotice("Run the calculator for a unit first \u00b7 notice figures are never estimated");
+      setTimeout(() => setNotice(""), 3500);
+      return;
+    }
     const first = rows.find((r) => r.days > 0) || rows[0];
     const amt = first ? Number(String(first.amount).replace(/,/g, "")) : 0;
     exportCollectionNotice(
@@ -142,8 +147,9 @@ export default function CollectionsScreen() {
       first?.unit || "",
       first ? amt.toLocaleString("en-US") : "0",
       first?.days || 0,
-      c ? Number(c.retentionAmount).toLocaleString("en-US") : String(Math.round(amt * 0.25)),
-      c ? Number(c.refund).toLocaleString("en-US") : String(Math.round(amt * 0.05))
+      Number(c.retentionAmount).toLocaleString("en-US"),
+      Number(c.refund).toLocaleString("en-US"),
+      String(c.tier || "")
     );
     setNotice("30-day notice generated for " + (first?.buyer || "buyer") + " \u00b7 sent to legal review");
     setTimeout(() => setNotice(""), 3000);

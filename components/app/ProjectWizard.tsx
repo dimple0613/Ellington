@@ -91,6 +91,9 @@ function WizardInner({ onClose, onCreated }: { onClose: () => void; onCreated: (
   const missingCompliance = COMPLIANCE_FIELDS.filter((c) => !compliance[c.field].trim());
 
   const planTotal = plan.reduce((a, m) => a + (Number(m.pct) || 0), 0);
+  const exemptPlan = (name: string) => /handover|booking|deposit|spa|completion/i.test(String(name || "").toLowerCase());
+  const constrMax = plan.filter((m) => !exemptPlan(m.name)).reduce((a, m) => Math.max(a, Number(m.pct) || 0), 0);
+  const brokerRate = parseFloat(brokerCommission) || 0;
   const plannedUnits = types.reduce((a, t) => a + (Number(t.count) || 0), 0);
   const towerCount = towers.reduce((a, t) => a + (Number(t.floors) || 0), 0);
   const gdv = parseFloat(form.gdv) || 0;
@@ -121,6 +124,11 @@ function WizardInner({ onClose, onCreated }: { onClose: () => void; onCreated: (
     if (step === 4) {
       if (!plan.length) return "Add at least one payment milestone.";
       if (planTotal !== 100) return "Payment schedule must total exactly 100% (currently " + planTotal + "%).";
+      if (constrMax > 20) return "Construction-linked instalments are capped at 20% each \u00b7 highest is currently " + constrMax + "%.";
+      return null;
+    }
+    if (step === 5) {
+      if (brokerRate > 5) return "Broker commission is capped at 5% \u00b7 currently " + brokerRate + "%.";
       return null;
     }
     return null;
@@ -357,6 +365,10 @@ function WizardInner({ onClose, onCreated }: { onClose: () => void; onCreated: (
                   {planTotal === 100
                     ? <span style={{ fontSize: 10.5, fontWeight: 700, background: "#E9F8F1", color: "#1F9D6B", borderRadius: 7, padding: "3px 8px" }}>Balanced</span>
                     : <span style={{ fontSize: 10.5, fontWeight: 700, background: "#FDECEC", color: "#E5484D", borderRadius: 7, padding: "3px 8px" }}>{planTotal < 100 ? "Undersubscribed" : "Oversubscribed"}</span>}
+                  <div style={{ flex: 1 }} />
+                  <span style={{ fontSize: 12, fontWeight: 700, color: "#6B7180" }}>Construction cap</span>
+                  <span style={{ fontSize: 14, fontWeight: 800, color: constrMax <= 20 ? "#1F9D6B" : "#E5484D" }}>{constrMax}%</span>
+                  <span style={{ fontSize: 10.5, fontWeight: 700, background: constrMax <= 20 ? "#E9F8F1" : "#FDECEC", color: constrMax <= 20 ? "#1F9D6B" : "#E5484D", borderRadius: 7, padding: "3px 8px" }}>{constrMax <= 20 ? "Within 20% cap" : "Over 20% cap"}</span>
                 </div>
               </div>
             )}
@@ -365,7 +377,12 @@ function WizardInner({ onClose, onCreated }: { onClose: () => void; onCreated: (
               <div style={{ marginTop: 18 }}>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 200px", gap: 14 }}>
                   <Field label="Sales agents (comma-separated)" value={agents} onChange={setAgents} ph="Reema, John D, Sana, Yusuf" />
-                  <Field label="Broker commission %" value={brokerCommission} onChange={setBrokerCommission} ph="2.0" num />
+                  <Field label="Broker commission %" value={brokerCommission} onChange={setBrokerCommission} ph="2.0" num ok={brokerCommission === "" ? undefined : brokerRate <= 5} />
+                </div>
+                <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 10 }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: "#6B7180" }}>Broker commission cap</span>
+                  <span style={{ fontSize: 14, fontWeight: 800, color: brokerRate <= 5 ? "#1F9D6B" : "#E5484D" }}>{brokerCommission === "" ? "—" : brokerRate + "%"}</span>
+                  <span style={{ fontSize: 10.5, fontWeight: 700, background: brokerRate <= 5 ? "#E9F8F1" : "#FDECEC", color: brokerRate <= 5 ? "#1F9D6B" : "#E5484D", borderRadius: 7, padding: "3px 8px" }}>{brokerRate <= 5 ? "Within 5% cap" : "Exceeds 5% cap"}</span>
                 </div>
                 <div style={{ marginTop: 18, background: "#F7F8FB", borderRadius: 16, padding: "16px 18px" }}>
                   <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: "-.01em" }}>Live summary</div>

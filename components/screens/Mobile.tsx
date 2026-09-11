@@ -44,9 +44,13 @@ type MobileAgg = {
     forecast30: number;
     milestones: { project: string; milestone: string; amount: number; due: string }[];
     ageing: { bucket: string; amount: number; pct: number }[];
-    buyer: { name: string; unit: string; amount: number; days: number } | null;
+    buyer: { name: string; unit: string; amount: number; days: number; revealed: boolean } | null;
   };
-  approvals: { count: number; valueM: string };
+  approvals: {
+    count: number;
+    valueM: string;
+    items: { id: number; ref: string; milestone: string; amount: number; cert: string | null; status: string }[];
+  };
 };
 
 const aedM = (v: number) =>
@@ -63,12 +67,15 @@ export default function MobileScreen() {
   const [activeTab, setActiveTab] = useState<Tab>("home");
   const [notice, setNotice] = useState("");
   const [moneyTab, setMoneyTab] = useState<MoneySub>("Ageing");
-  const [resolved, setResolved] = useState<Record<string, string>>({ discount: "", drawdown: "" });
+  const [resolvedIds, setResolvedIds] = useState<number[]>([]);
+  const [rejecting, setRejecting] = useState<number | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
   const [agg, setAgg] = useState<MobileAgg | null>(null);
+  const [revealBuyer, setRevealBuyer] = useState(false);
 
   useEffect(() => {
     let active = true;
-    fetchJSON<MobileAgg>("/api/mobile")
+    fetchJSON<MobileAgg>("/api/mobile" + (revealBuyer ? "?reveal=1" : ""))
       .then((j) => {
         if (active && j) setAgg(j);
       })
@@ -76,12 +83,16 @@ export default function MobileScreen() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [revealBuyer]);
+
+  const pendingItems = (agg ? agg.approvals.items || [] : []).filter((it) => !resolvedIds.includes(it.id));
+  const pendingCount = pendingItems.length;
+  const pendingValueM = pendingItems.reduce((a, it) => a + it.amount, 0) / 1e6;
 
   const ao = agg?.portfolio;
   const aM = agg?.money;
   const proj0 = agg?.projects?.[0];
-  const apprBadge = agg ? agg.approvals.count || 0 : 0;
+  const apprBadge = pendingCount || 0;
   const todayLabel =
     new Date().toLocaleDateString("en-US", { weekday: "long" }) + ", " + new Date().getDate() + " " + new Date().toLocaleDateString("en-US", { month: "long" });
 
@@ -111,21 +122,37 @@ export default function MobileScreen() {
     : [["Current", "#34C08A", "AED 8.2M", "64%"], ["1\u201330 days", "#F5A623", "AED 1.4M", "11%"], ["31\u201360 days", "#F5A623", "AED 0.8M", "6%"], ["61\u201390 days", "#E5484D", "AED 0.4M", "3%"], ["90+ days", "#E5484D", "AED 0.3M", "2%"]];
   const buyerInfo = aM && aM.buyer
     ? { name: aM.buyer.name, sub: "Unit " + aM.buyer.unit + " \u00b7 " + aedM(aM.buyer.amount) + " \u00b7 " + aM.buyer.days + " days overdue", days: aM.buyer.days }
-    : { name: "Rajesh Menon", sub: "Unit BLG-0402 \u00b7 AED 2.1M \u00b7 1 overdue cheque", days: 62 };
+    : { name: "—", sub: "No overdue buyer on record", days: 0 };
 
   const showNotice = (msg: string) => { setNotice(msg); setTimeout(() => setNotice(""), 3000); };
 
-  const resolveApproval = (key: string, outcome: string) => {
-    setResolved((p) => ({ ...p, [key]: outcome }));
-    showNotice((key === "discount" ? "Discount request " : "Drawdown request ") + outcome + (outcome === "approved" ? " \u00b7 requester notified" : " \u00b7 requester notified"));
-  };
-
-  const getPendingCount = () => [resolved.discount, resolved.drawdown].filter((v) => v === "").length;
-  const pendingValueM = () => {
-    let v = 0;
-    if (resolved.discount === "") v += 0.085;
-    if (resolved.drawdown === "") v += 1.2;
-    return v.toFixed(1);
+  const resolveItem = async (item: { id: number; ref: string }, outcome: "approved" | "rejected") => {
+    const reason = outcome === "rejected" ? rejectReason.trim() : "";
+    if (outcome === "rejected" && !reason) { setRejectReason(""); return; }
+    try {
+      const j = await fetchJSON<{ ref: string; resolved: string; count: number; valueM: string }>(
+        "/api/mobile",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: outcome, id: item.id, reason: reason || undefined }),
+        }
+      );
+      setResolvedIds((p) => [...p, item.id]);
+      setRejecting(null);
+      setRejectReason("");
+      setAgg((a) =>
+        a
+          ? {
+              ...a,
+              approvals: { ...a.approvals, count: j.count, valueM: j.valueM, items: a.approvals.items.filter((x) => x.id !== item.id) },
+            }
+          : a
+      );
+      showNotice((outcome === "approved" ? "Drawdown " : "Drawdown ") + (j.ref || "request") + " " + outcome + " \u00b7 audit logged");
+    } catch (e) {
+      showNotice((e as Error)?.message || "Approval failed \u00b7 try again");
+    }
   };
 
   const PhoneShell = ({ children }: { children: React.ReactNode }) => (
@@ -372,9 +399,13 @@ export default function MobileScreen() {
                     <Card>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                         <span style={{ fontSize: 10, fontWeight: 700 }}>{buyerInfo.name}</span>
-                        <span style={{ fontSize: 9, color: "#E5484D", fontWeight: 700 }}>{"\u25CF"} {buyerInfo.days} days</span>
+                        <button
+                          onClick={() => setRevealBuyer((v) => !v)}
+                          title={revealBuyer ? "Mask buyer name" : "Reveal buyer name (audited)"}
+                          style={{ height: 24, borderRadius: 6, border: "1px solid " + (revealBuyer ? AC : "#EDEEF3"), background: revealBuyer ? "#EEF0FF" : "#fff", padding: "0 8px", fontFamily: "inherit", fontSize: 9, fontWeight: 700, color: revealBuyer ? AC : "#6B7180", cursor: "pointer" }}>{revealBuyer ? "Mask" : "\u25C9 Reveal"}</button>
                       </div>
-                      <div style={{ fontSize: 9, color: "#9AA0AE", fontWeight: 600, marginTop: 2 }}>{buyerInfo.sub}</div>
+                      <div style={{ fontSize: 9, color: "#6B7180", fontWeight: 600, marginTop: 2 }}>{buyerInfo.sub}</div>
+                      <div style={{ fontSize: 8, color: "#9AA0AE", fontWeight: 600, marginTop: 3 }}>{revealBuyer ? "\u26A0 Reveal is logged to the audit trail." : "Name masked by default \u00b7 reveal is audited."}</div>
                     </Card>
                   </Section>
                 </div>
@@ -385,52 +416,59 @@ export default function MobileScreen() {
           {activeTab === "appr" && (
             <div>
               <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 8 }}>Approvals inbox</div>
-              {getPendingCount() > 0 ? (
+              {pendingCount > 0 ? (
                 <div style={{ background: "#FDECEC", borderRadius: 10, padding: "8px 10px", marginBottom: 10 }}>
-                  <span style={{ fontSize: 9, fontWeight: 700, color: "#E5484D" }}>{"\u26A0"} {getPendingCount()} pending approvals {"\u00b7"} AED {(agg ? Number(agg.approvals.valueM) + (resolved.discount === "" && resolved.drawdown === "" ? 0.085 : resolved.discount === "" ? 0.085 : 0) : Number(pendingValueM())).toFixed(1)}M</span>
+                  <span style={{ fontSize: 9, fontWeight: 700, color: "#E5484D" }}>{"\u26A0"} {pendingCount} pending approvals {"\u00b7"} AED {pendingValueM.toFixed(1)}M value impact</span>
                 </div>
               ) : (
                 <div style={{ background: "#E9F8F1", borderRadius: 10, padding: "8px 10px", marginBottom: 10 }}>
-                  <span style={{ fontSize: 9, fontWeight: 700, color: "#1F9D6B" }}>{"\u2713"} No pending approvals {"\u00b7"} inbox clear</span>
+                  <span style={{ fontSize: 9, fontWeight: 700, color: "#1F9D6B" }}>{"\u2713"} Nothing waiting on you.</span>
                 </div>
               )}
 
-              {!resolved.discount ? (
-                <Section title="Discount request">
-                  <Card>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start" }}>
-                      <div>
-                        <div style={{ fontSize: 11, fontWeight: 700 }}>Discount request</div>
-                        <div style={{ fontSize: 9, color: "#6B7180", fontWeight: 600, marginTop: 2 }}>Demo card · no discount currently pending</div>
-                      </div>
-                      <span style={{ fontSize: 9, fontWeight: 800, background: "#FFF3E0", color: "#F5A623", borderRadius: 6, padding: "3px 8px" }}>Pending</span>
-                    </div>
-                    <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
-                      <button onClick={() => resolveApproval("discount", "approved")} style={{ flex: 1, height: 28, borderRadius: 8, background: "#34C08A", color: "#fff", border: 0, fontSize: 10, fontWeight: 700, cursor: "pointer" }}>Approve</button>
-                      <button onClick={() => resolveApproval("discount", "rejected")} style={{ flex: 1, height: 28, borderRadius: 8, background: "#fff", color: "#E5484D", border: "1px solid #E5484D", fontSize: 10, fontWeight: 700, cursor: "pointer" }}>Reject</button>
-                    </div>
-                  </Card>
-                </Section>
-              ) : <Section title="Discount request"><Card><div style={{ fontSize: 11, fontWeight: 700, color: resolved.discount === "rejected" ? "#E5484D" : "#1F9D6B" }}>{resolved.discount === "rejected" ? "Discount request rejected" : "Discount request approved"}</div><div style={{ fontSize: 9, color: "#9AA0AE", fontWeight: 600, marginTop: 2 }}>BLG-0304 {"\u00b7"} resolved</div></Card></Section>}
+              {pendingItems.length === 0 && resolvedIds.length === 0 && !agg && (
+                <Section title="Drawdown request"><Card><div style={{ fontSize: 10, color: "#9AA0AE", fontWeight: 600 }}>Loading approvals…</div></Card></Section>
+              )}
 
-              {!resolved.drawdown ? (
-                <Section title="Drawdown request">
+              {pendingItems.map((it) => (
+                <Section key={it.id} title="Drawdown request">
                   <Card>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start" }}>
                       <div>
-                        <div style={{ fontSize: 11, fontWeight: 700 }}>Drawdown request</div>
-                        <div style={{ fontSize: 9, color: "#6B7180", fontWeight: 600, marginTop: 2 }}>Structure milestone · pending trustee release</div>
-                        <div style={{ fontSize: 9, color: "#6B7180", fontWeight: 600, marginTop: 1 }}>AED {agg ? agg.approvals.valueM : "—"}M</div>
+                        <div style={{ fontSize: 11, fontWeight: 700 }}>{it.milestone || "Drawdown"}</div>
+                        <div style={{ fontSize: 9, color: "#6B7180", fontWeight: 600, marginTop: 2 }}>{it.ref + " \u00b7 " + it.status}{it.cert ? " \u00b7 " + it.cert : ""}</div>
+                        <div style={{ fontSize: 9, color: "#6B7180", fontWeight: 600, marginTop: 1 }}>AED {aedM(it.amount)} escrow release</div>
                       </div>
                       <span style={{ fontSize: 9, fontWeight: 800, background: "#FFF3E0", color: "#F5A623", borderRadius: 6, padding: "3px 8px" }}>Pending</span>
                     </div>
-                    <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
-                      <button onClick={() => resolveApproval("drawdown", "approved")} style={{ flex: 1, height: 28, borderRadius: 8, background: "#34C08A", color: "#fff", border: 0, fontSize: 10, fontWeight: 700, cursor: "pointer" }}>Approve</button>
-                      <button onClick={() => resolveApproval("drawdown", "rejected")} style={{ flex: 1, height: 28, borderRadius: 8, background: "#fff", color: "#E5484D", border: "1px solid #E5484D", fontSize: 10, fontWeight: 700, cursor: "pointer" }}>Reject</button>
-                    </div>
+                    {rejecting === it.id ? (
+                      <div style={{ marginTop: 8 }}>
+                        <input
+                          value={rejectReason}
+                          onChange={(e) => setRejectReason(e.target.value)}
+                          placeholder="Reason is required to reject…"
+                          style={{ width: "100%", boxSizing: "border-box", height: 34, borderRadius: 8, border: "1px solid #EDEEF3", background: "#fff", padding: "0 10px", fontSize: 10.5, fontWeight: 600, outline: "none", fontFamily: "inherit" }}
+                        />
+                        <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
+                          <button onClick={() => resolveItem(it, "rejected")} disabled={!rejectReason.trim()} style={{ flex: 1, height: 28, borderRadius: 8, background: "#E5484D", color: "#fff", border: 0, fontSize: 10, fontWeight: 700, cursor: rejectReason.trim() ? "pointer" : "not-allowed", opacity: rejectReason.trim() ? 1 : 0.5 }}>Confirm reject</button>
+                          <button onClick={() => { setRejecting(null); setRejectReason(""); }} style={{ flex: 1, height: 28, borderRadius: 8, background: "#fff", color: "#6B7180", border: "1px solid #EDEEF3", fontSize: 10, fontWeight: 700, cursor: "pointer" }}>Cancel</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
+                        <button onClick={() => resolveItem(it, "approved")} style={{ flex: 1, height: 28, borderRadius: 8, background: "#34C08A", color: "#fff", border: 0, fontSize: 10, fontWeight: 700, cursor: "pointer" }}>Approve</button>
+                        <button onClick={() => { setRejecting(it.id); setRejectReason(""); }} style={{ flex: 1, height: 28, borderRadius: 8, background: "#fff", color: "#E5484D", border: "1px solid #E5484D", fontSize: 10, fontWeight: 700, cursor: "pointer" }}>Reject</button>
+                      </div>
+                    )}
                   </Card>
                 </Section>
-              ) : <Section title="Drawdown request"><Card><div style={{ fontSize: 11, fontWeight: 700, color: resolved.drawdown === "rejected" ? "#E5484D" : "#1F9D6B" }}>{resolved.drawdown === "rejected" ? "Drawdown rejected" : "Drawdown approved"}</div><div style={{ fontSize: 9, color: "#9AA0AE", fontWeight: 600, marginTop: 2 }}>DDR-0003 {"\u00b7"} resolved</div></Card></Section>}
+              ))}
+
+              {resolvedIds.length > 0 && (
+                <Section title="Resolved">
+                  <Card><div style={{ fontSize: 10, fontWeight: 700, color: "#1F9D6B" }}>{"\u2713"} {resolvedIds.length} approval{resolvedIds.length === 1 ? "" : "s"} sent to the audit log</div></Card>
+                </Section>
+              )}
             </div>
           )}
 
@@ -445,7 +483,7 @@ export default function MobileScreen() {
                   </div>
                 </div>
               </Card>
-              { [["Notifications", "Center & quiet hours"], ["My approvals", agg ? agg.approvals.count + " pending" : "Loading\u2026"], ["Documents", "Shared with me"], ["Help & support", "FAQ + contact"], ["Settings", "App preferences"]].map(([label, note]) => (
+              { [["Notifications", "Center & quiet hours"], ["My approvals", agg ? pendingCount + " pending" : "Loading\u2026"], ["Documents", "Shared with me"], ["Help & support", "FAQ + contact"], ["Settings", "App preferences"]].map(([label, note]) => (
                 <Card key={label}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <span style={{ fontSize: 11, fontWeight: 700 }}>{label}</span>

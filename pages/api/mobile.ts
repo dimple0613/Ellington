@@ -1,12 +1,24 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { withPerm } from "../../lib/permissions";
+import { withSession, type Session } from "../../lib/session";
+import { hasPerm } from "../../lib/permissions";
 import { query } from "../../lib/db";
-import { ok, methodNotAllowed } from "../../lib/api";
+import { ok, fail, methodNotAllowed } from "../../lib/api";
 
-export default withPerm("Dashboard", "REA", async function (req: NextApiRequest, res: NextApiResponse, session) {
+export default withSession(async function (req: NextApiRequest, res: NextApiResponse, session) {
+  if (req.method === "POST") {
+    return postMobile(req, res, session);
+  }
   if (req.method !== "GET") return methodNotAllowed(res);
 
-  const [proj, receipts, coll, mixes, topMiles, draw, ageing, topBuyer] = await Promise.all([
+  const read = await hasPerm(session, "Dashboard", "REA");
+  if (!read) return res.status(403).json({ error: "You don't have permission to perform this action." });
+
+  // DI-04: buyer names are PII and are masked by default. A caller must explicitly
+  // request reveal (?reveal=1); every reveal is written to the audit log.
+  const reveal = req.query.reveal === "1";
+  const revealActor = session.full_name || session.email || "system";
+
+  const [proj, receipts, coll, mixes, topMiles, draw, ageing, topBuyer, pendingDraw] = await Promise.all([
     query<any>(
       `SELECT p.code, p.name, p.gdv, p.collected,
               COUNT(u.id)::int AS total_u,
@@ -47,6 +59,10 @@ export default withPerm("Dashboard", "REA", async function (req: NextApiRequest,
        FROM collections`
     ),
     query<any>(`SELECT buyer, unit_no, amount, days_due FROM collections ORDER BY days_due DESC LIMIT 1`),
+    query<any>(
+      `SELECT id, ref, milestone, amount, cert, status
+       FROM drawdowns WHERE status <> 'Released' ORDER BY id`
+    ),
   ]);
 
   const pRows = proj.rows as {
@@ -62,6 +78,22 @@ export default withPerm("Dashboard", "REA", async function (req: NextApiRequest,
   const collTotal = Number(coll.rows[0]?.total || 0);
   const maxDue = Number(coll.rows[0]?.max_due || 0);
   const cheques = receipts.rows.find((r) => r.method === "cheque")?.n || 0;
+
+  const maskName = (n: unknown) => {
+    const s = String(n || "").trim();
+    if (!s) return "";
+    if (s.length <= 2) return s[0] + "*";
+    return s[0] + "*".repeat(Math.min(6, s.length - 2)) + s[s.length - 1];
+  };
+
+  if (reveal && topBuyer.rows[0]?.buyer) {
+    await query(
+      `INSERT INTO audit_log (ts, actor, role, action, object, field, before_val, after_val, sensitive)
+       VALUES (now(), $1, $2, $3, $4, $5, $6, $7, true)`,
+      [revealActor, session.role || "", "Revealed", "Mobile app · buyer PII", "name",
+        maskName(topBuyer.rows[0].buyer), String(topBuyer.rows[0].buyer)]
+    );
+  }
 
   const byCode = (code: string) =>
     mixes.rows.filter((m) => m.code === code).map((m) => ({
@@ -102,6 +134,16 @@ export default withPerm("Dashboard", "REA", async function (req: NextApiRequest,
   const receiptsTotal = receipts.rows.reduce((a, r) => a + Number(r.total), 0) || 1;
   const instalmentPct = Math.round((Number(bankTotal) / receiptsTotal) * 100);
 
+  const drawRows = draw.rows[0] || { total: 0, n: 0 };
+  const pendingItems = (pendingDraw.rows as any[]).map((d) => ({
+    id: d.id,
+    ref: d.ref || "",
+    milestone: d.milestone || "",
+    amount: Number(d.amount) || 0,
+    cert: d.cert || null,
+    status: d.status || "",
+  }));
+
   ok(res, {
     me: { name: session.full_name || session.email || "Executive", role: session.role || "" },
     portfolio: {
@@ -132,16 +174,62 @@ export default withPerm("Dashboard", "REA", async function (req: NextApiRequest,
       })),
       buyer: topBuyer.rows[0]
         ? {
-            name: topBuyer.rows[0].buyer || "",
+            name: reveal ? String(topBuyer.rows[0].buyer) : maskName(topBuyer.rows[0].buyer),
             unit: topBuyer.rows[0].unit_no || "",
             amount: Number(topBuyer.rows[0].amount) || 0,
             days: Number(topBuyer.rows[0].days_due) || 0,
+            revealed: reveal,
           }
         : null,
     },
     approvals: {
-      count: Number(draw.rows[0]?.n || 0),
-      valueM: ((Number(draw.rows[0]?.total || 0)) / 1e6).toFixed(1),
+      count: Number(drawRows.n || 0),
+      valueM: ((Number(drawRows.total || 0)) / 1e6).toFixed(1),
+      items: pendingItems,
     },
   });
 });
+
+async function postMobile(req: NextApiRequest, res: NextApiResponse, session: Session) {
+  const approve = await hasPerm(session, "Finance", "APR");
+  if (!approve) return res.status(403).json({ error: "You don't have permission to perform this action." });
+
+  const { action, id, reason } = req.body || {};
+  if (action !== "approve" && action !== "reject") return fail(res, "Action must be 'approve' or 'reject'.");
+  const idN = Number(id);
+  if (!Number.isInteger(idN) || idN <= 0) return fail(res, "A valid drawdown id is required.");
+  if (action === "reject" && !(reason && String(reason).trim().length > 0)) return fail(res, "Rejecting requires a reason.");
+
+  const row = await query<{ ref: string; milestone: string; status: string }>(
+    "SELECT ref, milestone, status FROM drawdowns WHERE id = $1",
+    [idN]
+  );
+  if (row.rows.length === 0) return fail(res, "Drawdown not found.", 404);
+  const { ref, milestone, status: before } = row.rows[0];
+  const next = action === "approve" ? "Released" : "Rejected";
+
+  await query("UPDATE drawdowns SET status = $1 WHERE id = $2", [next, idN]);
+  await query(
+    `INSERT INTO audit_log (actor, role, action, object, field, before_val, after_val, sensitive)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, true)`,
+    [
+      session.full_name || session.email || "Executive",
+      session.role || "",
+      "Drawdown " + action + "d",
+      ref || "DDR-" + idN,
+      "status",
+      before || "",
+      next,
+    ]
+  );
+
+  const left = await query<{ n: number; total: number }>(
+    "SELECT COALESCE(SUM(amount),0)::numeric AS total, COUNT(*)::int AS n FROM drawdowns WHERE status <> 'Released'"
+  );
+  return ok(res, {
+    ref,
+    resolved: next,
+    count: Number(left.rows[0]?.n || 0),
+    valueM: ((Number(left.rows[0]?.total || 0)) / 1e6).toFixed(1),
+  });
+}

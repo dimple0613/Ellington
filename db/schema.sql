@@ -105,6 +105,10 @@ ALTER TABLE receipts ADD COLUMN IF NOT EXISTS cheque_date DATE;
 ALTER TABLE receipts ADD COLUMN IF NOT EXISTS bank_name TEXT;
 ALTER TABLE receipts ADD COLUMN IF NOT EXISTS pdc_status TEXT;
 
+-- RC-01: an Oqood reference must be recorded on a unit before it can be marked sold (blocking rule).
+ALTER TABLE units ADD COLUMN IF NOT EXISTS oqood_no TEXT;
+ALTER TABLE units ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ;
+
 -- Finance (PLINTH parity T11): bank-statement import queue for escrow reconciliation.
 CREATE TABLE IF NOT EXISTS bank_statements (
   id SERIAL PRIMARY KEY,
@@ -287,6 +291,18 @@ CREATE TABLE IF NOT EXISTS audit_log (
   sensitive BOOLEAN DEFAULT false
 );
 CREATE INDEX IF NOT EXISTS idx_audit_ts ON audit_log(ts);
+
+-- DI-02: audit_log is an append-only ledger. Updates, deletes and truncates are
+-- rejected at the database layer so the trail cannot be rewritten after the fact.
+CREATE OR REPLACE FUNCTION fn_audit_log_append_only() RETURNS trigger AS $$
+BEGIN
+  RAISE EXCEPTION 'audit_log is append-only: rows cannot be updated, deleted or truncated';
+END;
+$$ LANGUAGE plpgsql;
+DROP TRIGGER IF EXISTS trg_audit_log_append_only ON audit_log;
+CREATE TRIGGER trg_audit_log_append_only
+  BEFORE UPDATE OR DELETE ON audit_log
+  FOR EACH ROW EXECUTE FUNCTION fn_audit_log_append_only();
 
 CREATE TABLE IF NOT EXISTS app_settings (
   id SMALLINT PRIMARY KEY,
@@ -513,21 +529,9 @@ BEGIN
       ('WPK-T1-0801','Fatima Al Hashimi','OQD-3362','AED 88,400','Issued','22 Aug 26','Released','Pending'),
       ('WPK-T1-0210','Vikram Shetty','OQD-3370','AED 104,200','Blocked','—','Held','Pending');
   END IF;
-  IF NOT EXISTS (SELECT 1 FROM audit_log) THEN
-    INSERT INTO audit_log (ts, actor, role, action, object, field, before_val, after_val, sensitive) VALUES
-      (now() - interval '5 days 2 hours','Khalid Al Fahim','CEO','Approved','BLG III · Discount request','Discount %','—','5%',false),
-      (now() - interval '5 days 3 hours','Sarah Mitchell','Sales Dir','Created','BLG III · Lead','—','—','Rajesh Menon',false),
-      (now() - interval '6 days 4 hours','Ravi Kumar','Finance Mgr','Updated','H21 · Receipt RCP-H21-004789','Status','Unmatched','Matched',false),
-      (now() - interval '6 days 5 hours','Ravi Kumar','Finance Mgr','Created','DDR-0004','—','—','Structure 60%',false),
-      (now() - interval '6 days 6 hours','Khalid Al Fahim','CEO','Approved','WPK · Phase 2 release','—','—','12 units',false),
-      (now() - interval '7 days 3 hours','Sarah Mitchell','Sales Dir','Updated','BLG III · Price list','Price/psf','AED 2,140','AED 2,200',true),
-      (now() - interval '7 days 5 hours','Omar Saeed','Project Mgr','Created','BLG III · Snag SNG-0412','—','—','Paint crack',false),
-      (now() - interval '8 days 1 hour','Ravi Kumar','Finance Mgr','Exported','Finance · Statement','—','—','47 rows CSV',true),
-      (now() - interval '8 days 4 hours','Khalid Al Fahim','CEO','Updated','System · User','Status','Active','Suspended',true),
-      (now() - interval '9 days 2 hours','Sarah Mitchell','Sales Dir','Created','BLG III · Booking BK-9042','—','—','Unit 0402',false),
-      (now() - interval '10 days 3 hours','Ravi Kumar','Finance Mgr','Updated','Escrow · Reconciliation','Variance','AED 14,200','AED 0',false),
-      (now() - interval '11 days 2 hours','Omar Saeed','Project Mgr','Updated','WPK · Milestone','Status','Pending','Certified',false);
-  END IF;
+  -- RC-01: link any seeded unit back to the Oqood reference recorded in the deeds register.
+  UPDATE units u SET oqood_no = d.oqood
+    FROM deeds d WHERE d.unit_no = u.no AND u.oqood_no IS NULL;
   IF NOT EXISTS (SELECT 1 FROM app_settings) THEN
     INSERT INTO app_settings (id, company, brand, numbering, notif) VALUES (1,
       '{"Legal name":"Ellington Properties Development LLC","Trade licence":"CN-2847192","ORN":"21281","RERA":"1884","VAT TRN":"100234567800003"}'::jsonb,

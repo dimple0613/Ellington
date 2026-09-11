@@ -151,6 +151,12 @@ async function main() {
     );
   }
 
+  // RC-01: sold units must carry an Oqood reference in the register.
+  await c.query(
+    `UPDATE units SET oqood_no = concat('OQD-', 3300 + (id * 7)::int)
+     WHERE status = 'sold' AND oqood_no IS NULL`
+  );
+
   // bookings register (T14) — one confirmed (sales ledger), one draft, one cancelled.
   for (const bk of BOOKINGS) {
     const u = await c.query(

@@ -164,9 +164,10 @@ async function calcDefault(unitNo: string) {
   let retentionPct = 0;
   if (overall < 60) retentionPct = 25;
   else if (overall <= 80) retentionPct = 40;
-  else retentionPct = 0;
+  else retentionPct = 100; // construction above 80%: developer may retain the full amount paid
 
-  const retentionAmount = contract * (retentionPct / 100);
+  // Law 19 of 2017: the retention ceiling applies to the AMOUNT PAID, not the contract value.
+  const retentionAmount = Math.min(paid, paid * (retentionPct / 100));
   const refund = Math.max(0, paid - retentionAmount);
 
   return {
@@ -179,6 +180,7 @@ async function calcDefault(unitNo: string) {
     retentionPct,
     retentionAmount,
     refund,
+    legalReviewRequired: true,
   };
 }
 

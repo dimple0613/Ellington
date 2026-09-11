@@ -153,6 +153,7 @@ export default function UnitScreen({
   }, [su, liveMiles]);
 
   const { net, collected, outstanding, live: liveMetrics } = data;
+  const discountPct = su.price > 0 ? Math.round((1 - net / su.price) * 1000) / 10 : 0;
   const where = "Tower 1 \u00b7 L" + su.f + " \u00b7 " + su.view;
 
   const unitDocs = liveDocs.filter(
@@ -270,8 +271,8 @@ export default function UnitScreen({
             </div>
           </div>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <button onClick={() => exportUnitSoa({ id: su.id, typ: su.typ, beds: su.beds, area: su.area, view: su.view, f: su.f, psf: su.psf, price: su.price, status: su.status, buyer: su.buyer }, uInst.map((i) => ({ seq: i.seq, label: i.label, due: i.due, pct: i.pct, amount: i.amount, status: i.status })))} style={{ height: 38, borderRadius: 12, border: "1px solid #EDEEF3", background: "#fff", padding: "0 14px", fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, color: "#4A5060", cursor: "pointer" }}>Generate SOA</button>
-            <button onClick={() => exportUnitEoi({ id: su.id, typ: su.typ, beds: su.beds, area: su.area, view: su.view, f: su.f, psf: su.psf, price: su.price, status: su.status, buyer: su.buyer })} style={{ height: 38, borderRadius: 12, border: "1px solid #EDEEF3", background: "#fff", padding: "0 14px", fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, color: "#4A5060", cursor: "pointer" }}>Generate EOI</button>
+            <button onClick={() => exportUnitSoa({ id: su.id, typ: su.typ, beds: su.beds, area: su.area, view: su.view, f: su.f, psf: su.psf, price: su.price, status: su.status, buyer: su.buyer }, uInst.map((i) => ({ seq: i.seq, label: i.label, due: i.due, pct: i.pct, amount: i.amount, status: i.status })), { discountPct, collected: liveMetrics ? collected : undefined })} style={{ height: 38, borderRadius: 12, border: "1px solid #EDEEF3", background: "#fff", padding: "0 14px", fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, color: "#4A5060", cursor: "pointer" }}>Generate SOA</button>
+            <button onClick={() => exportUnitEoi({ id: su.id, typ: su.typ, beds: su.beds, area: su.area, view: su.view, f: su.f, psf: su.psf, price: su.price, status: su.status, buyer: su.buyer }, { discountPct })} style={{ height: 38, borderRadius: 12, border: "1px solid #EDEEF3", background: "#fff", padding: "0 14px", fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, color: "#4A5060", cursor: "pointer" }}>Generate EOI</button>
             <button onClick={() => router.push("/finance?s=payments")} style={{ height: 38, borderRadius: 12, background: AC, color: "#fff", border: 0, padding: "0 16px", fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}>Record payment</button>
           </div>
         </div>
