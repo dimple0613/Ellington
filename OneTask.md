@@ -6,15 +6,13 @@
 ## Push (current branch + what to push)
 > Branch-per-task rule (see AGENTS.md): never push directly to main. Update this section per task.
 
-- Current branch: **`refactor/purge-static-data`** (made from `feat/audit-halfdone-completion`). Push target: this branch only.
-- PUSH THIS (next commit, purge batch 2 — Mobile phone-frame mock-to-live bind):
-  - **`components/screens/Mobile.tsx`**: removed hardcoded "▲ 2.4% vs last month" → live "% collected"; snap tab: replaced static `Overdue AED 0` / `Net margin 28.4%` → live portfolio overdue + computed collect-rate%; pulse tab: bound Available/Reserved/Blocked to live project counts, replaced static "newly released"/"selling fastest" with live milestones + honest empty state; buyers tab: replaced static Priya Sharma/Rajesh Menon with live top-overdue buyer + empty state; approval drawdown amount bound to `agg.approvals.valueM`; profile avatar initials now derive from live `me.name`.
-  - **`pages/api/mobile.ts`** (already committed in `9034d3e`): test-project filter + live total/sold from units.
-  - **`db/schema.sql`**: removed stale `next` counters from `app_settings.numbering` seed (display-only metadata); corrected receipt prefix from `RCP-{project}-{seq}` to `RCP-{seq}` to match actual row-ID format.
-- Also on branch (already committed, not pushed): wizard rewire commit `11a015c`, remaining-fabricated-data commit `0e53c6e`, notification fix commit, and UI-analysis-round-2 commit `9034d3e` (mobile test-project filter, live badges, SSR tabs, handover scope, WKP→WPK rename).
-- NOT in commit (never): `docs/ARCHITECTURE.md`, `auto-push.ps1`, `test-*.mjs`, `dev.log`.
-- Status: `npx tsc --noEmit` **green**; `next build` **green** (all pages compiled, dev server stopped for build).
-- Prior task `feat/audit-halfdone-completion` (portals/unit-builder/pricing) is fully shipped on its own branch — historical, NOT in this commit. Demo portal logins: `buyer@example.com` / `broker@example.com`, `Portal123!`.
+- Current branch: **`fix/production-audit-wave1`** — Wave-1 production-readiness fixes (issues 1–7). Push target: this branch only (merge to main after operator approval).
+- PUSH THIS (committed `8c1ae6f`, plus earlier wave commits `051c562` etc. already on branch):
+  - **Wave-1 items 1–5 (committed on branch)** — B-04 mobile approvals persistence (`pages/api/mobile.ts` + `Mobile.tsx`); RC-01 Oqood blocks Sold (`db/schema.sql` ALTER + backfill, `pages/api/inventory.ts` PUT, `db/seed.ts`); DI-01/02 audit actors removed + append-only trigger (`db/schema.sql`, `db/cleanup-audit-actors.ts` operator-run); B-01..03 + PI-01..03 PDF parameterization (`lib/pdf.ts` `soaNumbers`/4-page EOI/USO/handover cert/dates, `Unit.tsx` real discountPct); DI-04 PII masking + audited reveal (`pages/api/mobile.ts` + `Mobile.tsx`).
+  - **Wave-1 items 6–7 (commit `8c1ae6f`)** — MF-06/RC-04 Law-19 default calculator: retention now on **sums paid** (not contract), full-value >80% band, `legalReviewRequired` flag (`pages/api/finance.ts`); Collection notice never estimates — uses real calc tier + PDF tier param (`components/screens/Collections.tsx`, `lib/pdf.ts`). RC-02/03 ProjectWizard 20% construction-instalment cap + 5% broker-commission cap validators + gauges (`components/app/ProjectWizard.tsx`).
+- NOT in commit (never): `auto-push.ps1`, `test-*.mjs`, `dev.log*`, `*_out.html`, `docs/ARCHITECTURE.md` (tracked, but only committed on request).
+- Status: `npx tsc --noEmit` **green**; `next build` **green** (dev server stopped for build, restarted PID 14952); waves verified live (calculator: unit H21-T1-2705 → paid 1,236,000 · retention 309,000 = 25% of paid · refund 927,000).
+- Remaining wave-1 on branch (unassigned to this session): items 8/9 per original fix list — confirm with operator.
 
 ## Static data purge (purge-static-data)
 > Goal: remove ALL UI mock/fallback rows so the operator can test every screen manually against the live DB.
@@ -36,6 +34,18 @@
 - [x] **Sales booking wizard rewired to live data** (operator-approved) — deleted `SFIELDS` static step data; wizard now loads available units from `/api/inventory?status=available` (scoped to `?scope=`), unit picked in a live `<select>`, and `listPrice`/`psf`/`booking token`/`DLD` derived from the selected unit's `price`/`area`. `saveDraft`/`doConfirm` POST `unit_no` + `list_price` from the live unit; escrow/bank/ref defaults emptied (escrow is mandatory input before confirm); discount default 0 with live approval copy; step 2 identity fields honest ("Captured at KYC"/"—"/"Pending screening"); step 4 docs "Queued after confirmation"; deal rail + step-5 review + confirmed screen all live. Save-draft/continue disabled until a unit is selected.
 - [x] **Notifications now fully dynamic** — Shell tray no longer seeded with 6 fabricated notifications (`NOTIFS` removed); tray/ticker built only from `/api/finance` (overdue >90d, unmatched escrow, drawdowns awaiting trustee, worklist), re-fetched on window focus; "Due today" fallback now `AED 0` instead of fake `AED 4.2M`; profile "Preferences · Notifications & quiet hours" opens Settings on the real Notifications tab (`?s=settings&tab=notif`); "Offline cache · Last synced 09:39" fake timestamp neutralized; Mobile "Notifications · 12 unread" fake count neutralized. Settings notification matrix already live (loads/merges/saves `app_settings.notif` via `/api/system`).
 - [x] **Notification read/dismiss persists** — stable content-derived IDs (`collections-overdue`, `escrow-unmatched`, `drawdowns-awaiting`, `collections-worklist`) instead of ephemeral `n1/n2…`; mark-all-read + per-item dismiss now saved to `localStorage["ellington_notif_<userId>"]` (per admin) and applied on every rebuild, so unread state survives refresh. Client-side only — no schema/API change; per-user and per-device.
+
+## Wave-1 production-readiness (fix/production-audit-wave1)
+> Live checklist from the PLINTH reference audit. Issue-by-issue, one task at a time.
+
+- [x] **1 · B-04** Mobile approvals persistence — `pages/api/mobile.ts` (withSession; GET Dashboard/REA live drawdowns + masked money; POST Finance/APR approve/reject + audit) + `Mobile.tsx` live approve/reject UI with non-empty reject reason.
+- [x] **2 · RC-01** Oqood blocks Sold — `units.oqood_no`/`updated_at` ALTER + deeds backfill (dev applied, 84 sold units); `inventory.ts` PUT `{unit_id,status,oqood_no?}` gated `Inventory/UPD`; `sold` without Oqood → 400. Live-verified block + ok + revert.
+- [x] **3 · DI-01/02** Fake audit actors removed from seed + append-only trigger `trg_audit_log_append_only` (BEFORE UPDATE/DELETE → RAISE). `db/cleanup-audit-actors.ts` (operator-run, refuses if trigger present) applied to dev.
+- [x] **4 · B-01..03 + PI-01..03** PDF parameterization — no hardcoded figures/dates/fees in SOA, 4-page EOI (NON-BINDING watermark, build-driven schedule), USO with real issue date, handover cert today, dynamic report subtitles.
+- [x] **5 · DI-04** PII gating — buyer name masked by default (`M*****e`); `?reveal=1` logs every reveal to audit_log (sensitive=true).
+- [x] **6 · MF-06/RC-04** Law-19 default calculator — retention = % of **sums paid** (25/40/100 by construction tier), refund = paid − retention, `legalReviewRequired`; notice PDF renders real tier and never fabricates refund; collections notice blocks generation without a calc result.
+- [x] **7 · RC-02/03** ProjectWizard validators — no construction-linked instalment > 20% (booking/deposit/SPA/handover/completion exempt), broker commission ≤ 5% (hard block + gauges both steps).
+- [ ] **8/9 · (remaining wave-1 items)** — confirm remaining fix list with operator on branch.
 
 ## PLINTH Parity Program — verified remaining tasks
 > Re-audited from scratch against `C:\Users\admin\Downloads\New folder\plinth-prompt-pack_1.html`
