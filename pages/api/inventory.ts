@@ -101,7 +101,7 @@ async function updateUnit(req: NextApiRequest, res: NextApiResponse, session: { 
     }
 
     await query(
-      "UPDATE units SET status = $2, oqood_no = $3, updated_at = now() WHERE id = $1",
+      "UPDATE units SET status = $2, oqood_no = $3, held_until = CASE WHEN $2 = 'available' THEN NULL ELSE held_until END, updated_at = now() WHERE id = $1",
       [id, target, oqoodNo]
     );
 

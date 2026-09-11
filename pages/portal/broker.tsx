@@ -2,16 +2,27 @@ import { useEffect, useMemo, useState } from "react";
 import { PortalChrome, PortalLoginCard, PortalStatusPill, PORTAL_ACCENT } from "../../components/portal/PortalChrome";
 import { money } from "../../lib/format";
 
-type Me = { name: string; orn: string; status: string; commission_rate: string; alloc_units: number; deals: number; accrued: number; paid: number };
-type InvUnit = { id: number; no: string; type: string; beds: number; area: number; view: string; price: number; project_code: string; project_name: string; reserved: boolean };
-type ResRow = { id: number; unit_no: string; project_code: string; buyer_name: string; buyer_mobile: string; commission_pct: number; status: string; created_at: string };
+type Me = { name: string; orn: string; status: string; commission_rate: string; alloc_units: number; deals: number; accrued: number; paid: number; release_countdown_s: number };
+type InvUnit = { id: number; no: string; type: string; beds: number; area: number; view: string; price: number; project_code: string; project_name: string; reserved: boolean; hold_remaining_s: number; hold_until: string | null };
+type ResRow = { id: number; unit_no: string; project_code: string; buyer_name: string; buyer_mobile: string; commission_pct: number; status: string; created_at: string; expires_at: string | null };
 
 function PortalBroker() {
   const [phase, setPhase] = useState<"loading" | "login" | "data">("loading");
-  const [me, setMe] = useState<Me>({ name: "", orn: "", status: "", commission_rate: "", alloc_units: 0, deals: 0, accrued: 0, paid: 0 });
+  const [me, setMe] = useState<Me>({ name: "", orn: "", status: "", commission_rate: "", alloc_units: 0, deals: 0, accrued: 0, paid: 0, release_countdown_s: 0 });
   const [inventory, setInventory] = useState<InvUnit[]>([]);
   const [reservations, setReservations] = useState<ResRow[]>([]);
   const [notice, setNotice] = useState("");
+  const [now, setNow] = useState(() => Date.now());
+
+  const fmtCountdown = (target: string | null) => {
+    if (!target) return "";
+    const ms = Math.max(0, new Date(target).getTime() - now);
+    const s = Math.floor(ms / 1000);
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const sec = s % 60;
+    return String(h).padStart(2, "0") + ":" + String(m).padStart(2, "0") + ":" + String(sec).padStart(2, "0");
+  };
 
   const load = (silent?: boolean) => {
     if (!silent) setPhase("loading");
@@ -29,6 +40,10 @@ function PortalBroker() {
   };
 
   useEffect(() => { load(); }, []);
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
 
   const unpaid = useMemo(() => Math.max(0, Number(me.accrued) - Number(me.paid)), [me]);
   const avail = useMemo(() => inventory.filter((u) => !u.reserved), [inventory]);
@@ -42,7 +57,7 @@ function PortalBroker() {
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok || !json?.ok) { setNotice(json?.error || "Could not reserve unit"); return; }
-      setNotice(u.no + " reserved — pending developer approval");
+      setNotice(u.no + " reserved — 24h hold placed for your buyer");
       load(true);
     } catch {
       setNotice("Request failed");
@@ -73,7 +88,14 @@ function PortalBroker() {
             <button onClick={logout} style={{ height: 38, borderRadius: 12, border: 0, background: "#14161F", color: "#fff", padding: "0 16px", fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}>Sign out</button>
           </div>
 
-          {notice && <div style={{ background: notice.includes("reserved") ? "#E9F8F1" : "#FDECEC", color: notice.includes("reserved") ? "#1F9D6B" : "#E5484D", borderRadius: 12, padding: "11px 16px", fontSize: 12, fontWeight: 700, marginBottom: 16 }}>{notice}</div>}
+          {notice && <div style={{ display: "flex", alignItems: "center", gap: 10, background: notice.includes("reserved") ? "#E9F8F1" : "#FDECEC", color: notice.includes("reserved") ? "#1F9D6B" : "#E5484D", borderRadius: 12, padding: "11px 16px", fontSize: 12, fontWeight: 700, marginBottom: 12 }}>{notice}</div>}
+
+          {me.release_countdown_s > 0 && (
+            <div style={{ display: "flex", alignItems: "center", gap: 10, background: "#FBF3E3", color: "#B07B14", borderRadius: 12, padding: "11px 16px", fontSize: 12, fontWeight: 700, marginBottom: 16 }}>
+              <span style={{ whiteSpace: "nowrap" }}>Your hold releases in {fmtCountdown(new Date(now + me.release_countdown_s * 1000).toISOString())}</span>
+              <span style={{ fontSize: 11, fontWeight: 600, color: "#B07B14", opacity: 0.8 }}>Unconfirmed 24h holds lapse automatically back to available.</span>
+            </div>
+          )}
 
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 14, marginBottom: 18 }}>
             {[["Allocated inventory", String(me.alloc_units), "units in your allocation"], ["Available now", String(avail.length), inventory.length + " total in portfolio"], ["Deals in progress", String(me.deals), "across all agencies"], ["Commission accrued", money(me.accrued), money(unpaid) + " unpaid"]].map(([l, v, n]) => (
@@ -98,7 +120,10 @@ function PortalBroker() {
                     <span style={cell}>{Number(u.area).toLocaleString("en-US")} sq.ft</span>
                     <span style={{ textAlign: "right", fontSize: 12, fontWeight: 700 }}>{money(Number(u.price))}</span>
                     {u.reserved ? (
-                      <PortalStatusPill status="reserved" />
+                      <div style={{ display: "inline-flex", flexDirection: "column", alignItems: "center", gap: 1 }}>
+                        <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: ".05em", color: "#B07B14", textTransform: "uppercase" }}>Hold</span>
+                        <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, fontWeight: 700, color: "#B07B14", whiteSpace: "nowrap" }}>{fmtCountdown(u.hold_until)}</span>
+                      </div>
                     ) : (
                       <button onClick={() => reserve(u)} style={{ height: 30, borderRadius: 9, border: 0, background: PORTAL_ACCENT, color: "#fff", fontFamily: "inherit", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>Reserve</button>
                     )}
@@ -116,7 +141,10 @@ function PortalBroker() {
                   <div key={r.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 0", borderBottom: "1px solid #F6F7FA" }}>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 12, fontWeight: 700 }}>{r.unit_no}</div>
-                      <div style={{ fontSize: 10.5, color: "#9AA0AE", fontWeight: 600 }}>{r.project_code} · {String(r.created_at || "").slice(0, 10)}</div>
+                      <div style={{ fontSize: 10.5, color: "#9AA0AE", fontWeight: 600 }}>
+                        {r.project_code} · {String(r.created_at || "").slice(0, 10)}
+                        {r.status === "pending" && r.expires_at && ` · hold ends ${fmtCountdown(r.expires_at)}`}
+                      </div>
                     </div>
                     <span style={{ fontSize: 11, color: "#6B7180", fontWeight: 600 }}>{r.commission_pct}%</span>
                     <PortalStatusPill status={r.status} />

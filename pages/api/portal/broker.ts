@@ -64,7 +64,20 @@ async function enableHandler(req: NextApiRequest, res: NextApiResponse) {
   return ok(res, { enabled: true, email, created, temp_pw: tempPw, name: agency.rows[0].name });
 }
 
+async function sweepExpiredHolds() {
+  await query(
+    `UPDATE broker_reservations SET status = 'expired'
+     WHERE status IN ('pending','approved') AND expires_at IS NOT NULL AND expires_at < now()`
+  );
+  await query(
+    `UPDATE units SET status = 'available', held_until = NULL
+     WHERE status = 'held' AND held_until IS NOT NULL AND held_until < now()`
+  );
+}
+
 async function dataHandler(req: NextApiRequest, res: NextApiResponse, session: PortalSession) {
+  await sweepExpiredHolds();
+
   const agency = await query<any>(
     `SELECT id, name, COALESCE(orn,'') AS orn, alloc_units, deals, accrued, paid, commission_rate, status
      FROM broker_agencies WHERE id = $1`,
@@ -74,19 +87,52 @@ async function dataHandler(req: NextApiRequest, res: NextApiResponse, session: P
   const a = agency.rows[0];
 
   const reservations = await query<any>(
-    `SELECT id, unit_no, project_code, buyer_name, buyer_mobile, commission_pct, status, created_at
+    `SELECT id, unit_no, project_code, buyer_name, buyer_mobile, commission_pct, status, created_at, expires_at
      FROM broker_reservations WHERE agency_id = $1 ORDER BY created_at DESC LIMIT 40`,
     [session.id]
   );
 
   const inventory = await query<any>(
-    `SELECT u.id, u.no, u.type, u.beds, u.area, u."view", u.price, p.code AS project_code, p.name AS project_name
+    `SELECT u.id, u.no, u.type, u.beds, u.area, u."view", u.price, u.status, u.held_until,
+            p.code AS project_code, p.name AS project_name
      FROM units u JOIN projects p ON p.id = u.project_id
      WHERE u.status = 'available'
-     ORDER BY p.code, u.no LIMIT 250`
+        OR (u.status = 'held' AND u.id IN (
+              SELECT unit_id FROM broker_reservations
+              WHERE agency_id = $1 AND status IN ('pending','approved')))
+     ORDER BY p.code, u.no LIMIT 250`,
+    [session.id]
   );
 
-  const reservedNos = new Set(reservations.rows.filter((r: any) => r.status === "pending" || r.status === "approved").map((r: any) => r.unit_no));
+  const nowMs = Date.now();
+  const inv = inventory.rows.map((u: any) => {
+    let remaining = 0;
+    if (u.status === "held" && u.held_until) {
+      remaining = Math.max(0, Math.floor((new Date(u.held_until).getTime() - nowMs) / 1000));
+    }
+    return {
+      id: u.id,
+      no: u.no,
+      type: u.type,
+      beds: u.beds,
+      area: u.area,
+      view: u.view,
+      price: Number(u.price),
+      project_code: u.project_code,
+      project_name: u.project_name,
+      reserved: remaining > 0,
+      hold_remaining_s: remaining,
+      hold_until: u.held_until ? new Date(u.held_until).toISOString() : null,
+    };
+  });
+
+  const now = new Date();
+  const pending = reservations.rows.filter((r: any) =>
+    (r.status === "pending" || r.status === "approved") && r.expires_at && new Date(r.expires_at).getTime() > now.getTime()
+  );
+  const release_countdown_s = pending.length
+    ? Math.max(0, Math.min(...pending.map((r: any) => Math.floor((new Date(r.expires_at).getTime() - now.getTime()) / 1000))))
+    : 0;
 
   return ok(res, {
     me: {
@@ -98,13 +144,10 @@ async function dataHandler(req: NextApiRequest, res: NextApiResponse, session: P
       deals: a.deals,
       accrued: Number(a.accrued),
       paid: Number(a.paid),
+      release_countdown_s,
     },
     reservations: reservations.rows,
-    inventory: inventory.rows.map((u: any) => ({
-      ...u,
-      price: Number(u.price),
-      reserved: reservedNos.has(u.no),
-    })),
+    inventory: inv,
   });
 }
 
@@ -114,27 +157,37 @@ async function reserveHandler(req: NextApiRequest, res: NextApiResponse, session
   if (!unitId) return fail(res, "unit_id is required");
 
   const unit = await query<any>(
-    `SELECT u.id, u.no, p.code AS project_code, u.buyer_id
+    `SELECT u.id, u.no, p.code AS project_code, u.buyer_id, u.status
      FROM units u JOIN projects p ON p.id = u.project_id WHERE u.id = $1`,
     [unitId]
   );
   if (!unit.rows.length) return fail(res, "Unit not found", 404);
-  if (unit.rows[0].buyer_id) return fail(res, "Unit already allocated");
+  const row = unit.rows[0];
+  if (row.buyer_id) return fail(res, "Unit already allocated");
+  if (row.status !== "available") return fail(res, "Unit is no longer available \u00b7 refresh to see the latest status");
 
   const agency = await query<any>("SELECT name, commission_rate FROM broker_agencies WHERE id = $1", [session.id]);
   const ag = agency.rows[0];
 
+  const held = await query(
+    `UPDATE units SET status = 'held', held_until = now() + interval '24 hours'
+     WHERE id = $1 AND status = 'available'
+     RETURNING id`,
+    [unitId]
+  );
+  if (!held.rows.length) return fail(res, "Unit was just taken \u00b7 refresh and pick another");
+
   await query(
-    `INSERT INTO broker_reservations (agency_id, agency_name, unit_id, unit_no, project_code, status)
-     VALUES ($1,$2,$3,$4,$5,'pending')`,
-    [session.id, ag?.name || "", unit.rows[0].id, unit.rows[0].no, unit.rows[0].project_code]
+    `INSERT INTO broker_reservations (agency_id, agency_name, unit_id, unit_no, project_code, status, expires_at)
+     VALUES ($1,$2,$3,$4,$5,'pending', now() + interval '24 hours')`,
+    [session.id, ag?.name || "", row.id, row.no, row.project_code]
   );
   await query(
     `INSERT INTO broker_activity (text, meta, kind) VALUES ($1, $2, 'reservation')`,
-    [`${ag?.name || "Agency"} reserved ${unit.rows[0].no} from the portal`, unit.rows[0].project_code]
+    [`${ag?.name || "Agency"} reserved ${row.no} from the portal \u00b7 24h hold placed`, row.project_code]
   ).catch(() => {});
 
-  return ok(res, { reserved: true, unit_no: unit.rows[0].no });
+  return ok(res, { reserved: true, unit_no: row.no });
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {

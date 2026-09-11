@@ -108,6 +108,7 @@ ALTER TABLE receipts ADD COLUMN IF NOT EXISTS pdc_status TEXT;
 -- RC-01: an Oqood reference must be recorded on a unit before it can be marked sold (blocking rule).
 ALTER TABLE units ADD COLUMN IF NOT EXISTS oqood_no TEXT;
 ALTER TABLE units ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ;
+ALTER TABLE units ADD COLUMN IF NOT EXISTS held_until TIMESTAMPTZ;
 
 -- Finance (PLINTH parity T11): bank-statement import queue for escrow reconciliation.
 CREATE TABLE IF NOT EXISTS bank_statements (
@@ -467,8 +468,9 @@ CREATE TABLE IF NOT EXISTS broker_reservations (
   buyer_mobile TEXT,
   buyer_email TEXT,
   commission_pct NUMERIC DEFAULT 2.0,
-  status TEXT DEFAULT 'pending',          -- pending / approved / declined / cancelled
-  created_at TIMESTAMPTZ DEFAULT now()
+  status TEXT DEFAULT 'pending',          -- pending / approved / declined / cancelled / expired
+  created_at TIMESTAMPTZ DEFAULT now(),
+  expires_at TIMESTAMPTZ                  -- 24h hold window for reserve-from-portal
 );
 CREATE INDEX IF NOT EXISTS idx_broker_res_agency ON broker_reservations(agency_id);
 
