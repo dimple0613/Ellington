@@ -187,8 +187,8 @@ export default function CollectionsScreen() {
       )}
       {notice && <div style={{ background: "#E9F8F1", color: "#1F9D6B", borderRadius: 12, padding: "11px 16px", fontSize: 12, fontWeight: 700, marginBottom: 16 }}>{notice}</div>}
       {logEntry && <div style={{ background: "#F0EFFE", color: AC, borderRadius: 12, padding: "11px 16px", fontSize: 12, fontWeight: 700, marginBottom: 16 }}>Call logged for {logEntry} \u00b7 15-min follow-up scheduled</div>}
-      <div style={{ display: "flex", alignItems: "flex-end", gap: 16, marginBottom: 18 }}>
-        <div style={{ flex: 1 }}>
+      <div style={{ display: "flex", flexWrap: "wrap", rowGap: 12, alignItems: "flex-end", gap: 16, marginBottom: 18 }}>
+        <div style={{ flex: 1, minWidth: 220 }}>
           <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: "-.03em", lineHeight: 1.15 }}>Collections</div>
           <div style={{ fontSize: 13, color: "#6B7180", fontWeight: 500, marginTop: 5 }}>{overdueRows.length} overdue instalments \u00b7 {overdueFmt(overdueSum)} \u00b7 sorted by priority score</div>
         </div>
@@ -212,11 +212,12 @@ export default function CollectionsScreen() {
       <div style={{ display: "grid", gridTemplateColumns: "1.7fr 1fr", gap: 16, alignItems: "start" }}>
         <div>
           <div style={{ background: "#fff", borderRadius: 20, overflow: "hidden", boxShadow: "0 1px 3px rgba(20,22,31,.04)" }}>
-            <div style={{ display: "grid", gridTemplateColumns: "1.1fr 92px 96px 72px 116px 1fr", gap: 8, padding: "13px 20px", fontSize: 9.5, fontWeight: 700, letterSpacing: ".07em", color: "#9AA0AE", textTransform: "uppercase", background: "#FAFBFD", borderBottom: "1px solid #EDEEF3" }}>
+            <div style={{ overflowX: "auto" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1.1fr 92px 96px 72px 116px 1fr", minWidth: 780, gap: 8, padding: "13px 20px", fontSize: 9.5, fontWeight: 700, letterSpacing: ".07em", color: "#9AA0AE", textTransform: "uppercase", background: "#FAFBFD", borderBottom: "1px solid #EDEEF3" }}>
               <span>Buyer</span><span>Unit</span><span style={{ textAlign: "right" }}>Amount</span><span style={{ textAlign: "right" }}>Days</span><span>Stage</span><span>Next action</span>
             </div>
             {rows.map((r, i) => (
-              <div key={i} style={{ display: "grid", gridTemplateColumns: "1.1fr 92px 96px 72px 116px 1fr", gap: 8, alignItems: "center", padding: "0 20px", height: 46, borderBottom: "1px solid #F6F7FA" }}>
+              <div key={i} style={{ display: "grid", gridTemplateColumns: "1.1fr 92px 96px 72px 116px 1fr", minWidth: 780, gap: 8, alignItems: "center", padding: "0 20px", height: 46, borderBottom: "1px solid #F6F7FA" }}>
                 <span style={{ fontSize: 12, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.buyer}</span>
                 <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10.5, color: "#4A5060" }}>{r.unit}</span>
                 <span style={{ textAlign: "right", fontSize: 12, fontWeight: 700, color: "#E5484D" }}>AED {r.amount}</span>
@@ -231,6 +232,7 @@ export default function CollectionsScreen() {
                 </div>
               </div>
             ))}
+            </div>
           </div>
         </div>
 

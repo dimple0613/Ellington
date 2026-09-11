@@ -101,8 +101,8 @@ export default function FinancialsScreen({ projects }: { projects?: LiveProject[
 
   return (
     <div>
-      <div style={{ display: "flex", alignItems: "flex-end", gap: 16, marginBottom: 18 }}>
-        <div style={{ flex: 1 }}>
+      <div style={{ display: "flex", flexWrap: "wrap", rowGap: 12, alignItems: "flex-end", gap: 16, marginBottom: 18 }}>
+        <div style={{ flex: 1, minWidth: 220 }}>
           <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: "-.03em", lineHeight: 1.15 }}>Consolidated financials</div>
           <div style={{ fontSize: 13, color: "#6B7180", fontWeight: 500, marginTop: 5 }}>Consolidated across all project entities · position live</div>
         </div>
@@ -120,11 +120,12 @@ export default function FinancialsScreen({ projects }: { projects?: LiveProject[
       </div>
       <div style={{ background: "#fff", borderRadius: 20, boxShadow: "0 1px 3px rgba(20,22,31,.04)", overflow: "hidden", marginTop: 16 }}>
         <div style={{ padding: "20px 24px 4px", fontSize: 15, fontWeight: 700, letterSpacing: "-.015em" }}>Position by project entity</div>
-        <div style={{ display: "grid", gridTemplateColumns: "44px 1.4fr 88px 88px 88px 88px 84px 88px 96px", gap: 10, padding: "14px 24px", fontSize: 9.5, fontWeight: 700, letterSpacing: ".07em", color: "#9AA0AE", textTransform: "uppercase", borderBottom: "1px solid #EDEEF3" }}>
-          <span></span><span>Entity</span><span style={{ textAlign: "right" }}>GDV</span><span style={{ textAlign: "right" }}>Sold</span><span style={{ textAlign: "right" }}>Collected</span><span style={{ textAlign: "right" }}>Outstanding</span><span style={{ textAlign: "right" }}>Commission</span><span style={{ textAlign: "right" }}>DLD</span><span style={{ textAlign: "right" }}>Net cash</span>
-        </div>
-        {rows.map((r) => (
-          <div key={r.code} style={{ display: "grid", gridTemplateColumns: "44px 1.4fr 88px 88px 88px 88px 84px 88px 96px", gap: 10, alignItems: "center", padding: "0 24px", height: 46, borderBottom: "1px solid #F6F7FA" }}>
+        <div style={{ overflowX: "auto" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "44px 1.4fr 88px 88px 88px 88px 84px 88px 96px", minWidth: 760, gap: 10, padding: "14px 24px", fontSize: 9.5, fontWeight: 700, letterSpacing: ".07em", color: "#9AA0AE", textTransform: "uppercase", borderBottom: "1px solid #EDEEF3" }}>
+            <span></span><span>Entity</span><span style={{ textAlign: "right" }}>GDV</span><span style={{ textAlign: "right" }}>Sold</span><span style={{ textAlign: "right" }}>Collected</span><span style={{ textAlign: "right" }}>Outstanding</span><span style={{ textAlign: "right" }}>Commission</span><span style={{ textAlign: "right" }}>DLD</span><span style={{ textAlign: "right" }}>Net cash</span>
+          </div>
+          {rows.map((r) => (
+            <div key={r.code} style={{ display: "grid", gridTemplateColumns: "44px 1.4fr 88px 88px 88px 88px 84px 88px 96px", minWidth: 760, gap: 10, alignItems: "center", padding: "0 24px", height: 46, borderBottom: "1px solid #F6F7FA" }}>
             <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10, fontWeight: 700, padding: "4px 5px", borderRadius: 7, background: "#EDECFE", color: AC, textAlign: "center" }}>{r.code}</span>
             <span style={{ fontSize: 12.5, fontWeight: 700 }}>{r.name}</span>
             <span style={{ textAlign: "right", fontSize: 11.5, fontWeight: 600 }}>{r.gdv}</span>
@@ -135,7 +136,8 @@ export default function FinancialsScreen({ projects }: { projects?: LiveProject[
             <span style={{ textAlign: "right", fontSize: 11.5, fontWeight: 600, color: "#6B7180" }}>{r.dld}</span>
             <span style={{ textAlign: "right", fontSize: 12, fontWeight: 800 }}>{r.net}</span>
           </div>
-        ))}
+          ))}
+        </div>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1.2fr", gap: 16, marginTop: 16 }}>
         <div style={{ background: "#fff", borderRadius: 20, padding: "22px 24px", boxShadow: "0 1px 3px rgba(20,22,31,.04)" }}>
@@ -159,14 +161,15 @@ export default function FinancialsScreen({ projects }: { projects?: LiveProject[
         </div>
         <div style={{ background: "#fff", borderRadius: 20, boxShadow: "0 1px 3px rgba(20,22,31,.04)", overflow: "hidden" }}>
           <div style={{ padding: "20px 24px 4px", fontSize: 15, fontWeight: 700, letterSpacing: "-.015em" }}>Commission payable</div>
-          <div style={{ display: "grid", gridTemplateColumns: "1.4fr 80px 92px 92px 1fr 82px", gap: 10, padding: "14px 24px", fontSize: 9.5, fontWeight: 700, letterSpacing: ".07em", color: "#9AA0AE", textTransform: "uppercase", borderBottom: "1px solid #EDEEF3" }}>
+          <div style={{ overflowX: "auto" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1.4fr 80px 92px 92px 1fr 82px", minWidth: 580, gap: 10, padding: "14px 24px", fontSize: 9.5, fontWeight: 700, letterSpacing: ".07em", color: "#9AA0AE", textTransform: "uppercase", borderBottom: "1px solid #EDEEF3" }}>
             <span>Payee</span><span>Type</span><span style={{ textAlign: "right" }}>Accrued</span><span style={{ textAlign: "right" }}>Paid</span><span>Trigger</span><span>Status</span>
           </div>
           {COMM_ROWS.length ? (
             COMM_ROWS.map((c, i) => {
               const st = pill(c[5]);
               return (
-                <div key={i} style={{ display: "grid", gridTemplateColumns: "1.4fr 80px 92px 92px 1fr 82px", gap: 10, alignItems: "center", padding: "0 24px", height: 46, borderBottom: "1px solid #F6F7FA" }}>
+                <div key={i} style={{ display: "grid", gridTemplateColumns: "1.4fr 80px 92px 92px 1fr 82px", minWidth: 580, gap: 10, alignItems: "center", padding: "0 24px", height: 46, borderBottom: "1px solid #F6F7FA" }}>
                   <span style={{ fontSize: 12, fontWeight: 700 }}>{c[0]}</span>
                   <span style={{ fontSize: 11, color: "#9AA0AE", fontWeight: 600 }}>{c[1]}</span>
                   <span style={{ textAlign: "right", fontSize: 11.5, fontWeight: 700 }}>{c[2]}</span>
@@ -179,6 +182,7 @@ export default function FinancialsScreen({ projects }: { projects?: LiveProject[
           ) : (
             <div style={{ padding: "26px 24px", fontSize: 12, fontWeight: 600, color: "#9AA0AE" }}>No commission rows yet — appears when broker commissions are recorded.</div>
           )}
+          </div>
         </div>
       </div>
     </div>

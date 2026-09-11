@@ -279,8 +279,8 @@ export default function PaymentsScreen({ buyer }: { buyer?: string }) {
           Bank statement imported · {imported.imported} rows · {imported.matched} auto-matched to receipts · {imported.imported - imported.matched} in review queue
         </div>
       )}
-      <div style={{ display: "flex", alignItems: "flex-end", gap: 16, marginBottom: 18 }}>
-        <div style={{ flex: 1 }}>
+      <div style={{ display: "flex", flexWrap: "wrap", rowGap: 12, alignItems: "flex-end", gap: 16, marginBottom: 18 }}>
+        <div style={{ flex: 1, minWidth: 220 }}>
           <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: "-.03em", lineHeight: 1.15 }}>Payments &amp; receipts</div>
           <div style={{ fontSize: 13, color: "#6B7180", fontWeight: 500, marginTop: 5 }}>All buyer funds must be deposited to the project escrow account</div>
         </div>
@@ -306,11 +306,12 @@ export default function PaymentsScreen({ buyer }: { buyer?: string }) {
       <div style={{ background: "#fff", borderRadius: 20, boxShadow: "0 1px 3px rgba(20,22,31,.04)", overflow: "hidden" }}>
         {tab === "receipts" && (
           <>
-            <div style={{ display: "grid", gridTemplateColumns: "118px 86px 1.1fr 92px 96px 96px 104px 88px", gap: 8, padding: "14px 22px", fontSize: 9.5, fontWeight: 700, letterSpacing: ".07em", color: "#9AA0AE", textTransform: "uppercase", background: "#FAFBFD", borderBottom: "1px solid #EDEEF3" }}>
+            <div style={{ overflowX: "auto" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "118px 86px 1.1fr 92px 96px 96px 104px 88px", minWidth: 900, gap: 8, padding: "14px 22px", fontSize: 9.5, fontWeight: 700, letterSpacing: ".07em", color: "#9AA0AE", textTransform: "uppercase", background: "#FAFBFD", borderBottom: "1px solid #EDEEF3" }}>
               <span>Receipt</span><span>Date</span><span>Buyer</span><span>Unit</span><span style={{ textAlign: "right" }}>Amount</span><span>Method</span><span>Escrow ref</span><span>Recon</span>
             </div>
             {[...dbRows, ...extraRows].map((r, i) => (
-              <div key={i} style={{ display: "grid", gridTemplateColumns: "118px 86px 1.1fr 92px 96px 96px 104px 88px", gap: 8, alignItems: "center", padding: "0 22px", height: 40, borderBottom: "1px solid #F6F7FA" }}>
+              <div key={i} style={{ display: "grid", gridTemplateColumns: "118px 86px 1.1fr 92px 96px 96px 104px 88px", minWidth: 900, gap: 8, alignItems: "center", padding: "0 22px", height: 40, borderBottom: "1px solid #F6F7FA" }}>
                 <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, fontWeight: 600 }}>{r.rcp}</span>
                 <span style={{ fontSize: 11.5, color: "#6B7180", fontWeight: 600 }}>{r.date}</span>
                 <span style={{ fontSize: 11.5, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.buyer}</span>
@@ -321,6 +322,7 @@ export default function PaymentsScreen({ buyer }: { buyer?: string }) {
                 <span style={pillStyle(r.recon)}>{r.recon}</span>
               </div>
             ))}
+            </div>
           </>
         )}
         {tab === "pdc" && (
@@ -329,11 +331,12 @@ export default function PaymentsScreen({ buyer }: { buyer?: string }) {
               <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: "-.015em" }}>Post-dated cheque register</div>
               <div style={{ fontSize: 11.5, color: "#9AA0AE", fontWeight: 500, marginTop: 3 }}>By presentation date · a bounced cheque raises a fee and a dunning event</div>
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "96px 96px 1.1fr 92px 104px 116px 96px", gap: 8, padding: "14px 22px", fontSize: 9.5, fontWeight: 700, letterSpacing: ".07em", color: "#9AA0AE", textTransform: "uppercase", borderBottom: "1px solid #EDEEF3", background: "#FAFBFD" }}>
+            <div style={{ overflowX: "auto" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "96px 96px 1.1fr 92px 104px 116px 96px", minWidth: 820, gap: 8, padding: "14px 22px", fontSize: 9.5, fontWeight: 700, letterSpacing: ".07em", color: "#9AA0AE", textTransform: "uppercase", borderBottom: "1px solid #EDEEF3", background: "#FAFBFD" }}>
               <span>Cheque</span><span>Present</span><span>Buyer</span><span>Unit</span><span style={{ textAlign: "right" }}>Amount</span><span>Bank</span><span>Status</span>
             </div>
             {pdcList.map((r, i) => (
-              <div key={i} style={{ display: "grid", gridTemplateColumns: "96px 96px 1.1fr 92px 104px 116px 96px", gap: 8, alignItems: "center", padding: "0 22px", height: 44, borderBottom: "1px solid #F6F7FA" }}>
+              <div key={i} style={{ display: "grid", gridTemplateColumns: "96px 96px 1.1fr 92px 104px 116px 96px", minWidth: 820, gap: 8, alignItems: "center", padding: "0 22px", height: 44, borderBottom: "1px solid #F6F7FA" }}>
                 <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, fontWeight: 600 }}>{r.no}</span>
                 <span style={{ fontSize: 11.5, color: "#6B7180", fontWeight: 600 }}>{r.date}</span>
                 <span style={{ fontSize: 11.5, fontWeight: 600 }}>{r.buyer}</span>
@@ -351,6 +354,7 @@ export default function PaymentsScreen({ buyer }: { buyer?: string }) {
                 </span>
               </div>
             ))}
+            </div>
           </>
         )}
         {tab === "statement" && (
@@ -359,7 +363,8 @@ export default function PaymentsScreen({ buyer }: { buyer?: string }) {
               <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: "-.015em" }}>Bank statement · review queue</div>
               <div style={{ fontSize: 11.5, color: "#9AA0AE", fontWeight: 500, marginTop: 3 }}>Imported lines auto-match to receipts · confirm or reject each suggestion</div>
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "96px 1fr 104px 1.3fr 92px 132px", gap: 8, padding: "14px 22px", fontSize: 9.5, fontWeight: 700, letterSpacing: ".07em", color: "#9AA0AE", textTransform: "uppercase", borderBottom: "1px solid #EDEEF3", background: "#FAFBFD" }}>
+            <div style={{ overflowX: "auto" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "96px 1fr 104px 1.3fr 92px 132px", minWidth: 620, gap: 8, padding: "14px 22px", fontSize: 9.5, fontWeight: 700, letterSpacing: ".07em", color: "#9AA0AE", textTransform: "uppercase", borderBottom: "1px solid #EDEEF3", background: "#FAFBFD" }}>
               <span>Value date</span><span>Reference</span><span style={{ textAlign: "right" }}>Amount</span><span>Description</span><span>Match</span><span style={{ textAlign: "right" }}>Action</span>
             </div>
             {stmtRows.length === 0 && (
@@ -384,13 +389,14 @@ export default function PaymentsScreen({ buyer }: { buyer?: string }) {
                 </span>
               </div>
             ))}
+            </div>
           </>
         )}
       </div>
 
       {showForm && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(20,22,31,.35)", zIndex: 60, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <div style={{ width: 440, background: "#fff", borderRadius: 22, padding: 24, boxShadow: "0 24px 60px rgba(20,22,31,.2)" }}>
+          <div style={{ width: "min(92vw, 440px)", background: "#fff", borderRadius: 22, padding: 24, boxShadow: "0 24px 60px rgba(20,22,31,.2)" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18 }}>
               <span style={{ flex: 1, fontSize: 17, fontWeight: 800, letterSpacing: "-.02em" }}>Record payment</span>
               <button onClick={() => setShowForm(false)} style={{ width: 28, height: 28, borderRadius: 9, border: "1px solid #EDEEF3", background: "#fff", fontFamily: "inherit", fontSize: 13, fontWeight: 700, color: "#9AA0AE", cursor: "pointer" }}>&#10005;</button>
@@ -424,7 +430,7 @@ export default function PaymentsScreen({ buyer }: { buyer?: string }) {
 
       {showImport && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(20,22,31,.35)", zIndex: 60, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <div style={{ width: 520, background: "#fff", borderRadius: 22, padding: 24, boxShadow: "0 24px 60px rgba(20,22,31,.2)" }}>
+          <div style={{ width: "min(92vw, 520px)", background: "#fff", borderRadius: 22, padding: 24, boxShadow: "0 24px 60px rgba(20,22,31,.2)" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
               <span style={{ flex: 1, fontSize: 17, fontWeight: 800, letterSpacing: "-.02em" }}>Import bank statement</span>
               <button onClick={() => setShowImport(false)} style={{ width: 28, height: 28, borderRadius: 9, border: "1px solid #EDEEF3", background: "#fff", fontFamily: "inherit", fontSize: 13, fontWeight: 700, color: "#9AA0AE", cursor: "pointer" }}>&#10005;</button>

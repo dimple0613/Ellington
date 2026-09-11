@@ -196,7 +196,7 @@ export default function MobileScreen() {
         <div style={{ fontSize: 13, color: "#6B7180", fontWeight: 500, marginTop: 5 }}>iPhone 15 Pro \u00b7 393\u00d7852 \u00b7 read + approve only \u00b7 select a tab to preview each screen</div>
       </div>
 
-      <div style={{ display: "flex", gap: 20, alignItems: "flex-start" }}>
+      <div style={{ display: "flex", gap: 20, alignItems: "flex-start", flexWrap: "wrap" }}>
         <PhoneShell>
           {activeTab === "home" && (
             <div>
@@ -207,7 +207,7 @@ export default function MobileScreen() {
                 <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: "-.03em", marginTop: 4 }}>{aedM(ao ? ao.value : 0)}</div>
                 <div style={{ fontSize: 9, color: "#9AA0AE", fontWeight: 600, marginTop: 2 }}>{ao ? Math.round(((ao.collected) / ao.target) * 100) + "% collected" : "Loading…"}</div>
               </Card>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 6 }}>
                 <Card>
                   <div style={{ fontSize: 9, fontWeight: 700, color: "#9AA0AE", letterSpacing: ".05em", textTransform: "uppercase" as const }}>Collected</div>
                   <div style={{ fontSize: 15, fontWeight: 800, marginTop: 3 }}>{aedM(ao ? ao.collected : 0)}</div>
@@ -253,7 +253,7 @@ export default function MobileScreen() {
                   </div>
                 </div>
               </Card>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 6 }}>
                 <Card><div style={{ fontSize: 8, color: "#9AA0AE", fontWeight: 700, textTransform: "uppercase" as const }}>Collected</div><div style={{ fontSize: 13, fontWeight: 800, marginTop: 2 }}>{aedM(proj0 ? proj0.collected : 0)}</div></Card>
                 <Card><div style={{ fontSize: 8, color: "#9AA0AE", fontWeight: 700, textTransform: "uppercase" as const }}>Outstanding</div><div style={{ fontSize: 13, fontWeight: 800, marginTop: 2 }}>{proj0 ? aedM(Math.max(0, proj0.gdv - proj0.collected)) : "—"}</div></Card>
                 <Card><div style={{ fontSize: 8, color: "#9AA0AE", fontWeight: 700, textTransform: "uppercase" as const }}>Portfolio overdue</div><div style={{ fontSize: 13, fontWeight: 800, marginTop: 2, color: ao && ao.overdue > 0 ? "#E5484D" : undefined }}>{ao ? aedM(ao.overdue) : "—"}</div></Card>

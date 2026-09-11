@@ -95,7 +95,7 @@ export default function ResetPassword() {
   const fieldStyle = (hasError: boolean): React.CSSProperties => ({
     width: "100%",
     height: 44,
-    padding: hasError ? "0 42px 0 13px" : "0 13px",
+    padding: "0 42px 0 13px",
     border: `1px solid ${hasError ? "#E5484D" : "#E4E6EE"}`,
     borderRadius: 12,
     fontSize: 13.5,

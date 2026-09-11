@@ -294,7 +294,7 @@ export default function UnitScreen({
 
       <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr", gap: 16, marginTop: 16, alignItems: "start" }}>
         <div>
-          <div style={{ display: "flex", gap: 4, background: "#fff", border: "1px solid #EDEEF3", borderRadius: 13, padding: 4, marginBottom: 14, width: "fit-content" }}>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 4, background: "#fff", border: "1px solid #EDEEF3", borderRadius: 13, padding: 4, marginBottom: 14, width: "fit-content" }}>
             {tabBtn("overview", "Overview")}
             {tabBtn("pay", "Payments")}
             {tabBtn("docs", "Documents")}
@@ -352,7 +352,8 @@ export default function UnitScreen({
                   </div>
                 ))}
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "28px 1.4fr 96px 82px 92px 84px", gap: 8, padding: "10px 0", fontSize: 9.5, fontWeight: 700, letterSpacing: ".07em", color: "#9AA0AE", textTransform: "uppercase", borderBottom: "1px solid #EDEEF3" }}>
+              <div style={{ overflowX: "auto" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "28px 1.4fr 96px 82px 92px 84px", minWidth: 580, gap: 8, padding: "10px 0", fontSize: 9.5, fontWeight: 700, letterSpacing: ".07em", color: "#9AA0AE", textTransform: "uppercase", borderBottom: "1px solid #EDEEF3" }}>
                 <span>#</span><span>Milestone</span><span>Due</span><span style={{ textAlign: "right" }}>%</span><span style={{ textAlign: "right" }}>Amount</span><span>Status</span>
               </div>
               {uInst.length === 0 && (
@@ -361,7 +362,7 @@ export default function UnitScreen({
               {uInst.map((i) => {
                 const p = pill(i.status);
                 return (
-                  <div key={i.seq} style={{ display: "grid", gridTemplateColumns: "28px 1.4fr 96px 82px 92px 84px", gap: 8, alignItems: "center", padding: "11px 0", borderBottom: "1px solid #F6F7FA" }}>
+                  <div key={i.seq} style={{ display: "grid", gridTemplateColumns: "28px 1.4fr 96px 82px 92px 84px", minWidth: 580, gap: 8, alignItems: "center", padding: "11px 0", borderBottom: "1px solid #F6F7FA" }}>
                     <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, color: "#9AA0AE" }}>{i.seq}</span>
                     <span style={{ minWidth: 0 }}>
                       <span style={{ display: "block", fontSize: 12, fontWeight: 600 }}>{i.label}</span>
@@ -374,6 +375,7 @@ export default function UnitScreen({
                   </div>
                 );
               })}
+              </div>
               <div style={{ display: "grid", gridTemplateColumns: "28px 1.4fr 96px 82px 92px 84px", gap: 8, alignItems: "center", padding: "14px 0 2px" }}>
                 <span></span><span style={{ fontSize: 12, fontWeight: 800 }}>Total</span><span></span>
                 <span style={{ textAlign: "right", fontSize: 11.5, fontWeight: 700 }}>100%</span>

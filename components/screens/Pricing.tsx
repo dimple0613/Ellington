@@ -259,8 +259,8 @@ export default function PricingScreen({ scope = "ALL" }: { scope?: string }) {
 
   return (
     <div>
-      <div style={{ display: "flex", alignItems: "flex-end", gap: 16, marginBottom: 18 }}>
-        <div style={{ flex: 1 }}>
+      <div style={{ display: "flex", flexWrap: "wrap", rowGap: 12, alignItems: "flex-end", gap: 16, marginBottom: 18 }}>
+        <div style={{ flex: 1, minWidth: 240 }}>
           <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: "-.03em", lineHeight: 1.15 }}>Pricing &amp; availability</div>
           <div style={{ fontSize: 13, color: "#6B7180", fontWeight: 500, marginTop: 5 }}>{projName} \u00b7 price ladder from live inventory{live ? "" : " \u00b7 demo"} </div>
         </div>
@@ -281,8 +281,8 @@ export default function PricingScreen({ scope = "ALL" }: { scope?: string }) {
       )}
 
       <div style={{ background: "#fff", borderRadius: 20, padding: "22px 24px", boxShadow: "0 1px 3px rgba(20,22,31,.04)" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
-          <div style={{ flex: 1 }}>
+        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 12, marginBottom: 16 }}>
+          <div style={{ flex: 1, minWidth: 180 }}>
             <div style={{ fontSize: 15, fontWeight: 700, letterSpacing: "-.015em" }}>Price ladder \u00b7 AED per sq.ft</div>
             <div style={{ fontSize: 11.5, color: "#9AA0AE", fontWeight: 500, marginTop: 3 }}>Typology \u00d7 floor band, computed from live unit prices. Darker means richer; sold count exposes where pricing is working.</div>
           </div>
@@ -290,6 +290,7 @@ export default function PricingScreen({ scope = "ALL" }: { scope?: string }) {
           <span style={{ width: 110, height: 8, borderRadius: 5, background: "linear-gradient(90deg,#F0EFFE,#827CCE)" }}></span>
           <span style={{ fontSize: 10, fontWeight: 700, color: "#9AA0AE" }}>high</span>
         </div>
+        <div style={{ overflowX: "auto" }}>
         <div style={{ display: "flex", gap: 8, paddingLeft: 104, marginBottom: 8 }}>
           {BANDS.map((b) => (
             <span key={b} style={{ flex: 1, fontSize: 10, fontWeight: 700, letterSpacing: ".06em", color: "#9AA0AE", textTransform: "uppercase" }}>{b}</span>
@@ -310,6 +311,7 @@ export default function PricingScreen({ scope = "ALL" }: { scope?: string }) {
           </div>
         ))}
         {matrix.length === 0 && <div style={{ fontSize: 12, color: "#9AA0AE", fontWeight: 600, padding: "16px 0", textAlign: "center" }}>No units yet \u2014 generate inventory from the Unit Builder to compute a price ladder.</div>}
+        </div>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginTop: 16, alignItems: "start" }}>

@@ -171,8 +171,8 @@ export default function ConstructionScreen({ scope = "ALL" }: { scope?: string }
 
   return (
     <div>
-      <div style={{ display: "flex", alignItems: "flex-end", gap: 16, marginBottom: 18 }}>
-        <div style={{ flex: 1 }}>
+      <div style={{ display: "flex", flexWrap: "wrap", rowGap: 12, alignItems: "flex-end", gap: 16, marginBottom: 18 }}>
+        <div style={{ flex: 1, minWidth: 220 }}>
           <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: "-.03em", lineHeight: 1.15 }}>Construction progress</div>
           <div style={{ fontSize: 13, color: "#6B7180", fontWeight: 500, marginTop: 5 }}>{projName} \u00b7 ALEC Engineering \u00b7 certified by WSP Middle East</div>
         </div>
@@ -252,7 +252,8 @@ export default function ConstructionScreen({ scope = "ALL" }: { scope?: string }
           <div style={{ fontSize: 15, fontWeight: 700, letterSpacing: "-.015em" }}>Milestones and the money they release</div>
           <div style={{ fontSize: 11.5, color: "#9AA0AE", fontWeight: 500, marginTop: 3 }}>Certifying a milestone generates invoices immediately. Confirm before certifying.</div>
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1.3fr 92px 92px 92px 84px 96px 1.1fr", gap: 10, padding: "14px 24px", fontSize: 9.5, fontWeight: 700, letterSpacing: ".07em", color: "#9AA0AE", textTransform: "uppercase", borderBottom: "1px solid #EDEEF3" }}>
+        <div style={{ overflowX: "auto" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1.3fr 92px 92px 92px 84px 96px 1.1fr", minWidth: 740, gap: 10, padding: "14px 24px", fontSize: 9.5, fontWeight: 700, letterSpacing: ".07em", color: "#9AA0AE", textTransform: "uppercase", borderBottom: "1px solid #EDEEF3" }}>
           <span>Milestone</span><span>Planned</span><span>Forecast</span><span>Actual</span><span style={{ textAlign: "right" }}>Variance</span><span>Status</span><span style={{ textAlign: "right" }}>Becomes due</span>
         </div>
         {miles.map((m) => {
@@ -268,8 +269,9 @@ export default function ConstructionScreen({ scope = "ALL" }: { scope?: string }
               <span style={{ textAlign: "right", fontSize: 11.5, fontWeight: 700 }}>{m.triggers}</span>
             </div>
           );
-        })}
-      </div>
+          })}
+        </div>
+        </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 16, marginTop: 16, alignItems: "start" }}>
         <div style={{ background: "#fff", borderRadius: 20, padding: "22px 24px", boxShadow: "0 1px 3px rgba(20,22,31,.04)" }}>

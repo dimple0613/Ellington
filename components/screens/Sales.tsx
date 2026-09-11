@@ -1235,8 +1235,8 @@ function BookingsRegister({ onBack }: { onBack: () => void }) {
         </div>
       )}
       {notice && <div style={{ background: "#E9F8F1", color: "#1F9D6B", borderRadius: 12, padding: "11px 16px", fontSize: 12, fontWeight: 700, marginBottom: 16 }}>{notice}</div>}
-      <div style={{ display: "flex", alignItems: "flex-end", gap: 16, marginBottom: 18 }}>
-        <div style={{ flex: 1 }}>
+      <div style={{ display: "flex", flexWrap: "wrap", rowGap: 12, alignItems: "flex-end", gap: 16, marginBottom: 18 }}>
+        <div style={{ flex: 1, minWidth: 220 }}>
           <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: "-.03em", lineHeight: 1.15 }}>Bookings register</div>
           <div style={{ fontSize: 13, color: "#6B7180", fontWeight: 500, marginTop: 5 }}>{show.length} bookings · {moneyM(gross)} contract value · {moneyM(tokens)} tokens held</div>
         </div>
@@ -1250,11 +1250,12 @@ function BookingsRegister({ onBack }: { onBack: () => void }) {
         ))}
       </div>
       <div style={{ background: "#fff", borderRadius: 20, padding: "18px 22px", boxShadow: "0 1px 3px rgba(20,22,31,.04)" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr 1.4fr 1fr 1fr 1fr 1fr 1fr", gap: 12, padding: "0 8px 10px", borderBottom: "1px solid #F1F2F6" }}>
+        <div style={{ overflowX: "auto" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr 1.4fr 1fr 1fr 1fr 1fr 1fr", minWidth: 1050, gap: 12, padding: "0 8px 10px", borderBottom: "1px solid #F1F2F6" }}>
           {["Reference", "Unit", "Buyer", "Status", "List price", "Net price", "Token", "Scheduled"].map((h) => <div key={h} style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".05em", color: "#9AA0AE", textTransform: "uppercase" }}>{h}</div>)}
         </div>
         {filtered.map((r, i) => (
-          <div key={r.ref || "b" + i} style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr 1.4fr 1fr 1fr 1fr 1fr 1fr", gap: 12, alignItems: "center", padding: "12px 8px", borderBottom: i < filtered.length - 1 ? "1px solid #F6F7FA" : "none" }}>
+          <div key={r.ref || "b" + i} style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr 1.4fr 1fr 1fr 1fr 1fr 1fr", minWidth: 1050, gap: 12, alignItems: "center", padding: "12px 8px", borderBottom: i < filtered.length - 1 ? "1px solid #F6F7FA" : "none" }}>
             <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 12, fontWeight: 600 }}>{r.ref || "\u2014"}</span>
             <span style={{ fontSize: 12.5, fontWeight: 700 }}>{r.unit_no} <span style={{ color: "#9AA0AE", fontWeight: 600, fontSize: 11 }}>· {r.project}</span></span>
             <span style={{ fontSize: 12.5, fontWeight: 600 }}>{r.buyer}</span>
@@ -1265,6 +1266,7 @@ function BookingsRegister({ onBack }: { onBack: () => void }) {
             <span style={{ fontSize: 12, color: "#6B7180", fontWeight: 600 }}>{r.expected_spa || "\u2014"}</span>
           </div>
         ))}
+        </div>
         {filtered.length === 0 && <div style={{ padding: "18px 8px", textAlign: "center", fontSize: 12.5, color: "#9AA0AE", fontWeight: 600 }}>No {filter} bookings yet</div>}
         <div style={{ display: "flex", gap: 10, paddingTop: 14, marginTop: 6, borderTop: "1px solid #F6F7FA" }}>
           <span style={{ fontSize: 11.5, color: "#9AA0AE", fontWeight: 600, marginRight: 6 }}>This register updates from the booking wizard — confirm a booking to log it here.</span>
@@ -1361,8 +1363,8 @@ function BuyersDirectory({ onOpen }: { onOpen: (id: number) => void }) {
         <div style={{ background: "#FDECEC", color: "#B33745", borderRadius: 12, padding: "11px 16px", fontSize: 12, fontWeight: 700, marginBottom: 16 }}>{error}</div>
       )}
       {notice && <div style={{ background: "#E9F8F1", color: "#1F9D6B", borderRadius: 12, padding: "11px 16px", fontSize: 12, fontWeight: 700, marginBottom: 16 }}>{notice}</div>}
-      <div style={{ display: "flex", alignItems: "flex-end", gap: 16, marginBottom: 18 }}>
-        <div style={{ flex: 1 }}>
+      <div style={{ display: "flex", flexWrap: "wrap", rowGap: 12, alignItems: "flex-end", gap: 16, marginBottom: 18 }}>
+        <div style={{ flex: 1, minWidth: 220 }}>
           <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: "-.03em", lineHeight: 1.15 }}>Buyers directory</div>
           <div style={{ fontSize: 13, color: "#6B7180", fontWeight: 500, marginTop: 5 }}>
             {avail ? show.length + " buyers on record" : "Live directory unavailable"} \u00b7 {filtered.length} shown \u00b7 click a row for the full 360 view
@@ -1403,7 +1405,7 @@ function BuyersDirectory({ onOpen }: { onOpen: (id: number) => void }) {
 
       <div style={{ background: "#fff", borderRadius: 20, boxShadow: "0 1px 3px rgba(20,22,31,.04)", overflowX: "auto" }}>
         <div style={{ minWidth: 1240 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "40px 1.5fr 1.1fr 74px 58px 1fr 1fr 1fr 1fr 1.2fr 1fr 1fr", gap: 10, padding: "14px 22px", fontSize: 9.5, fontWeight: 700, letterSpacing: ".07em", color: "#9AA0AE", textTransform: "uppercase", background: "#FAFBFD", borderBottom: "1px solid #EDEEF3" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "40px 1.5fr 1.1fr 74px 58px 1fr 1fr 1fr 1fr 1.2fr 1fr 1fr", minWidth: 1240, gap: 10, padding: "14px 22px", fontSize: 9.5, fontWeight: 700, letterSpacing: ".07em", color: "#9AA0AE", textTransform: "uppercase", background: "#FAFBFD", borderBottom: "1px solid #EDEEF3" }}>
             <span />
             <span>Buyer</span><span>Contact</span><span>KYC</span><span style={{ textAlign: "right" }}>Units</span><span style={{ textAlign: "right" }}>Contracted</span><span style={{ textAlign: "right" }}>Collected</span><span style={{ textAlign: "right" }}>Outstanding</span><span style={{ textAlign: "right" }}>Overdue</span><span>Docs</span><span>Agent</span><span>Broker</span>
           </div>
@@ -1411,7 +1413,7 @@ function BuyersDirectory({ onOpen }: { onOpen: (id: number) => void }) {
             const picked = r.id != null && sel.has(r.id);
             const docs = r.docCount || 0;
             return (
-              <div key={r.id} style={{ display: "grid", gridTemplateColumns: "40px 1.5fr 1.1fr 74px 58px 1fr 1fr 1fr 1fr 1.2fr 1fr 1fr", gap: 10, alignItems: "center", padding: "0 22px", height: 64, borderBottom: "1px solid #F6F7FA", cursor: avail ? "pointer" : "default", background: avail ? (picked ? "#F7F9FF" : "transparent") : "#FAFBFC" }}>
+              <div key={r.id} style={{ display: "grid", gridTemplateColumns: "40px 1.5fr 1.1fr 74px 58px 1fr 1fr 1fr 1fr 1.2fr 1fr 1fr", minWidth: 1240, gap: 10, alignItems: "center", padding: "0 22px", height: 64, borderBottom: "1px solid #F6F7FA", cursor: avail ? "pointer" : "default", background: avail ? (picked ? "#F7F9FF" : "transparent") : "#FAFBFC" }}>
                 <span onClick={(e) => e.stopPropagation()}>
                   <input type="checkbox" checked={picked} onChange={() => r.id && toggle(r.id)} style={{ width: 15, height: 15, accentColor: AC, cursor: "pointer" }} />
                 </span>

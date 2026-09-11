@@ -6,14 +6,37 @@
 ## Push (current branch + what to push)
 > Branch-per-task rule (see AGENTS.md): never push directly to main. Update this section per task.
 
-- Current branch: **`fix/production-audit-wave1`** — Wave-1 production-readiness fixes (issues 1–7). Push target: this branch only (merge to main after operator approval).
-- PUSH THIS (committed `8c1ae6f`, plus earlier wave commits `051c562` etc. already on branch):
-  - **Wave-1 items 1–5 (committed on branch)** — B-04 mobile approvals persistence (`pages/api/mobile.ts` + `Mobile.tsx`); RC-01 Oqood blocks Sold (`db/schema.sql` ALTER + backfill, `pages/api/inventory.ts` PUT, `db/seed.ts`); DI-01/02 audit actors removed + append-only trigger (`db/schema.sql`, `db/cleanup-audit-actors.ts` operator-run); B-01..03 + PI-01..03 PDF parameterization (`lib/pdf.ts` `soaNumbers`/4-page EOI/USO/handover cert/dates, `Unit.tsx` real discountPct); DI-04 PII masking + audited reveal (`pages/api/mobile.ts` + `Mobile.tsx`).
-  - **Wave-1 items 6–7 (commit `8c1ae6f`)** — MF-06/RC-04 Law-19 default calculator: retention now on **sums paid** (not contract), full-value >80% band, `legalReviewRequired` flag (`pages/api/finance.ts`); Collection notice never estimates — uses real calc tier + PDF tier param (`components/screens/Collections.tsx`, `lib/pdf.ts`). RC-02/03 ProjectWizard 20% construction-instalment cap + 5% broker-commission cap validators + gauges (`components/app/ProjectWizard.tsx`).
-  - **Wave-1 item 8 (24h broker hold)** — `db/schema.sql` (`units.held_until`, `broker_reservations.expires_at`), `pages/api/portal/broker.ts` (sweep, hold-on-reserve, countdown fields), `pages/portal/broker.tsx` (live countdown chips + release banner), `pages/api/inventory.ts` (clear held_until on `available`).
+- Current branch: **`fix/ui-responsive-audit`** — Responsive/overflow/UI fixes across the whole console. Push target: this branch only (merge to main after operator approval). The earlier `fix/production-audit-wave1` work stays on its own branch (content preserved below in the wave section).
+- PUSH THIS (current working tree — verified `npx tsc --noEmit` **green** + `next build` **green**):
+  - **`styles/globals.css`** — removed the old `[style*="min-width: 1180"]` + `[style*="overflow-x: auto"]`/`overflowX` overrides that forced every scroll wrapper to `visible` (this restored native scrolling: Sales kanban :488, viewings :433, buyers table :1406, Pipeline kanban, Inventory tabs/stack, Construction photos). New responsive rules: repeat(6/4/5,1fr) and `repeat(4,1fr) 1.4fr` KPI collapse; fr-pair + `1fr 1fr` stacks — ALL guarded with `:not([style*="min-width"])` (serialized DOM form) and the `1fr 1fr` rule anchored to `grid-template-columns: ` so wide data tables (which carry inline min-width) are never collapsed to 1 col on mobile; `repeat(6,…)` matcher narrowed to `repeat(6,1fr)` so the Users permission matrix (`repeat(6,38px)`) is untouched; radius 22→15, fontSize 22→18 / 26→20, `[id=password]/[id=email]` 16px on ≤640; ProjectWizard rail column-stack (`max-width:900` → flex-direction:column, `width:214` → 100% on ≤640).
+  - **Table horizontal-scroll wrappers (`overflowX:"auto"` + `minWidth` on header/row grids)** — dashboard Projects (660), Financials entity (760) + commissions (580), Reports scheduled deliveries (560), Pricing matrix, Sales bookings register (8-col, 1050) + buyers directory (12-col, 1240), Invoices (11-col, 1000), Payments receipts (900) / PDC (820) / statement (620), Escrow drawdowns (640), Collections overdue (780), Unit payment schedule (580), Construction milestones (740), Deeds (8-col, 860), Snagging (9-col, 900), Users (7-col, 680), AuditLog (9-col, 920), Inventory list view (9-col, 760), Settings notification matrix (5-col, 560).
+  - **Header/stats rows `flexWrap:"wrap"` + `rowGap:12` + `minWidth` on titles** — all 20 screens (dashboard, Financials, Cashflow, Reports, Inventory, Pricing, Construction, Users, UnitBuilder, Snagging, Invoices, Settings, Deeds, Pipeline, Sales ×2, Payments, Collections, Projects, AuditLog) + Mobile.tsx preview row + tab bar.
+  - **Modals** — Payments 440/520 → `width: "min(92vw, Npx)"`; Escrow/Invoices/Reports/Settings width caps already fine.
+  - **Misc** — `pages/reset-password.tsx` password input `paddingRight:42` (text no longer runs under the show/hide eye toggle); `Mobile.tsx` phone-inner `1fr 1fr` → `repeat(2,1fr)` so the global mobile-stack rule never touches the iPhone preview grid; `PortalChrome.tsx` header `flexWrap:"wrap"`.
+  - Files: `styles/globals.css`, `pages/dashboard.tsx`, `pages/reset-password.tsx`, `components/portal/PortalChrome.tsx`, `components/screens/{AuditLog,Cashflow,Collections,Construction,Deeds,Escrow,Financials,Inventory,Invoices,Mobile,Payments,Pipeline,Pricing,Projects,Reports,Sales,Settings,Snagging,Unit,UnitBuilder,Users}.tsx`.
 - NOT in commit (never): `auto-push.ps1`, `test-*.mjs`, `dev.log*`, `*_out.html`, `docs/ARCHITECTURE.md` (tracked, but only committed on request).
-- Status: `npx tsc --noEmit` **green**; `next build` **green** (dev server stopped for build, restarted PID 14952); waves verified live (calculator: unit H21-T1-2705 → paid 1,236,000 · retention 309,000 = 25% of paid · refund 927,000).
-- Remaining wave-1 on branch (unassigned to this session): items 8/9 per original fix list — confirm with operator.
+- Status: `npx tsc --noEmit` **green**; `next build` **green**. **Live CDP browser verification passed (6 widths × 7 routes = 42 checks):** `documentElement.scrollWidth` == `clientWidth` (no page-level horizontal scrollbar) on every check; all wrapped data tables scroll via their `overflow-x:auto` wrapper (grids correctly skipped as scroll containers); KPI strips collapse (repeat(6)→3/2) and fr-pair panels stack at breakpoints; Users permission matrix (`repeat(6,38px)`) untouched. Residual `clipped` items are intentional/cosmetic only — section titles stretch with their grid min-width and clip at the shell wrapper on ≤430px (by design; title sits above the scrolled grid), search-placeholder ellipsis, table-cell deltas (own-hidden). No regressions detected vs the `verify_functionality`/`verify_responsive` baselines.
+
+## Production Readiness Audit (11 Sep 2026) — READY CONDITIONAL, NOT BLOCKING
+> Full release audit run live on the dev stack (branch `fix/production-audit-wave1`). 90/91 API battery,
+> 42 DB-integrity checks, 21/21 workflow-chain + portal, RBAC proof (ops role), tsc + `next build` green,
+> `/sales` serves 200. No code changed (audit-only). Two authoritative go-live gates → OPEN (fix before GO):
+>
+> **[P1] Duplicate confirmed bookings on one unit** — `createBooking`/`confirmBooking`
+> (`pages/api/bookings.ts`) never checks `units.status`; proven live: 3 confirmed bookings accepted on one
+> unit (BLG-026). Unit is only set `reserved` at confirm (never before), so a unit can be booked/sold twice.
+> **[P1/P2] Bounced cheque doesn't reverse anything** — `receipts.ts` PUT `action=pdc` → `Bounced` only
+> inserts a dunning `collections` row; the receipt stays in `receipts` sums and `projects.collected` is
+> not decremented (receipts POST bumps it, never undone) → "Collected"/receivables/invoice-paid overstated.
+>
+> Additional findings (fix in wave-2, non-blocking for the report): cancel never reverts unit `reserved` to
+> `available` (burned inventory); booking-confirm deposit receipt bypasses the `projects.collected` bump
+> that `receipts.ts` POST does (deposits under-count KPIs); `/api/dashboard` has no method guard (POST → 200);
+> 401/403 guard envelopes are `{error}` without `ok:false` (inconsistent with `fail()`); multi-statement
+> writes (receipts POST, booking confirm) not wrapped in a transaction. Data drift on dev DB (H21/BLG/WPK
+> `projects.collected` vs receipts sum — direct-DB test rows bypass the bump; dup lead phone; 3 seeded paid
+> invoices without a matching receipt; collection actions are free-text). Recommend a data-health pass on
+> the real dataset before GO. Dev DB returned to pre-audit state (QA rows purged, units reverted).
 
 ## Static data purge (purge-static-data)
 > Goal: remove ALL UI mock/fallback rows so the operator can test every screen manually against the live DB.

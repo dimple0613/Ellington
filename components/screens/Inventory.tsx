@@ -266,8 +266,8 @@ export default function InventoryScreen({
           Live data unavailable ({apiError}) — showing sample units
         </div>
       )}
-      <div style={{ display: "flex", alignItems: "flex-end", gap: 16, marginBottom: 18 }}>
-        <div style={{ flex: 1 }}>
+      <div style={{ display: "flex", flexWrap: "wrap", rowGap: 12, alignItems: "flex-end", gap: 16, marginBottom: 18 }}>
+        <div style={{ flex: 1, minWidth: 220 }}>
           <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: "-.03em", lineHeight: 1.15 }}>Inventory</div>
           <div style={{ fontSize: 13, color: "#6B7180", fontWeight: 500, marginTop: 5 }}>
             {scopeName} \u00b7 {source.length} units
@@ -503,7 +503,8 @@ export default function InventoryScreen({
 
       {view === "list" && (
         <div style={{ background: "#fff", borderRadius: 20, boxShadow: "0 1px 3px rgba(20,22,31,.04)", overflow: "hidden" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "96px 84px 52px 78px 70px 82px 74px 92px 96px", gap: 8, padding: "14px 22px", fontSize: 9.5, fontWeight: 700, letterSpacing: ".07em", color: "#9AA0AE", textTransform: "uppercase", borderBottom: "1px solid #EDEEF3", background: "#FAFBFD" }}>
+          <div style={{ overflowX: "auto" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "96px 84px 52px 78px 70px 82px 74px 92px 96px", minWidth: 760, gap: 8, padding: "14px 22px", fontSize: 9.5, fontWeight: 700, letterSpacing: ".07em", color: "#9AA0AE", textTransform: "uppercase", borderBottom: "1px solid #EDEEF3", background: "#FAFBFD" }}>
             <span>Unit</span><span>Typology</span><span style={{ textAlign: "right" }}>Floor</span><span style={{ textAlign: "right" }}>Sq.ft</span><span style={{ textAlign: "right" }}>AED/ft</span><span style={{ textAlign: "right" }}>Price</span><span>View</span><span>Status</span><span>Buyer</span>
           </div>
           <div style={{ maxHeight: 560, overflow: "auto" }}>
@@ -511,7 +512,7 @@ export default function InventoryScreen({
               <button
                 key={u.id}
                 onClick={() => onSelectUnit && onSelectUnit(u.id)}
-                style={{ width: "100%", display: "grid", gridTemplateColumns: "96px 84px 52px 78px 70px 82px 74px 92px 96px", gap: 8, alignItems: "center", padding: "0 22px", height: 38, border: 0, background: "transparent", borderBottom: "1px solid #F6F7FA", cursor: "pointer", fontFamily: "inherit", textAlign: "left" }}
+                style={{ minWidth: 760, width: "100%", display: "grid", gridTemplateColumns: "96px 84px 52px 78px 70px 82px 74px 92px 96px", gap: 8, alignItems: "center", padding: "0 22px", height: 38, border: 0, background: "transparent", borderBottom: "1px solid #F6F7FA", cursor: "pointer", fontFamily: "inherit", textAlign: "left" }}
               >
                 <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, fontWeight: 600 }}>{u.id}</span>
                 <span style={{ fontSize: 11.5, fontWeight: 600, color: "#4A5060" }}>{u.typ}</span>
@@ -524,6 +525,7 @@ export default function InventoryScreen({
                 <span style={{ fontSize: 11, color: "#6B7180", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{u.buyer}</span>
               </button>
             ))}
+          </div>
           </div>
         </div>
       )}

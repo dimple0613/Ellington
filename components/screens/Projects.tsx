@@ -74,8 +74,8 @@ export default function ProjectsScreen({
 
   return (
     <div>
-      <div style={{ display: "flex", alignItems: "flex-end", gap: 16, marginBottom: 20 }}>
-        <div style={{ flex: 1 }}>
+      <div style={{ display: "flex", flexWrap: "wrap", rowGap: 12, alignItems: "flex-end", gap: 16, marginBottom: 20 }}>
+        <div style={{ flex: 1, minWidth: 220 }}>
           <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: "-.03em", lineHeight: 1.15 }}>Projects</div>
           <div style={{ fontSize: 13, color: "#6B7180", fontWeight: 500, marginTop: 5 }}>
             {list.length} projects · {totalUnits.toLocaleString("en-US")} units · {compact(totalGdv)} gross development value

@@ -254,11 +254,12 @@ export default function EscrowScreen() {
         <div style={{ padding: "16px 22px 10px", borderBottom: "1px solid #EDEEF3" }}>
           <span style={{ fontSize: 14, fontWeight: 700, letterSpacing: "-.01em" }}>Drawdown requests</span>
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "92px 1.2fr 116px 1.5fr 86px 1.1fr", gap: 8, padding: "12px 22px", fontSize: 9.5, fontWeight: 700, letterSpacing: ".07em", color: "#9AA0AE", textTransform: "uppercase", borderBottom: "1px solid #EDEEF3" }}>
+        <div style={{ overflowX: "auto" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "92px 1.2fr 116px 1.5fr 86px 1.1fr", minWidth: 640, gap: 8, padding: "12px 22px", fontSize: 9.5, fontWeight: 700, letterSpacing: ".07em", color: "#9AA0AE", textTransform: "uppercase", borderBottom: "1px solid #EDEEF3" }}>
           <span>Request</span><span>Milestone</span><span style={{ textAlign: "right" }}>Amount</span><span>Engineer certificate</span><span>RERA</span><span>Status</span>
         </div>
         {drawdowns.map((d) => (
-          <div key={d.id} style={{ display: "grid", gridTemplateColumns: "92px 1.2fr 116px 1.5fr 86px 1.1fr", gap: 8, alignItems: "center", padding: "0 22px", height: 46, borderBottom: "1px solid #F6F7FA" }}>
+          <div key={d.id} style={{ display: "grid", gridTemplateColumns: "92px 1.2fr 116px 1.5fr 86px 1.1fr", minWidth: 640, gap: 8, alignItems: "center", padding: "0 22px", height: 46, borderBottom: "1px solid #F6F7FA" }}>
             <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, fontWeight: 600 }}>{d.id}</span>
             <span style={{ fontSize: 11.5, fontWeight: 600 }}>{d.milestone}</span>
             <span style={{ textAlign: "right", fontSize: 11.5, fontWeight: 700 }}>AED {d.amount}</span>
@@ -267,6 +268,7 @@ export default function EscrowScreen() {
             <span style={pill(d.status, "status")}>{d.status}</span>
           </div>
         ))}
+        </div>
       </div>
 
       {ddrOpen && (

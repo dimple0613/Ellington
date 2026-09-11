@@ -144,8 +144,8 @@ export default function UsersScreen() {
     <div>
       {apiError && <div style={{ background: "#FDECEC", color: "#E5484D", borderRadius: 12, padding: "11px 16px", fontSize: 12, fontWeight: 700, marginBottom: 16 }}>Live data unavailable ({apiError}) — showing sample rows</div>}
       {notice && <div style={{ background: "#E9F8F1", color: "#1F9D6B", borderRadius: 12, padding: "11px 16px", fontSize: 12, fontWeight: 700, marginBottom: 16 }}>{notice}</div>}
-      <div style={{ display: "flex", alignItems: "flex-end", gap: 16, marginBottom: 18 }}>
-        <div style={{ flex: 1 }}>
+      <div style={{ display: "flex", flexWrap: "wrap", rowGap: 12, alignItems: "flex-end", gap: 16, marginBottom: 18 }}>
+        <div style={{ flex: 1, minWidth: 220 }}>
           <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: "-.03em", lineHeight: 1.15 }}>Users &amp; roles</div>
           <div style={{ fontSize: 13, color: "#6B7180", fontWeight: 500, marginTop: 5 }}>Role-based with per-project scoping \u00b7 {effectiveUsers.length} users loaded</div>
         </div>
@@ -154,12 +154,13 @@ export default function UsersScreen() {
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 350px", gap: 16, alignItems: "start" }}>
         <div style={{ background: "#fff", borderRadius: 20, overflow: "hidden", boxShadow: "0 1px 3px rgba(20,22,31,.04)" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1.4fr 96px 1.1fr 82px 72px 72px", gap: 8, padding: "13px 20px", fontSize: 9.5, fontWeight: 700, letterSpacing: ".07em", color: "#9AA0AE", textTransform: "uppercase", background: "#FAFBFD", borderBottom: "1px solid #EDEEF3" }}>
+          <div style={{ overflowX: "auto" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1.4fr 96px 1.1fr 82px 72px 72px", minWidth: 680, gap: 8, padding: "13px 20px", fontSize: 9.5, fontWeight: 700, letterSpacing: ".07em", color: "#9AA0AE", textTransform: "uppercase", background: "#FAFBFD", borderBottom: "1px solid #EDEEF3" }}>
             <span>Name</span><span>Email</span><span>Role</span><span>Projects</span><span>Last active</span><span>2FA</span><span>Status</span>
           </div>
           {effectiveUsers.length === 0 && <div style={{ padding: 32, textAlign: "center", fontSize: 13, color: "#9AA0AE", fontWeight: 600 }}>{loaded ? "No users loaded yet — invite one or wait for the user list." : "Loading users…"}</div>}
           {effectiveUsers.map((u, i) => (
-            <div key={i} onClick={() => { setSel(i); setRole(u.role); }} style={{ display: "grid", gridTemplateColumns: "1.2fr 1.4fr 96px 1.1fr 82px 72px 72px", gap: 8, alignItems: "center", padding: "0 20px", height: 46, borderBottom: "1px solid #F6F7FA", cursor: "pointer", background: i === sel ? "#F0EFFE" : undefined }}>
+            <div key={i} onClick={() => { setSel(i); setRole(u.role); }} style={{ display: "grid", gridTemplateColumns: "1.2fr 1.4fr 96px 1.1fr 82px 72px 72px", minWidth: 680, gap: 8, alignItems: "center", padding: "0 20px", height: 46, borderBottom: "1px solid #F6F7FA", cursor: "pointer", background: i === sel ? "#F0EFFE" : undefined }}>
               <span style={{ fontSize: 12, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{u.name}</span>
               <span style={{ fontSize: 11, color: "#6B7180", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{u.email}</span>
               <span style={{ fontSize: 11, fontWeight: 700, color: AC }}>{u.role}</span>
@@ -169,6 +170,7 @@ export default function UsersScreen() {
               <span style={{ fontSize: 10.5, fontWeight: 700, color: u.status === "Active" ? "#1F9D6B" : "#E5484D" }}>{u.status}</span>
             </div>
           ))}
+          </div>
         </div>
 
         <div style={{ background: "#fff", borderRadius: 20, padding: "22px 24px", boxShadow: "0 1px 3px rgba(20,22,31,.04)" }}>
