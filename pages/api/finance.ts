@@ -149,7 +149,7 @@ async function calcDefault(unitNo: string) {
   const contract = Number(unit.price) || 0;
 
   const paidRes = await query<any>(
-    `SELECT COALESCE(SUM(amount),0) AS paid FROM receipts WHERE unit_id = $1`,
+    `SELECT COALESCE(SUM(amount),0) AS paid FROM receipts WHERE unit_id = $1 AND (pdc_status IS NULL OR pdc_status <> 'Bounced')`,
     [unit.id]
   );
   const paid = Number(paidRes.rows[0].paid) || 0;

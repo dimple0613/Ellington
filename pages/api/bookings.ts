@@ -1,6 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { withPerm } from "../../lib/permissions";
-import { query } from "../../lib/db";
+import { query, withTransaction } from "../../lib/db";
 import { ok, fail, methodNotAllowed, missingFields } from "../../lib/api";
 
 const num = (v: unknown) => Number(v ?? 0);
@@ -62,6 +62,10 @@ async function createBooking(req: NextApiRequest, res: NextApiResponse) {
   if (unit.length === 0) return fail(res, "Unit not found", 404);
   const u = unit[0];
 
+  if (u.status !== "available") {
+    return fail(res, "Unit is already " + u.status + " and cannot be booked", 409);
+  }
+
   const listPrice = num(b.list_price || u.price);
   const discountPct = num(b.discount_pct);
   const discountAmt = num(b.discount_amt);
@@ -103,12 +107,33 @@ async function updateBooking(req: NextApiRequest, res: NextApiResponse) {
     return confirmBooking(id, b, res);
   }
   if (action === "cancel") {
-    try {
-      await query("UPDATE bookings SET status = 'cancelled', updated_at = now() WHERE id = $1", [id]);
-      return ok(res, { id, status: "cancelled" });
-    } catch (e: any) {
-      return fail(res, "Failed to cancel booking: " + (e?.message || e), 500);
-    }
+    return withTransaction(async (q) => {
+      const { rows: bkRows } = await q.query<any>(
+        "SELECT id, unit_id, status, buyer_id FROM bookings WHERE id = $1",
+        [id]
+      );
+      if (bkRows.length === 0) throw new Error("NOT_FOUND");
+      const bk = bkRows[0];
+
+      await q.query("UPDATE bookings SET status = 'cancelled', updated_at = now() WHERE id = $1", [id]);
+
+      if (bk.status === "confirmed") {
+        const { rows: unitRows } = await q.query<any>(
+          "SELECT status, buyer_id FROM units WHERE id = $1",
+          [bk.unit_id]
+        );
+        if (unitRows[0]?.status === "reserved" && unitRows[0]?.buyer_id === bk.buyer_id) {
+          await q.query("UPDATE units SET status = 'available', buyer_id = NULL WHERE id = $1", [bk.unit_id]);
+        }
+      }
+
+      return { id, status: "cancelled" };
+    })
+      .then((r) => ok(res, r))
+      .catch((e: any) => {
+        if (e?.message === "NOT_FOUND") return fail(res, "Booking not found", 404);
+        return fail(res, "Failed to cancel booking: " + (e?.message || e), 500);
+      });
   }
 
   return fail(res, "Unknown booking action", 400);
@@ -118,55 +143,72 @@ async function confirmBooking(id: number, b: any, res: NextApiResponse) {
   const missing = missingFields(b, ["escrow_ref"]);
   if (missing) return fail(res, "All buyer funds must be deposited to the project escrow account (" + missing + ")", 400);
 
-  const { rows } = await query<any>("SELECT bk.*, u.no AS unit_no, u.project_id, u.id AS unit_id FROM bookings bk JOIN units u ON u.id = bk.unit_id WHERE bk.id = $1", [id]);
-  if (rows.length === 0) return fail(res, "Booking not found", 404);
-  const bk = rows[0];
-
   try {
-    // Upsert buyer from booking payload if a buyer_id wasn't attached
-    let buyerId = bk.buyer_id;
-    if (!buyerId) {
-      const { rows: ins } = await query<any>(
-        `INSERT INTO buyers (name, email, phone) VALUES ($1,$2,$3) RETURNING id`,
-        [bk.buyer_name || bk.buyer_name || "Booking buyer", b.buyer_email || bk.buyer_email, b.buyer_mobile || bk.buyer_mobile || null]
+    return await withTransaction(async (q) => {
+      const { rows } = await q.query<any>("SELECT bk.*, u.no AS unit_no, u.project_id, u.id AS unit_id, u.status AS unit_status FROM bookings bk JOIN units u ON u.id = bk.unit_id WHERE bk.id = $1", [id]);
+      if (rows.length === 0) throw new Error("NOT_FOUND");
+      const bk = rows[0];
+
+      // Guard: never confirm a second booking onto an already-claimed unit.
+      // Re-confirming the same already-confirmed booking is allowed (idempotent).
+      if (bk.status !== "confirmed") {
+        const { rows: conflict } = await q.query<any>(
+          "SELECT id FROM bookings WHERE unit_id = $1 AND id <> $2 AND status = 'confirmed' LIMIT 1",
+          [bk.unit_id, id]
+        );
+        if (conflict.length > 0) throw new Error("UNIT_SOLD");
+        if (!["available", "reserved"].includes(bk.unit_status)) throw new Error("UNIT_UNAVAILABLE:" + bk.unit_status);
+      }
+
+      // Upsert buyer from booking payload if a buyer_id wasn't attached
+      let buyerId = bk.buyer_id;
+      if (!buyerId) {
+        const { rows: ins } = await q.query<any>(
+          `INSERT INTO buyers (name, email, phone) VALUES ($1,$2,$3) RETURNING id`,
+          [bk.buyer_name || "Booking buyer", b.buyer_email || bk.buyer_email, b.buyer_mobile || bk.buyer_mobile || null]
+        );
+        buyerId = ins[0].id;
+      }
+
+      // Create the receipt for the booking payment
+      const { rows: rcp } = await q.query<any>(
+        `INSERT INTO receipts (project_id, unit_id, buyer_id, amount, method, reference, received_at)
+         VALUES ($1,$2,$3,$4,$5,$6, now()) RETURNING id`,
+        [bk.project_id, bk.unit_id, buyerId, bk.booking_amount, b.payment_method || bk.payment_method || "bank_transfer", b.payment_reference || null]
       );
-      buyerId = ins[0].id;
-    }
 
-    // Create the receipt for the booking payment
-    const { rows: rcp } = await query<any>(
-      `INSERT INTO receipts (project_id, unit_id, buyer_id, amount, method, reference, received_at)
-       VALUES ($1,$2,$3,$4,$5,$6, now()) RETURNING id`,
-      [bk.project_id, bk.unit_id, buyerId, bk.booking_amount, b.payment_method || bk.payment_method || "bank_transfer", b.payment_reference || null]
-    );
+      // Mark unit reserved
+      await q.query("UPDATE units SET status = 'reserved', buyer_id = $2 WHERE id = $1", [bk.unit_id, buyerId]);
+      // Advance any linked lead to booked
+      await q.query("UPDATE leads SET stage = 'booked', stage_changed_at = now() WHERE id IN (SELECT id FROM leads WHERE phone = $1 AND stage <> 'booked' LIMIT 1)", [bk.buyer_mobile || bk.buyer_name || ""]);
 
-    // Mark unit reserved
-    await query("UPDATE units SET status = 'reserved', buyer_id = $2 WHERE id = $1", [bk.unit_id, buyerId]);
-    // Advance any linked lead to booked
-    await query("UPDATE leads SET stage = 'booked', stage_changed_at = now() WHERE id IN (SELECT id FROM leads WHERE phone = $1 AND stage <> 'booked' LIMIT 1)", [bk.buyer_mobile || bk.buyer_name || ""]);
+      // Finalize the booking
+      await q.query(
+        `UPDATE bookings SET buyer_id = $2, status = 'confirmed', receipt_id = $3,
+           payment_method = $4, payment_bank = $5, payment_cheque_no = $6, payment_reference = $7,
+           escrow_ref = $8, discount_pct = $9, discount_amt = $10, net_price = $11, booking_amount = $12,
+           confirmed_at = now(), updated_at = now()
+         WHERE id = $1`,
+        [id, buyerId, rcp[0].id, b.payment_method || bk.payment_method || "bank_transfer",
+          b.payment_bank || bk.payment_bank || null, b.payment_cheque_no || bk.payment_cheque_no || null,
+          b.payment_reference || null, b.escrow_ref, num(b.discount_pct ?? bk.discount_pct),
+          num(b.discount_amt ?? bk.discount_amt), num(b.net_price ?? bk.net_price), num(b.booking_amount ?? bk.booking_amount)]
+      );
 
-    // Finalize the booking
-    await query(
-      `UPDATE bookings SET buyer_id = $2, status = 'confirmed', receipt_id = $3,
-         payment_method = $4, payment_bank = $5, payment_cheque_no = $6, payment_reference = $7,
-         escrow_ref = $8, discount_pct = $9, discount_amt = $10, net_price = $11, booking_amount = $12,
-         confirmed_at = now(), updated_at = now()
-       WHERE id = $1`,
-      [id, buyerId, rcp[0].id, b.payment_method || bk.payment_method || "bank_transfer",
-        b.payment_bank || bk.payment_bank || null, b.payment_cheque_no || bk.payment_cheque_no || null,
-        b.payment_reference || null, b.escrow_ref, num(b.discount_pct ?? bk.discount_pct),
-        num(b.discount_amt ?? bk.discount_amt), num(b.net_price ?? bk.net_price), num(b.booking_amount ?? bk.booking_amount)]
-    );
-
-    return ok(res, {
-      id,
-      ref: bk.ref,
-      unit: bk.unit_no,
-      buyerId,
-      receiptId: rcp[0].id,
-      status: "confirmed",
-    });
+      return {
+        id,
+        ref: bk.ref,
+        unit: bk.unit_no,
+        buyerId,
+        receiptId: rcp[0].id,
+        status: "confirmed",
+      };
+    }).then((r) => ok(res, r));
   } catch (e: any) {
-    return fail(res, "Failed to confirm booking: " + (e?.message || e), 500);
+    const msg = e?.message || String(e);
+    if (msg === "NOT_FOUND") return fail(res, "Booking not found", 404);
+    if (msg === "UNIT_SOLD") return fail(res, "This unit has already been sold to another buyer. Cannot confirm.", 409);
+    if (msg.startsWith("UNIT_UNAVAILABLE")) return fail(res, "Unit is no longer bookable (status: " + msg.split(":")[1] + ").", 409);
+    return fail(res, "Failed to confirm booking: " + msg, 500);
   }
 }

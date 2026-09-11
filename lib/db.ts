@@ -55,3 +55,52 @@ export async function query<T extends Record<string, any> = any>(
   const result = await sql.query(text, params ?? []);
   return { rows: result as T[] };
 }
+
+type Tx = {
+  query: <T extends Record<string, any> = any>(text: string, params?: any[]) => Promise<{ rows: T[] }>;
+};
+
+export async function withTransaction<T>(fn: (q: Tx) => Promise<T>): Promise<T> {
+  const connectionString = getHyperdriveConnection() || process.env.DATABASE_URL;
+  if (!connectionString) throw new Error("DATABASE_URL is not set");
+
+  if (!isNeon(connectionString)) {
+    const { Client } = await import("pg");
+    const client = new Client({ connectionString });
+    await client.connect();
+    try {
+      await client.query("BEGIN");
+      const result = await fn({
+        query: async (text, params) => {
+          const r = await client.query(text, params ?? []);
+          return { rows: r.rows };
+        },
+      });
+      await client.query("COMMIT");
+      return result;
+    } catch (e) {
+      try { await client.query("ROLLBACK"); } catch {}
+      throw e;
+    } finally {
+      await client.end();
+    }
+  }
+
+  // Neon fallback (only used when deployed without Hyperdrive): each statement is an HTTP
+  // round-trip, so wrap BEGIN/COMMIT as plain statements on the shared connection.
+  const sql = neon(connectionString);
+  await sql.query("BEGIN");
+  try {
+    const result = await fn({
+      query: async (text, params) => {
+        const r = await sql.query(text, params ?? []);
+        return { rows: r as any[] };
+      },
+    });
+    await sql.query("COMMIT");
+    return result;
+  } catch (e) {
+    await sql.query("ROLLBACK").catch(() => {});
+    throw e;
+  }
+}

@@ -7,13 +7,15 @@
 > Branch-per-task rule (see AGENTS.md): never push directly to main. Update this section per task.
 
 - Current branch: **`fix/production-audit-wave1`** — Wave-1 production-readiness fixes (issues 1–7). Push target: this branch only (merge to main after operator approval).
-- PUSH THIS (committed `8c1ae6f`, plus earlier wave commits `051c562` etc. already on branch):
-  - **Wave-1 items 1–5 (committed on branch)** — B-04 mobile approvals persistence (`pages/api/mobile.ts` + `Mobile.tsx`); RC-01 Oqood blocks Sold (`db/schema.sql` ALTER + backfill, `pages/api/inventory.ts` PUT, `db/seed.ts`); DI-01/02 audit actors removed + append-only trigger (`db/schema.sql`, `db/cleanup-audit-actors.ts` operator-run); B-01..03 + PI-01..03 PDF parameterization (`lib/pdf.ts` `soaNumbers`/4-page EOI/USO/handover cert/dates, `Unit.tsx` real discountPct); DI-04 PII masking + audited reveal (`pages/api/mobile.ts` + `Mobile.tsx`).
-  - **Wave-1 items 6–7 (commit `8c1ae6f`)** — MF-06/RC-04 Law-19 default calculator: retention now on **sums paid** (not contract), full-value >80% band, `legalReviewRequired` flag (`pages/api/finance.ts`); Collection notice never estimates — uses real calc tier + PDF tier param (`components/screens/Collections.tsx`, `lib/pdf.ts`). RC-02/03 ProjectWizard 20% construction-instalment cap + 5% broker-commission cap validators + gauges (`components/app/ProjectWizard.tsx`).
-  - **Wave-1 item 8 (24h broker hold)** — `db/schema.sql` (`units.held_until`, `broker_reservations.expires_at`), `pages/api/portal/broker.ts` (sweep, hold-on-reserve, countdown fields), `pages/portal/broker.tsx` (live countdown chips + release banner), `pages/api/inventory.ts` (clear held_until on `available`).
+- PUSH THIS (uncommitted, authored this session) — **Production-gate P1 fixes** (all earlier wave-1 items 1–8 are already committed on this branch):
+  - **P1 duplicate-booking guard** (`pages/api/bookings.ts`) — POST createBooking rejects any unit whose `units.status != 'available'` (409); `confirmBooking` runs inside a transaction, rejects when another booking is already confirmed on the unit (409 "already sold"), re-confirm of the same booking stays idempotent; `cancel` of a confirmed booking releases the unit back to `available`. Verified live (double-confirm blocked, unit released on cancel).
+  - **P1/P2 bounced-PDC reversal** (`pages/api/receipts.ts`) — marking a PDC `Bounced` reverses the `projects.collected` bump from receipt POST (and `Cleared`/`Held` after a bounce re-adds it), all inside a transaction; dunning row + audit unchanged.
+  - **Collected now excludes Bounced PDCs** (`pages/api/buyers.ts` + `finance.ts` + `mobile.ts` + `dashboard.ts`) — `SUM(amount)` over receipts filtered `(pdc_status IS NULL OR pdc_status <> 'Bounced')` so buyer/finance/mobile/dashboard "collected/paid" numbers stop overstating bounced cheques.
+  - **`lib/db.ts`** — new `withTransaction()` helper (pg BEGIN/COMMIT for local + Hyperdrive; Neon BEGIN/COMMIT fallback). No schema change, no new deps.
+  - Status: `tsc` **green**; `next build` **green**; scratch HTTP+DB verify (`verify-p1.cjs`, outside repo) **ALL CHECKS PASSED**.
 - NOT in commit (never): `auto-push.ps1`, `test-*.mjs`, `dev.log*`, `*_out.html`, `docs/ARCHITECTURE.md` (tracked, but only committed on request).
-- Status: `npx tsc --noEmit` **green**; `next build` **green** (dev server stopped for build, restarted PID 14952); waves verified live (calculator: unit H21-T1-2705 → paid 1,236,000 · retention 309,000 = 25% of paid · refund 927,000).
-- Remaining wave-1 on branch (unassigned to this session): items 8/9 per original fix list — confirm with operator.
+- Status: `npx tsc --noEmit` **green**; `next build` **green**; P1 fixes verified live end-to-end (bookings guard 409 + cancel-reverts-unit + bounced-PDC reversal + re-add on clear + dunning event).
+- Remaining wave-1 on branch (unassigned to this session): item 9 (broker portal read-only allocated-inventory scope + "Convert to booking" path) — confirm with operator.
 
 ## Static data purge (purge-static-data)
 > Goal: remove ALL UI mock/fallback rows so the operator can test every screen manually against the live DB.
